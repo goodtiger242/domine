@@ -14,7 +14,7 @@ export const liturgicalPrayerBeforeMassLines = [
   "많은 은총을 베풀어 주시고",
   "우리의 몸과 마음을 깨끗하게 씻어주소서.",
   "우리 주 그리스도를 통하여 비나이다.",
-  "아멘 ~",
+  "아멘",
 ] as const;
 
 export const liturgicalPrayerAfterMassLines = [
@@ -28,5 +28,5 @@ export const liturgicalPrayerAfterMassLines = [
   "세상의 빛과 소금으로서 하느님의 영광을",
   "나타내며 살 수 있도록 도와주소서.",
   "우리 주 그리스도를 통하여 비나이다.",
-  "아멘 ~",
+  "아멘",
 ] as const;
