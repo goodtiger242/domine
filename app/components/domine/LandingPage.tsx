@@ -46,34 +46,27 @@ export function LandingPage({
         </div>
       </header>
 
-      <HakJunMilitaryBanner />
-
       <main className="flex-1">
         <section
-          className="relative overflow-hidden border-b border-slate-200/70 bg-gradient-to-br from-[#eef2ff] via-[#f8fafc] to-[#fff7ed] px-5 py-24 sm:px-10 sm:py-32 dark:border-slate-800 dark:from-slate-900 dark:via-slate-950 dark:to-slate-950"
+          className="relative overflow-hidden border-b border-slate-200/70 bg-gradient-to-br from-[#eef2ff] via-[#f8fafc] to-[#fff7ed] px-5 py-20 sm:px-10 sm:py-28 dark:border-slate-800 dark:from-slate-900 dark:via-slate-950 dark:to-slate-950"
           aria-labelledby="hero-title"
         >
           <div className="pointer-events-none absolute -right-28 top-8 h-80 w-80 rounded-full bg-amber-300/30 blur-3xl dark:bg-amber-600/10" />
           <div className="pointer-events-none absolute -left-24 bottom-4 h-64 w-64 rounded-full bg-indigo-400/15 blur-3xl dark:bg-indigo-900/20" />
           <div className="relative mx-auto max-w-3xl text-center">
-            <p className="mb-5 text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-indigo-950/90 dark:text-amber-200/80">
-              용호성당 · 청년 사도직
+            <p className="mb-4 text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-indigo-950/90 dark:text-amber-200/80">
+              용호성당
             </p>
             <h1
               id="hero-title"
-              className={`${outfitDisplay.className} mb-7 text-5xl leading-[1.05] text-indigo-950 sm:text-6xl md:text-7xl dark:text-amber-50`}
+              className={`${outfitDisplay.className} text-5xl leading-[1.05] text-indigo-950 sm:text-6xl md:text-7xl dark:text-amber-50`}
             >
               도미네
-              <span className="mt-3 block font-sans text-2xl font-semibold tracking-tight text-slate-700 sm:text-3xl dark:text-slate-300">
-                Domine
-              </span>
             </h1>
-            <p className="mx-auto max-w-lg text-lg leading-relaxed text-slate-700 dark:text-slate-400">
-              주님을 중심으로 모이는 청년들의 공동체입니다.
-              <br className="hidden sm:inline" /> 신앙을 나누고, 일상을 함께 걷습니다.
-            </p>
           </div>
         </section>
+
+        <HakJunMilitaryBanner />
 
         <LiturgicalMonthSection
           year={liturgicalYear}
@@ -89,7 +82,7 @@ export function LandingPage({
         <p className={`${outfitDisplay.className} text-xl text-amber-50`}>도미네</p>
         <p className="mt-2 text-[15px] text-amber-100/85">용호성당 청년회</p>
         <p className="mt-8 text-xs text-amber-200/55">
-          © {new Date().getFullYear()} Domine. All rights reserved.
+          © {new Date().getFullYear()} 도미네
         </p>
       </footer>
     </div>
