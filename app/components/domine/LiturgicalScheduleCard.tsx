@@ -104,31 +104,18 @@ export function LiturgicalScheduleCard({
             ) : null}
           </div>
 
-          <div>
-            <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
-              복사단
-            </h4>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <RoleCell label="대복" value={schedule.thurifer_main} />
-              <RoleCell label="소복" value={schedule.thurifer_sub} />
-            </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+            <RoleCell label="대복" value={schedule.thurifer_main} />
+            <RoleCell label="소복" value={schedule.thurifer_sub} />
           </div>
 
-          <div>
-            <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
-              지휘 · 반주
-            </h4>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <RoleCell label="지휘" value={FIXED_CONDUCTOR_NAME} />
-              <RoleCell label="반주" value={schedule.organist} />
-            </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+            <RoleCell label="지휘" value={FIXED_CONDUCTOR_NAME} />
+            <RoleCell label="반주" value={schedule.organist} />
           </div>
         </div>
       ) : (
         <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-amber-50/40 to-slate-50/30 p-4 dark:border-slate-700 dark:from-slate-900/40 dark:to-slate-950/50 sm:p-5">
-          <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
-            지휘 · 반주
-          </h4>
           <div className="grid grid-cols-2 gap-x-3 gap-y-2">
             <RoleCell label="지휘" value={FIXED_CONDUCTOR_NAME} />
             <RoleCell label="반주" value={schedule.organist} />
