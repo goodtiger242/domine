@@ -1,3 +1,4 @@
+import Image from "next/image";
 import {
   formatKoreanDate,
   getHakJunMilitaryStats,
@@ -5,6 +6,8 @@ import {
   HAK_JUN_ENLIST,
   HAK_JUN_NAME,
 } from "@/lib/domine/hak-jun-military";
+
+const PHOTO = "/image/이학준.jpg";
 
 /**
  * 유머: 이학준 멤버 군 복무 카운터 (메인 상단)
@@ -28,46 +31,66 @@ export function HakJunMilitaryBanner() {
   }
 
   return (
-    <div className="border-b border-slate-200/80 bg-gradient-to-r from-slate-100 via-indigo-50/80 to-slate-100 dark:border-slate-800 dark:from-slate-900 dark:via-indigo-950/40 dark:to-slate-900">
-      <div className="mx-auto max-w-6xl px-4 py-3 sm:px-10">
-        <p className="mb-2 text-center text-[0.65rem] font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-          {HAK_JUN_NAME} 님 복무 카운트
-        </p>
-        <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-8 sm:gap-y-2">
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-center text-sm text-slate-700 dark:text-slate-300">
-            <span>
-              <span className="text-slate-500 dark:text-slate-500">입대</span>{" "}
-              <span className="font-semibold text-indigo-950 dark:text-amber-100">
-                {formatKoreanDate(HAK_JUN_ENLIST)}
-              </span>
-            </span>
-            <span className="text-slate-300 dark:text-slate-600" aria-hidden>
-              ·
-            </span>
-            <span>
-              <span className="text-slate-500 dark:text-slate-500">전역(가정)</span>{" "}
-              <span className="font-semibold text-indigo-950 dark:text-amber-100">
-                {formatKoreanDate(HAK_JUN_DISCHARGE)}
-              </span>
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-4 border-t border-slate-200/80 pt-3 sm:border-t-0 sm:pt-0 dark:border-slate-700">
-            <span className="text-sm font-bold tabular-nums text-indigo-950 dark:text-amber-200">
-              {ddayLabel}
-            </span>
-            <span className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <span className="text-slate-500">진행</span>
-              <span className="font-bold tabular-nums text-indigo-950 dark:text-amber-100">
-                {pctLabel}%
-              </span>
-            </span>
-            <div className="h-2 w-full max-w-[12rem] overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700">
-              <div
-                className="h-full rounded-full bg-indigo-600 transition-[width] dark:bg-amber-400"
-                style={{
-                  width: `${Math.min(100, Math.max(0, stats.progressPercent))}%`,
-                }}
+    <div className="border-b border-slate-200/80 bg-gradient-to-b from-slate-100/95 to-indigo-50/50 dark:border-slate-800 dark:from-slate-900 dark:to-indigo-950/30">
+      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-10 sm:py-5">
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-[0_4px_24px_rgb(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-700/90 dark:bg-slate-900/70 dark:shadow-none sm:flex-row sm:items-center sm:gap-6 sm:p-5">
+          <div className="flex shrink-0 justify-center sm:justify-start">
+            <div className="relative aspect-[4/5] w-[6.5rem] overflow-hidden rounded-2xl bg-slate-200 shadow-inner ring-2 ring-white/90 dark:bg-slate-800 dark:ring-slate-700/80 sm:w-[7.25rem]">
+              <Image
+                src={PHOTO}
+                alt={`${HAK_JUN_NAME} 사진`}
+                fill
+                sizes="(max-width: 640px) 104px, 116px"
+                className="object-cover object-top"
+                priority
               />
+            </div>
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="text-center sm:text-left">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                {HAK_JUN_NAME} 님 복무 카운트
+              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-slate-700 dark:text-slate-300 sm:justify-start">
+                <span>
+                  <span className="text-slate-500 dark:text-slate-500">입대</span>{" "}
+                  <span className="font-semibold text-indigo-950 dark:text-amber-100">
+                    {formatKoreanDate(HAK_JUN_ENLIST)}
+                  </span>
+                </span>
+                <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                  ·
+                </span>
+                <span>
+                  <span className="text-slate-500 dark:text-slate-500">전역(가정)</span>{" "}
+                  <span className="font-semibold text-indigo-950 dark:text-amber-100">
+                    {formatKoreanDate(HAK_JUN_DISCHARGE)}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+              <div className="flex items-baseline justify-center gap-6 sm:justify-start">
+                <span className="text-2xl font-bold tabular-nums tracking-tight text-indigo-950 dark:text-amber-200">
+                  {ddayLabel}
+                </span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  진행{" "}
+                  <span className="text-lg font-bold tabular-nums text-indigo-950 dark:text-amber-100">
+                    {pctLabel}%
+                  </span>
+                </span>
+              </div>
+              <div className="h-2.5 w-full min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 dark:from-amber-400 dark:to-amber-300"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, stats.progressPercent))}%`,
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
