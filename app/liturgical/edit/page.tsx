@@ -20,18 +20,18 @@ export default async function LiturgicalEditPage({
   const schedule = await getScheduleForDate(liturgyDate);
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-[#faf8f5] to-[#f0ebe3] px-4 py-10 text-stone-900 dark:from-stone-950 dark:to-stone-900 dark:text-stone-100">
-      <div className="mx-auto max-w-4xl">
+    <div className="min-h-full bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-[#fff7ed] px-5 py-12 text-slate-900 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
+      <div className="mx-auto max-w-5xl">
         <Link
           href="/"
-          className="inline-flex text-sm font-medium text-[#1a2f4a] underline underline-offset-2 dark:text-amber-200"
+          className="inline-flex text-sm font-semibold text-indigo-950 underline underline-offset-4 dark:text-amber-200"
         >
           ← 메인으로
         </Link>
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight text-[#1a2f4a] dark:text-amber-50">
+        <h1 className="mt-8 text-3xl font-bold tracking-tight text-indigo-950 dark:text-amber-50">
           전례 봉사 편집
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600 dark:text-slate-400">
           달력에서 미사 날짜를 고른 뒤 내용을 입력하고 저장하세요. 로그인 없이
           누구나 수정할 수 있습니다.
         </p>

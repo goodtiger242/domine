@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 @theme inline {
@@ -23,4 +23,15 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* 전례 편집용 DayPicker: 큰 셀·캡션 가독성 */
+.rdp-mass-calendar .rdp-month_caption {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.rdp-mass-calendar .rdp-weekday {
+  font-size: 0.8rem;
+  opacity: 0.85;
 }

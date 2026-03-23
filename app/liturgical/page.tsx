@@ -26,25 +26,25 @@ export default async function LiturgicalGuidePage({
   const schedules = await listLiturgicalInMonth(year, month);
 
   return (
-    <div className="flex min-h-full flex-col bg-[#faf8f5] text-stone-900 dark:bg-stone-950 dark:text-stone-100">
-      <header className="border-b border-stone-200/80 bg-[#faf8f5]/95 backdrop-blur dark:border-stone-800 dark:bg-stone-950/95">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5 sm:px-8">
+    <div className="flex min-h-full flex-col bg-[#f4f6fb] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <header className="border-b border-slate-200/80 bg-[#f4f6fb]/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+        <div className="mx-auto flex h-[3.75rem] max-w-6xl items-center justify-between px-5 sm:px-10">
           <Link
             href="/"
-            className={`${display.className} text-lg text-[#1a2f4a] dark:text-amber-100`}
+            className={`${display.className} text-lg text-indigo-950 dark:text-amber-100`}
           >
             ← 도미네
           </Link>
-          <nav className="flex flex-wrap items-center gap-2 text-sm sm:gap-4">
+          <nav className="flex flex-wrap items-center gap-2 text-[15px] font-medium sm:gap-4">
             <Link
               href="/liturgical/edit"
-              className="rounded-full px-3 py-1.5 text-stone-600 transition hover:bg-stone-200/60 dark:text-stone-400 dark:hover:bg-stone-800"
+              className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               전례 편집
             </Link>
             <Link
               href="/calendar"
-              className="rounded-full px-3 py-1.5 text-stone-600 transition hover:bg-stone-200/60 dark:text-stone-400 dark:hover:bg-stone-800"
+              className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               캘린더
             </Link>

@@ -26,25 +26,25 @@ export default async function CalendarPage({
   const events = await listCalendarEventsInMonth(year, month);
 
   return (
-    <div className="flex min-h-full flex-col bg-gradient-to-b from-[#faf8f5] to-[#f0ebe3] text-stone-900 dark:from-stone-950 dark:to-stone-900 dark:text-stone-100">
-      <header className="border-b border-stone-200/80 bg-[#faf8f5]/95 backdrop-blur dark:border-stone-800 dark:bg-stone-950/95">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5 sm:px-8">
+    <div className="flex min-h-full flex-col bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-[#fff7ed] text-slate-900 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
+      <header className="border-b border-slate-200/80 bg-[#f4f6fb]/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+        <div className="mx-auto flex h-[3.75rem] max-w-6xl items-center justify-between px-5 sm:px-10">
           <Link
             href="/"
-            className={`${display.className} text-lg text-[#1a2f4a] dark:text-amber-100`}
+            className={`${display.className} text-lg text-indigo-950 dark:text-amber-100`}
           >
             ← 도미네
           </Link>
-          <nav className="flex flex-wrap items-center gap-2 text-sm sm:gap-4">
+          <nav className="flex flex-wrap items-center gap-2 text-[15px] font-medium sm:gap-4">
             <Link
               href="/liturgical"
-              className="rounded-full px-3 py-1.5 text-stone-600 transition hover:bg-stone-200/60 dark:text-stone-400 dark:hover:bg-stone-800"
+              className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               전례 안내
             </Link>
             <Link
               href="/liturgical/edit"
-              className="rounded-full px-3 py-1.5 text-stone-600 transition hover:bg-stone-200/60 dark:text-stone-400 dark:hover:bg-stone-800"
+              className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               전례 편집
             </Link>
@@ -52,13 +52,13 @@ export default async function CalendarPage({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-10 sm:px-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-12 sm:px-10">
         <h1
-          className={`${display.className} text-3xl text-[#1a2f4a] dark:text-amber-50`}
+          className={`${display.className} text-4xl tracking-tight text-indigo-950 dark:text-amber-50`}
         >
           도미네 캘린더
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600 dark:text-slate-400">
           공동으로 쓰는 일정입니다. 회장님 포함 누구나 추가·삭제할 수
           있어요. (로그인 없음)
         </p>

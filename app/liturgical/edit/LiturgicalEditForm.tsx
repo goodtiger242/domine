@@ -8,9 +8,10 @@ import {
 } from "@/app/actions/liturgical";
 import { MassDatePicker } from "@/app/components/liturgical/MassDatePicker";
 import { MemberOrCustomInput } from "@/app/components/liturgical/MemberOrCustomInput";
+import { FIXED_CONDUCTOR_NAME } from "@/lib/constants/liturgical";
 
 const fieldClass =
-  "mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 shadow-sm outline-none transition focus:border-[#1a2f4a]/40 focus:ring-2 focus:ring-[#1a2f4a]/15 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100";
+  "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-950/35 focus:ring-2 focus:ring-indigo-950/12 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100";
 
 type Props = {
   liturgyDate: string;
@@ -31,7 +32,6 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
     role_gospel_acclamation: initial?.role_gospel_acclamation ?? "",
     thurifer_main: initial?.thurifer_main ?? "",
     thurifer_sub: initial?.thurifer_sub ?? "",
-    conductor: initial?.conductor ?? "",
     organist: initial?.organist ?? "",
   });
 
@@ -53,7 +53,7 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
         role_gospel_acclamation: form.role_gospel_acclamation,
         thurifer_main: form.thurifer_main,
         thurifer_sub: form.thurifer_sub,
-        conductor: form.conductor,
+        conductor: FIXED_CONDUCTOR_NAME,
         organist: form.organist,
       });
       if (r.ok) {
@@ -67,11 +67,11 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr] lg:items-start">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,28rem)_1fr] xl:grid-cols-[minmax(0,36rem)_1fr] lg:items-start">
         <MassDatePicker value={liturgyDate} onChange={onDateChange} />
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-stone-800 dark:text-stone-200">
+            <label className="block text-sm font-medium text-slate-800 dark:text-slate-200">
               제목
             </label>
             <input
@@ -86,7 +86,7 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-stone-800 dark:text-stone-200">
+            <label className="block text-sm font-medium text-slate-800 dark:text-slate-200">
               추가 안내
             </label>
             <textarea
@@ -105,8 +105,8 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-stone-200/90 bg-white/70 p-5 shadow-sm dark:border-stone-700 dark:bg-stone-950/40 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1a2f4a] dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-slate-200/90 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/40 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-950 dark:text-amber-200">
           전례 봉사
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -137,8 +137,8 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-stone-200/90 bg-white/70 p-5 shadow-sm dark:border-stone-700 dark:bg-stone-950/40 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1a2f4a] dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-slate-200/90 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/40 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-950 dark:text-amber-200">
           복사단
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -155,16 +155,15 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-stone-200/90 bg-white/70 p-5 shadow-sm dark:border-stone-700 dark:bg-stone-950/40 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1a2f4a] dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-slate-200/90 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/40 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-950 dark:text-amber-200">
           지휘 · 반주
         </h2>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <MemberOrCustomInput
-            label="지휘"
-            value={form.conductor}
-            onChange={(v) => setForm((f) => ({ ...f, conductor: v }))}
-          />
+        <p className="rounded-xl border border-indigo-950/10 bg-indigo-950/[0.03] px-4 py-3 text-sm text-slate-700 dark:border-amber-200/20 dark:bg-slate-900/50 dark:text-slate-300">
+          지휘는 <span className="font-semibold text-indigo-950 dark:text-amber-100">{FIXED_CONDUCTOR_NAME}</span>
+          로 고정입니다.
+        </p>
+        <div className="max-w-md">
           <MemberOrCustomInput
             label="반주"
             value={form.organist}
@@ -176,13 +175,13 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
       <button
         type="submit"
         disabled={pending}
-        className="h-12 w-full rounded-full bg-[#1a2f4a] text-sm font-semibold text-white shadow-md transition hover:bg-[#142340] disabled:opacity-50 dark:bg-amber-100 dark:text-stone-900 dark:hover:bg-white"
+        className="h-12 w-full rounded-full bg-indigo-950 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-900 disabled:opacity-50 dark:bg-amber-100 dark:text-slate-900 dark:hover:bg-white"
       >
         {pending ? "저장 중…" : "저장"}
       </button>
 
       {msg ? (
-        <p className="text-center text-sm text-stone-600 dark:text-stone-400">
+        <p className="text-center text-sm text-slate-600 dark:text-slate-400">
           {msg}
         </p>
       ) : null}

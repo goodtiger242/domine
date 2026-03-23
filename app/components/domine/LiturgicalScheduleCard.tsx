@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
+import { FIXED_CONDUCTOR_NAME } from "@/lib/constants/liturgical";
 
 function formatDateLabel(iso: string) {
   const d = new Date(`${iso}T12:00:00`);
@@ -17,66 +18,72 @@ function Row({ label, value }: { label: string; value: string }) {
   }
   return (
     <p className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-      <span className="shrink-0 text-sm font-medium text-[#1a2f4a]/80 dark:text-amber-200/80">
+      <span className="shrink-0 text-sm font-semibold text-indigo-900/85 dark:text-amber-200/85">
         {label}
       </span>
-      <span className="text-stone-800 dark:text-stone-200">{value}</span>
+      <span className="text-slate-800 dark:text-slate-100">{value}</span>
     </p>
   );
 }
 
 type Props = {
   schedule: LiturgicalSchedule;
+  /** 메인 등 조회 전용 화면에서는 수정 링크 숨김 */
+  showEditLink?: boolean;
 };
 
-export function LiturgicalScheduleCard({ schedule }: Props) {
-  const hasAnyRole = [
+export function LiturgicalScheduleCard({
+  schedule,
+  showEditLink = true,
+}: Props) {
+  const hasLiturgicalRoles = [
     schedule.role_commentator,
     schedule.role_reader_1,
     schedule.role_reader_2,
     schedule.role_gospel_acclamation,
     schedule.thurifer_main,
     schedule.thurifer_sub,
-    schedule.conductor,
     schedule.organist,
   ].some((s) => s.trim());
 
   return (
-    <article className="rounded-2xl border border-stone-200/90 bg-white/90 p-6 shadow-sm dark:border-stone-700 dark:bg-stone-950/70">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <article className="rounded-3xl border border-slate-200/90 bg-white p-7 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-950/80 dark:shadow-none">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-[#1a2f4a]/75 dark:text-amber-200/80">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-indigo-950/80 dark:text-amber-200/90">
             {formatDateLabel(schedule.liturgy_date)}
           </p>
           {schedule.title.trim() ? (
-            <h3 className="mt-2 text-lg font-semibold text-stone-900 dark:text-stone-100">
+            <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
               {schedule.title}
             </h3>
           ) : null}
         </div>
-        <Link
-          href={`/liturgical/edit?date=${schedule.liturgy_date}`}
-          className="inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-[#1a2f4a]/25 bg-white px-4 text-xs font-medium text-[#1a2f4a] transition hover:bg-[#1a2f4a]/5 dark:border-amber-200/25 dark:bg-stone-900 dark:text-amber-100 dark:hover:bg-stone-800"
-        >
-          수정
-        </Link>
+        {showEditLink ? (
+          <Link
+            href={`/liturgical/edit?date=${schedule.liturgy_date}`}
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-indigo-900/20 bg-white px-5 text-sm font-medium text-indigo-950 transition hover:bg-indigo-50 dark:border-amber-200/25 dark:bg-slate-900 dark:text-amber-100 dark:hover:bg-slate-800"
+          >
+            수정
+          </Link>
+        ) : null}
       </div>
 
       {schedule.announcement_detail.trim() ? (
-        <div className="mb-5 rounded-xl border border-stone-200 bg-stone-50/90 p-4 dark:border-stone-700 dark:bg-stone-900/50">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+        <div className="mb-6 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-5 dark:border-slate-600 dark:bg-slate-900/60">
+          <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-800 dark:text-slate-200">
             {schedule.announcement_detail}
           </p>
         </div>
       ) : null}
 
-      {hasAnyRole ? (
-        <div className="space-y-5 rounded-xl border border-stone-200/70 bg-[#faf8f5] p-4 dark:border-stone-700 dark:bg-stone-950/50">
+      {hasLiturgicalRoles ? (
+        <div className="space-y-6 rounded-2xl border border-slate-200/70 bg-gradient-to-b from-amber-50/40 to-slate-50/30 p-5 dark:border-slate-700 dark:from-slate-900/40 dark:to-slate-950/50">
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#1a2f4a] dark:text-amber-200/90">
+            <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
               전례 봉사
             </h4>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2.5 text-[15px] leading-snug">
               <Row label="해설" value={schedule.role_commentator} />
               <Row label="1독서" value={schedule.role_reader_1} />
               <Row label="2독서" value={schedule.role_reader_2} />
@@ -84,40 +91,50 @@ export function LiturgicalScheduleCard({ schedule }: Props) {
           </div>
 
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#1a2f4a] dark:text-amber-200/90">
+            <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
               복음 환호송
             </h4>
             {schedule.role_gospel_acclamation.trim() ? (
-              <p className="text-sm text-stone-800 dark:text-stone-200">
+              <p className="text-[15px] text-slate-800 dark:text-slate-200">
                 {schedule.role_gospel_acclamation}
               </p>
             ) : null}
           </div>
 
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#1a2f4a] dark:text-amber-200/90">
+            <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
               복사단
             </h4>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2.5 text-[15px] leading-snug">
               <Row label="대복" value={schedule.thurifer_main} />
               <Row label="소복" value={schedule.thurifer_sub} />
             </div>
           </div>
 
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#1a2f4a] dark:text-amber-200/90">
+            <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
               지휘 · 반주
             </h4>
-            <div className="space-y-2 text-sm">
-              <Row label="지휘" value={schedule.conductor} />
+            <div className="space-y-2.5 text-[15px] leading-snug">
+              <Row label="지휘" value={FIXED_CONDUCTOR_NAME} />
               <Row label="반주" value={schedule.organist} />
             </div>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-amber-50/40 to-slate-50/30 p-5 dark:border-slate-700 dark:from-slate-900/40 dark:to-slate-950/50">
+          <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
+            지휘 · 반주
+          </h4>
+          <div className="space-y-2.5 text-[15px] leading-snug">
+            <Row label="지휘" value={FIXED_CONDUCTOR_NAME} />
+            <Row label="반주" value={schedule.organist} />
+          </div>
+        </div>
+      )}
 
       {schedule.updated_at ? (
-        <p className="mt-4 text-center text-[11px] text-stone-500 dark:text-stone-500">
+        <p className="mt-5 text-center text-xs text-slate-500 dark:text-slate-500">
           마지막 저장:{" "}
           {new Date(schedule.updated_at).toLocaleString("ko-KR")}
         </p>

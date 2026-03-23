@@ -40,18 +40,18 @@ export function MonthNav({ year, month, basePath }: Props) {
         <button
           type="button"
           onClick={prevMonth}
-          className="inline-flex h-10 min-w-[2.75rem] items-center justify-center rounded-full border border-stone-300 bg-white text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800"
+          className="inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
           aria-label="이전 달"
         >
           ‹
         </button>
-        <span className="min-w-[10rem] text-center text-base font-semibold text-[#1a2f4a] dark:text-amber-100">
+        <span className="min-w-[10rem] text-center text-base font-semibold text-indigo-950 dark:text-amber-100">
           {label}
         </span>
         <button
           type="button"
           onClick={nextMonth}
-          className="inline-flex h-10 min-w-[2.75rem] items-center justify-center rounded-full border border-stone-300 bg-white text-sm font-medium text-stone-800 shadow-sm transition hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800"
+          className="inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
           aria-label="다음 달"
         >
           ›
@@ -60,7 +60,7 @@ export function MonthNav({ year, month, basePath }: Props) {
       <button
         type="button"
         onClick={thisMonth}
-        className="h-10 rounded-full border border-[#1a2f4a]/30 bg-[#1a2f4a]/5 px-4 text-sm font-medium text-[#1a2f4a] transition hover:bg-[#1a2f4a]/10 dark:border-amber-200/30 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50"
+        className="h-11 rounded-full border border-indigo-950/25 bg-indigo-950/[0.06] px-5 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-950/10 dark:border-amber-200/30 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50"
       >
         이번 달
       </button>

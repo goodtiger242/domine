@@ -85,7 +85,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
       <MonthNav year={year} month={month} basePath="/calendar" />
 
       <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-start lg:justify-center">
-        <div className="[&_.rdp-month_caption]:hidden [&_.rdp-nav]:hidden rounded-2xl border border-stone-200/90 bg-white/90 p-4 shadow-sm dark:border-stone-700 dark:bg-stone-950/60">
+        <div className="[&_.rdp-month_caption]:hidden [&_.rdp-nav]:hidden w-full max-w-md rounded-3xl border border-slate-200/90 bg-white p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700 dark:bg-slate-950/70 dark:shadow-none">
           <DayPicker
             mode="single"
             locale={ko}
@@ -93,20 +93,21 @@ export function CalendarPageClient({ year, month, events }: Props) {
             modifiers={{ hasEvent: eventDates }}
             modifiersClassNames={{
               hasEvent:
-                "font-semibold text-[#1a2f4a] dark:text-amber-200 relative after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-amber-500 dark:after:bg-amber-400",
+                "font-semibold text-indigo-950 dark:text-amber-200 relative after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-amber-500 dark:after:bg-amber-400",
             }}
+            className="w-full [--rdp-cell-size:2.75rem] sm:[--rdp-cell-size:3rem] text-base"
           />
-          <p className="mt-1 text-center text-xs text-stone-500 dark:text-stone-500">
+          <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-500">
             표시된 달의 날짜에 점이 있으면 일정이 있습니다.
           </p>
         </div>
 
         <div className="w-full max-w-md space-y-4">
-          <h2 className="text-sm font-semibold text-[#1a2f4a] dark:text-amber-200">
+          <h2 className="text-base font-bold text-indigo-950 dark:text-amber-200">
             {formatMonthLabelKo(year, month)} 일정
           </h2>
           {events.length === 0 ? (
-            <p className="text-sm text-stone-500 dark:text-stone-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               등록된 일정이 없습니다.
             </p>
           ) : (
@@ -114,20 +115,20 @@ export function CalendarPageClient({ year, month, events }: Props) {
               {events.map((ev) => (
                 <li
                   key={ev.id}
-                  className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-stone-700 dark:bg-stone-900/50"
+                  className="rounded-2xl border border-slate-200 bg-slate-50/90 p-4 dark:border-slate-700 dark:bg-slate-900/50"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-xs text-stone-500 dark:text-stone-500">
+                      <p className="text-xs text-slate-500 dark:text-slate-500">
                         {format(parseLocalYMD(ev.event_date), "M월 d일 (EEE)", {
                           locale: ko,
                         })}
                       </p>
-                      <p className="font-medium text-stone-900 dark:text-stone-100">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">
                         {ev.title || "(제목 없음)"}
                       </p>
                       {ev.body.trim() ? (
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-stone-600 dark:text-stone-400">
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">
                           {ev.body}
                         </p>
                       ) : null}
@@ -148,16 +149,16 @@ export function CalendarPageClient({ year, month, events }: Props) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-lg rounded-2xl border border-stone-200/90 bg-white/80 p-6 shadow-sm dark:border-stone-700 dark:bg-stone-950/50">
-        <h2 className="text-sm font-semibold text-[#1a2f4a] dark:text-amber-200">
+      <div className="mx-auto max-w-lg rounded-3xl border border-slate-200/90 bg-white/90 p-7 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700 dark:bg-slate-950/50 dark:shadow-none">
+        <h2 className="text-base font-bold text-indigo-950 dark:text-amber-200">
           일정 추가
         </h2>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-500">
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
           로그인 없이 누구나 추가할 수 있습니다.
         </p>
         <form onSubmit={onAdd} className="mt-4 space-y-4">
           <div>
-            <label className="text-xs font-medium text-stone-600 dark:text-stone-400">
+            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
               날짜
             </label>
             <input
@@ -166,41 +167,41 @@ export function CalendarPageClient({ year, month, events }: Props) {
               required
               value={formDate}
               onChange={(e) => setFormDate(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-stone-600 dark:text-stone-400">
+            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
               제목
             </label>
             <input
               name="title"
               type="text"
-              className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
               placeholder="예: 청년회 모임"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-stone-600 dark:text-stone-400">
+            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
               내용
             </label>
             <textarea
               name="body"
               rows={3}
-              className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
               placeholder="선택"
             />
           </div>
           <button
             type="submit"
             disabled={pending}
-            className="h-11 w-full rounded-full bg-[#1a2f4a] text-sm font-semibold text-white shadow-md transition hover:bg-[#142340] disabled:opacity-50 dark:bg-amber-100 dark:text-stone-900 dark:hover:bg-white"
+            className="h-12 w-full rounded-full bg-indigo-950 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-900 disabled:opacity-50 dark:bg-amber-100 dark:text-slate-900 dark:hover:bg-white"
           >
             {pending ? "저장 중…" : "일정 저장"}
           </button>
         </form>
         {msg ? (
-          <p className="mt-3 text-center text-sm text-stone-600 dark:text-stone-400">
+          <p className="mt-3 text-center text-sm text-slate-600 dark:text-slate-400">
             {msg}
           </p>
         ) : null}

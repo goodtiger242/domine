@@ -38,11 +38,11 @@ export function MassDatePicker({ value, onChange }: Props) {
   })();
 
   return (
-    <div className="rounded-2xl border border-stone-200/90 bg-white/90 p-4 shadow-sm dark:border-stone-700 dark:bg-stone-950/60">
-      <p className="mb-3 text-sm font-medium text-[#1a2f4a] dark:text-amber-100">
+    <div className="w-full max-w-md rounded-3xl border border-slate-200/90 bg-white p-6 shadow-[0_12px_40px_rgb(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-950/70 dark:shadow-none xl:max-w-none">
+      <p className="mb-4 text-base font-semibold text-indigo-950 dark:text-amber-100">
         미사 날짜
       </p>
-      <div className="flex flex-col items-center sm:items-start">
+      <div className="flex flex-col items-stretch">
         <DayPicker
           mode="single"
           locale={ko}
@@ -52,19 +52,22 @@ export function MassDatePicker({ value, onChange }: Props) {
               onChange(formatLocalYMD(d));
             }
           }}
-          className="rdp-modern [--rdp-accent-color:#1a2f4a] [--rdp-background-color:#f5f0e8] dark:[--rdp-accent-color:#fcd34d] dark:[--rdp-background-color:#1c1917]"
+          className="rdp-mass-calendar w-full [--rdp-accent-color:#1e1b4b] [--rdp-background-color:#f8fafc] [--rdp-cell-size:3rem] sm:[--rdp-cell-size:3.5rem] [--rdp-day-height:3rem] [--rdp-day-width:3rem] dark:[--rdp-accent-color:#fcd34d] dark:[--rdp-background-color:#0f172a]"
           classNames={{
-            today: "font-bold text-[#1a2f4a] dark:text-amber-200",
+            today: "font-bold text-indigo-950 dark:text-amber-200",
             selected:
-              "bg-[#1a2f4a] text-white rounded-lg dark:bg-amber-100 dark:text-stone-900",
-            root: "w-full",
-            month_caption: "flex justify-center pt-1 relative items-center mb-2",
-            chevron: "fill-[#1a2f4a] dark:fill-amber-200",
+              "bg-indigo-950 text-white rounded-xl dark:bg-amber-100 dark:text-slate-900",
+            root: "w-full max-w-none text-base",
+            month_caption:
+              "flex justify-center pt-1 relative items-center mb-2 text-lg font-semibold",
+            chevron: "size-6 fill-indigo-950 dark:fill-amber-200",
+            weekdays: "text-sm font-medium",
+            day: "text-base",
           }}
         />
       </div>
       {label ? (
-        <p className="mt-3 text-center text-xs text-stone-500 dark:text-stone-400 sm:text-left">
+        <p className="mt-4 text-center text-sm text-slate-600 dark:text-slate-400 sm:text-left">
           선택: {label}
         </p>
       ) : null}

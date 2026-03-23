@@ -39,11 +39,11 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <label className="text-xs font-medium text-stone-600 dark:text-stone-400">
+        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
           {label}
         </label>
         <div
-          className="inline-flex rounded-full bg-stone-200/70 p-0.5 dark:bg-stone-800"
+          className="inline-flex rounded-full bg-slate-200/80 p-0.5 dark:bg-slate-800"
           role="group"
           aria-label={`${label} 입력 방식`}
         >
@@ -57,8 +57,8 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
             }}
             className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs ${
               mode === "member"
-                ? "bg-white text-[#1a2f4a] shadow-sm dark:bg-stone-950 dark:text-amber-100"
-                : "text-stone-600 dark:text-stone-400"
+                ? "bg-white text-indigo-950 shadow-sm dark:bg-slate-950 dark:text-amber-100"
+                : "text-slate-600 dark:text-slate-400"
             }`}
           >
             멤버 선택
@@ -68,8 +68,8 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
             onClick={() => setMode("custom")}
             className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs ${
               mode === "custom"
-                ? "bg-white text-[#1a2f4a] shadow-sm dark:bg-stone-950 dark:text-amber-100"
-                : "text-stone-600 dark:text-stone-400"
+                ? "bg-white text-indigo-950 shadow-sm dark:bg-slate-950 dark:text-amber-100"
+                : "text-slate-600 dark:text-slate-400"
             }`}
           >
             직접 입력
@@ -82,7 +82,7 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
           id={`${baseId}-sel`}
           value={isYouthMemberName(value) ? value : ""}
           onChange={(e) => onChange(e.target.value)}
-          className="mt-0.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 shadow-sm outline-none transition focus:border-[#1a2f4a]/40 focus:ring-2 focus:ring-[#1a2f4a]/15 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
+          className="mt-0.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-950/35 focus:ring-2 focus:ring-indigo-950/12 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
         >
           <option value="">선택하세요</option>
           {members.map((n) => (
@@ -98,7 +98,7 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="이름을 입력하세요"
-          className="mt-0.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 focus:border-[#1a2f4a]/40 focus:ring-2 focus:ring-[#1a2f4a]/15 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
+          className="mt-0.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-950/35 focus:ring-2 focus:ring-indigo-950/12 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
         />
       )}
     </div>
