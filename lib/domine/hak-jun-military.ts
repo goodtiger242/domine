@@ -66,3 +66,17 @@ export function formatKoreanDate(d: Date) {
     day: "numeric",
   });
 }
+
+/** 진행률 표시 — 작은 값도 보이게 소수 자릿수 조절 (반올림만 하지 않음) */
+export function formatProgressPercentDisplay(p: number): string {
+  if (p >= 99.995) {
+    return "100";
+  }
+  if (p <= 0) {
+    return "0";
+  }
+  if (p < 0.01) {
+    return p.toFixed(3);
+  }
+  return p.toFixed(2);
+}
