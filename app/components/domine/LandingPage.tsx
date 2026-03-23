@@ -1,12 +1,7 @@
 import Link from "next/link";
-import { Cormorant_Garamond } from "next/font/google";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
-
-const display = Cormorant_Garamond({
-  weight: ["600", "700"],
-  subsets: ["latin"],
-});
+import { outfitDisplay } from "@/lib/fonts/display";
 
 const nav = [
   { href: "/liturgical", label: "전례 안내" },
@@ -31,7 +26,7 @@ export function LandingPage({
         <div className="mx-auto flex h-[4.25rem] max-w-6xl items-center justify-between gap-4 px-5 sm:px-10">
           <Link
             href="/"
-            className={`${display.className} shrink-0 text-2xl tracking-tight text-indigo-950 dark:text-amber-50`}
+            className={`${outfitDisplay.className} shrink-0 text-2xl tracking-tight text-indigo-950 dark:text-amber-50`}
           >
             도미네
           </Link>
@@ -62,7 +57,7 @@ export function LandingPage({
             </p>
             <h1
               id="hero-title"
-              className={`${display.className} mb-7 text-5xl leading-[1.05] text-indigo-950 sm:text-6xl md:text-7xl dark:text-amber-50`}
+              className={`${outfitDisplay.className} mb-7 text-5xl leading-[1.05] text-indigo-950 sm:text-6xl md:text-7xl dark:text-amber-50`}
             >
               도미네
               <span className="mt-3 block font-sans text-2xl font-semibold tracking-tight text-slate-700 sm:text-3xl dark:text-slate-300">
@@ -85,7 +80,7 @@ export function LandingPage({
       </main>
 
       <footer className="border-t border-slate-800/80 bg-indigo-950 px-5 py-12 text-center text-sm text-amber-50/95 dark:border-slate-800">
-        <p className={`${display.className} text-xl text-amber-50`}>도미네</p>
+        <p className={`${outfitDisplay.className} text-xl text-amber-50`}>도미네</p>
         <p className="mt-2 text-[15px] text-amber-100/85">용호성당 청년회</p>
         <p className="mt-8 text-xs text-amber-200/55">
           © {new Date().getFullYear()} Domine. All rights reserved.

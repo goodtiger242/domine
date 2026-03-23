@@ -1,14 +1,9 @@
 import Link from "next/link";
-import { Cormorant_Garamond } from "next/font/google";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { formatMonthLabelKo } from "@/lib/date/month";
 import { LiturgicalScheduleCard } from "@/app/components/domine/LiturgicalScheduleCard";
 import { MonthNav } from "@/app/components/ui/MonthNav";
-
-const display = Cormorant_Garamond({
-  weight: ["600", "700"],
-  subsets: ["latin"],
-});
+import { outfitDisplay } from "@/lib/fonts/display";
 
 type Props = {
   year: number;
@@ -38,7 +33,7 @@ export function LiturgicalMonthSection({
                 전례 안내
               </p>
               <h2
-                className={`${display.className} mt-2 text-3xl tracking-tight text-indigo-950 sm:text-4xl dark:text-amber-50`}
+                className={`${outfitDisplay.className} mt-2 text-3xl tracking-tight text-indigo-950 sm:text-4xl dark:text-amber-50`}
               >
                 {label} 전례 봉사
               </h2>

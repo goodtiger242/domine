@@ -1,13 +1,8 @@
 import Link from "next/link";
-import { Cormorant_Garamond } from "next/font/google";
 import { listLiturgicalInMonth } from "@/app/actions/liturgical";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { parseYearMonthParams } from "@/lib/date/month";
-
-const display = Cormorant_Garamond({
-  weight: ["600", "700"],
-  subsets: ["latin"],
-});
+import { outfitDisplay } from "@/lib/fonts/display";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +26,7 @@ export default async function LiturgicalGuidePage({
         <div className="mx-auto flex h-[3.75rem] max-w-6xl items-center justify-between px-5 sm:px-10">
           <Link
             href="/"
-            className={`${display.className} text-lg text-indigo-950 dark:text-amber-100`}
+            className={`${outfitDisplay.className} text-lg text-indigo-950 dark:text-amber-100`}
           >
             ← 도미네
           </Link>
