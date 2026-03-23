@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
+import { HakJunMilitaryBanner } from "@/app/components/domine/HakJunMilitaryBanner";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { outfitDisplay } from "@/lib/fonts/display";
 
@@ -43,6 +44,8 @@ export function LandingPage({
           </nav>
         </div>
       </header>
+
+      <HakJunMilitaryBanner />
 
       <main className="flex-1">
         <section
