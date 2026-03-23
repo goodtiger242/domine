@@ -25,13 +25,88 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* 전례 편집용 DayPicker: 큰 셀·캡션 가독성 */
-.rdp-mass-calendar .rdp-month_caption {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
+/* 전례 편집용 DayPicker — v9는 --rdp-day_* / --rdp-day_button_* 로 셀 크기 제어 */
+.rdp-mass-calendar {
+  --rdp-accent-color: #1e1b4b;
+  --rdp-accent-background-color: #eef2ff;
+  /* 기본(모바일): 큰 터치 영역 */
+  --rdp-day-height: 3.75rem;
+  --rdp-day-width: 3.75rem;
+  --rdp-day_button-height: 3.5rem;
+  --rdp-day_button-width: 3.5rem;
+  --rdp-nav_button-height: 2.75rem;
+  --rdp-nav_button-width: 2.75rem;
+  --rdp-nav-height: 3.25rem;
 }
+
+@media (min-width: 640px) {
+  .rdp-mass-calendar {
+    --rdp-day-height: 4.5rem;
+    --rdp-day-width: 4.5rem;
+    --rdp-day_button-height: 4.25rem;
+    --rdp-day_button-width: 4.25rem;
+    --rdp-nav_button-height: 3rem;
+    --rdp-nav_button-width: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .rdp-mass-calendar {
+    --rdp-day-height: 5.25rem;
+    --rdp-day-width: 5.25rem;
+    --rdp-day_button-height: 5rem;
+    --rdp-day_button-width: 5rem;
+    --rdp-nav_button-height: 3.25rem;
+    --rdp-nav_button-width: 3.25rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .rdp-mass-calendar {
+    --rdp-accent-color: #fcd34d;
+    --rdp-accent-background-color: #1e293b;
+  }
+}
+
+.rdp-mass-calendar .rdp-caption_label,
+.rdp-mass-calendar .rdp-month_caption {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+@media (min-width: 1024px) {
+  .rdp-mass-calendar .rdp-caption_label,
+  .rdp-mass-calendar .rdp-month_caption {
+    font-size: 1.375rem;
+  }
+}
+
 .rdp-mass-calendar .rdp-weekday {
-  font-size: 0.8rem;
-  opacity: 0.85;
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+@media (min-width: 640px) {
+  .rdp-mass-calendar .rdp-weekday {
+    font-size: 1rem;
+  }
+}
+
+.rdp-mass-calendar .rdp-day_button {
+  font-size: 1.0625rem;
+  font-weight: 500;
+}
+
+@media (min-width: 640px) {
+  .rdp-mass-calendar .rdp-day_button {
+    font-size: 1.1875rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .rdp-mass-calendar .rdp-day_button {
+    font-size: 1.25rem;
+  }
 }

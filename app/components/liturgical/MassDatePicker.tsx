@@ -38,11 +38,11 @@ export function MassDatePicker({ value, onChange }: Props) {
   })();
 
   return (
-    <div className="w-full max-w-md rounded-3xl border border-slate-200/90 bg-white p-6 shadow-[0_12px_40px_rgb(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-950/70 dark:shadow-none xl:max-w-none">
-      <p className="mb-4 text-base font-semibold text-indigo-950 dark:text-amber-100">
+    <div className="w-full rounded-3xl border border-slate-200/90 bg-white p-6 shadow-[0_12px_40px_rgb(15,23,42,0.08)] sm:p-8 dark:border-slate-700 dark:bg-slate-950/70 dark:shadow-none">
+      <p className="mb-5 text-lg font-semibold text-indigo-950 dark:text-amber-100">
         미사 날짜
       </p>
-      <div className="flex flex-col items-stretch">
+      <div className="flex w-full min-w-0 flex-col items-stretch overflow-x-auto">
         <DayPicker
           mode="single"
           locale={ko}
@@ -52,17 +52,18 @@ export function MassDatePicker({ value, onChange }: Props) {
               onChange(formatLocalYMD(d));
             }
           }}
-          className="rdp-mass-calendar w-full [--rdp-accent-color:#1e1b4b] [--rdp-background-color:#f8fafc] [--rdp-cell-size:3rem] sm:[--rdp-cell-size:3.5rem] [--rdp-day-height:3rem] [--rdp-day-width:3rem] dark:[--rdp-accent-color:#fcd34d] dark:[--rdp-background-color:#0f172a]"
+          className="rdp-mass-calendar w-full min-w-0 max-w-none justify-center"
           classNames={{
             today: "font-bold text-indigo-950 dark:text-amber-200",
             selected:
               "bg-indigo-950 text-white rounded-xl dark:bg-amber-100 dark:text-slate-900",
-            root: "w-full max-w-none text-base",
+            root: "w-full max-w-none",
             month_caption:
-              "flex justify-center pt-1 relative items-center mb-2 text-lg font-semibold",
-            chevron: "size-6 fill-indigo-950 dark:fill-amber-200",
-            weekdays: "text-sm font-medium",
-            day: "text-base",
+              "flex justify-center pt-1 relative items-center mb-3 text-xl font-semibold sm:text-2xl",
+            chevron:
+              "size-7 fill-indigo-950 sm:size-8 dark:fill-amber-200",
+            weekdays: "text-sm font-semibold sm:text-base",
+            day: "text-[1.05rem] sm:text-[1.125rem]",
           }}
         />
       </div>

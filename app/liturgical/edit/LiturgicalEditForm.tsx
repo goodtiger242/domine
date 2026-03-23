@@ -67,7 +67,7 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-8">
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,28rem)_1fr] xl:grid-cols-[minmax(0,36rem)_1fr] lg:items-start">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,34rem)_1fr] xl:grid-cols-[minmax(0,44rem)_1fr] 2xl:grid-cols-[minmax(0,52rem)_1fr] lg:items-start">
         <MassDatePicker value={liturgyDate} onChange={onDateChange} />
         <div className="space-y-5">
           <div>
