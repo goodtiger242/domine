@@ -9,6 +9,7 @@ const nav = [
   { href: "/liturgical", label: "전례 안내" },
   { href: "/liturgical/edit", label: "전례 편집" },
   { href: "/calendar", label: "캘린더" },
+  { href: "/youth", label: "청년회 멤버" },
 ];
 
 type Props = {

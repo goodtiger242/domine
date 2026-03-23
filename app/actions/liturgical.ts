@@ -129,3 +129,24 @@ export async function upsertLiturgicalSchedule(
     return { ok: false, error: msg };
   }
 }
+
+/** 해당 날짜 행 전체 삭제 — 메인·목록에서도 사라짐 */
+export async function deleteLiturgicalSchedule(
+  liturgyDateISO: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = createAnonServerClient();
+    const { error } = await supabase
+      .from("liturgical_weekly_schedule")
+      .delete()
+      .eq("liturgy_date", liturgyDateISO);
+
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "삭제에 실패했습니다.";
+    return { ok: false, error: msg };
+  }
+}

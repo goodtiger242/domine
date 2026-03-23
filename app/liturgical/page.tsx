@@ -43,6 +43,12 @@ export default async function LiturgicalGuidePage({
             >
               캘린더
             </Link>
+            <Link
+              href="/youth"
+              className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800"
+            >
+              청년회 멤버
+            </Link>
           </nav>
         </div>
       </header>

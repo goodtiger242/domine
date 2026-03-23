@@ -11,6 +11,7 @@ export type DomineCalendarEvent = {
   updated_at: string;
 };
 
+/** 월별 테이블이 아니라 `event_date`(YYYY-MM-DD) 한 컬럼으로 저장하고, 조회 시 해당 월 구간만 필터링합니다. */
 export async function listCalendarEventsInMonth(
   year: number,
   month: number
@@ -54,6 +55,34 @@ export async function insertCalendarEvent(input: {
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "저장에 실패했습니다.";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function updateCalendarEvent(input: {
+  id: string;
+  event_date: string;
+  title: string;
+  body: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const supabase = createAnonServerClient();
+    const { error } = await supabase
+      .from("domine_calendar_events")
+      .update({
+        event_date: input.event_date,
+        title: input.title.trim(),
+        body: input.body,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.id);
+
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "수정에 실패했습니다.";
     return { ok: false, error: msg };
   }
 }

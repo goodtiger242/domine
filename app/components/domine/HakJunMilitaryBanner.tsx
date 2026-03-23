@@ -84,7 +84,10 @@ export function HakJunMilitaryBanner() {
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 dark:from-amber-400 dark:to-amber-300"
                   style={{
-                    width: `${Math.min(100, Math.max(0, displayPct))}%`,
+                    width:
+                      displayPct <= 0
+                        ? "0%"
+                        : `max(${String(Math.min(100, Math.max(0, displayPct)))}%, 2px)`,
                   }}
                 />
               </div>

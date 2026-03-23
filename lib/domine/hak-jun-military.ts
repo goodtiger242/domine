@@ -71,23 +71,24 @@ export function formatKoreanDate(d: Date) {
   });
 }
 
+/** 소수 끝의 0만 제거 (0.00034… 형태를 0으로 망가뜨리지 않음) */
 function trimTrailingZeros(s: string): string {
   if (!s.includes(".")) {
     return s;
   }
-  return s
-    .replace(/(\.\d*?)0+$/, "$1")
-    .replace(/\.$/, "");
+  const trimmed = s.replace(/0+$/, "");
+  return trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
 }
 
 /**
- * 진행률 표시 — 1% 미만은 유효숫자 4개(toPrecision(4)) 기준, 끝 0은 제거
+ * 진행률 표시 (% 단위, 0–100).
+ * 1% 미만은 소수 자릿수 제한을 두지 않고(최대 16자리) 끝 0만 제거해 최대한 그대로 보여 줌.
  */
 export function formatProgressPercentDisplay(p: number): string {
   if (p >= 99.995) {
     return "100";
   }
-  if (p <= 0) {
+  if (!(p > 0)) {
     return "0";
   }
   if (p >= 1) {
@@ -99,13 +100,5 @@ export function formatProgressPercentDisplay(p: number): string {
     return trimTrailingZeros(p.toFixed(6));
   }
 
-  let s = p.toPrecision(4);
-  if (/e/i.test(s)) {
-    const decimals = Math.min(
-      20,
-      Math.max(6, Math.ceil(-Math.log10(p)) + 3)
-    );
-    s = p.toFixed(decimals);
-  }
-  return trimTrailingZeros(s);
+  return trimTrailingZeros(p.toFixed(16));
 }
