@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { Cormorant_Garamond } from "next/font/google";
+import type { LiturgicalSchedule } from "@/app/actions/liturgical";
+import { LiturgicalMinistrySection } from "@/app/components/domine/LiturgicalMinistrySection";
 import { SampleDbTest } from "@/app/components/SampleDbTest";
 
 const display = Cormorant_Garamond({
@@ -7,31 +10,38 @@ const display = Cormorant_Garamond({
 });
 
 const nav = [
-  { href: "#intro", label: "소개" },
-  { href: "#life", label: "함께하는 삶" },
-  { href: "#contact", label: "문의" },
+  { href: "/#liturgical", label: "전례 안내" },
+  { href: "/liturgical/edit", label: "전례 편집" },
+  { href: "/#intro", label: "소개" },
+  { href: "/#life", label: "함께하는 삶" },
+  { href: "/#contact", label: "문의" },
 ];
 
-export function LandingPage() {
+type Props = {
+  weekSunday: string;
+  liturgicalSchedule: LiturgicalSchedule | null;
+};
+
+export function LandingPage({ weekSunday, liturgicalSchedule }: Props) {
   return (
     <div className="flex min-h-full flex-col bg-[#faf8f5] text-stone-900 dark:bg-stone-950 dark:text-stone-100">
       <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-[#faf8f5]/90 backdrop-blur-md dark:border-stone-800 dark:bg-stone-950/90">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5 sm:px-8">
-          <a
-            href="#"
-            className={`${display.className} text-xl tracking-tight text-[#1a2f4a] dark:text-amber-100/90`}
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-5 sm:px-8">
+          <Link
+            href="/"
+            className={`${display.className} shrink-0 text-xl tracking-tight text-[#1a2f4a] dark:text-amber-100/90`}
           >
             도미네
-          </a>
-          <nav className="flex items-center gap-1 text-sm sm:gap-6">
+          </Link>
+          <nav className="flex flex-wrap items-center justify-end gap-1 text-sm sm:gap-4">
             {nav.map((item) => (
-              <a
+              <Link
                 key={item.href}
                 href={item.href}
                 className="rounded-full px-2 py-1.5 text-stone-600 transition hover:bg-stone-200/60 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
         </div>
@@ -63,6 +73,11 @@ export function LandingPage() {
             </p>
           </div>
         </section>
+
+        <LiturgicalMinistrySection
+          weekSunday={weekSunday}
+          schedule={liturgicalSchedule}
+        />
 
         <section
           id="intro"
