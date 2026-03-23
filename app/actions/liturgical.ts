@@ -1,7 +1,8 @@
 "use server";
 
 import { createAnonServerClient } from "@/lib/supabase/anon-server";
-import { getTodayISO } from "@/lib/date/local";
+import { getMonthRangeISO } from "@/lib/date/month";
+import { hasLiturgicalContent } from "@/lib/liturgical/content";
 
 export type LiturgicalSchedule = {
   liturgy_date: string;
@@ -17,6 +18,30 @@ export type LiturgicalSchedule = {
   organist: string;
   updated_at: string;
 };
+
+/** 해당 월에 DB에 있고, 내용이 하나라도 있는 미사만 (날짜 오름차순) */
+export async function listLiturgicalInMonth(
+  year: number,
+  month: number
+): Promise<LiturgicalSchedule[]> {
+  try {
+    const { start, end } = getMonthRangeISO(year, month);
+    const supabase = createAnonServerClient();
+    const { data, error } = await supabase
+      .from("liturgical_weekly_schedule")
+      .select("*")
+      .gte("liturgy_date", start)
+      .lte("liturgy_date", end)
+      .order("liturgy_date", { ascending: true });
+
+    if (error || !data) {
+      return [];
+    }
+    return (data as LiturgicalSchedule[]).filter(hasLiturgicalContent);
+  } catch {
+    return [];
+  }
+}
 
 export async function getScheduleForDate(
   liturgyDateISO: string
@@ -36,50 +61,6 @@ export async function getScheduleForDate(
     return data as LiturgicalSchedule | null;
   } catch {
     return null;
-  }
-}
-
-/** 메인: 오늘 이후 가장 가까운 미사 → 없으면 가장 최근 과거 */
-export async function getScheduleForMainDisplay(): Promise<{
-  liturgy_date: string;
-  schedule: LiturgicalSchedule | null;
-}> {
-  try {
-    const supabase = createAnonServerClient();
-    const today = getTodayISO();
-
-    const { data: future } = await supabase
-      .from("liturgical_weekly_schedule")
-      .select("*")
-      .gte("liturgy_date", today)
-      .order("liturgy_date", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (future) {
-      return {
-        liturgy_date: future.liturgy_date,
-        schedule: future as LiturgicalSchedule,
-      };
-    }
-
-    const { data: past } = await supabase
-      .from("liturgical_weekly_schedule")
-      .select("*")
-      .order("liturgy_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (past) {
-      return {
-        liturgy_date: past.liturgy_date,
-        schedule: past as LiturgicalSchedule,
-      };
-    }
-
-    return { liturgy_date: today, schedule: null };
-  } catch {
-    return { liturgy_date: getTodayISO(), schedule: null };
   }
 }
 

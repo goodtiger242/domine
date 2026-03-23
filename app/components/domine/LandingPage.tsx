@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Cormorant_Garamond } from "next/font/google";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
-import { LiturgicalMinistrySection } from "@/app/components/domine/LiturgicalMinistrySection";
+import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { SampleDbTest } from "@/app/components/SampleDbTest";
 
 const display = Cormorant_Garamond({
@@ -10,16 +10,22 @@ const display = Cormorant_Garamond({
 });
 
 const nav = [
-  { href: "/#liturgical", label: "전례 안내" },
+  { href: "/liturgical", label: "전례 안내" },
   { href: "/liturgical/edit", label: "전례 편집" },
+  { href: "/calendar", label: "캘린더" },
 ];
 
 type Props = {
-  liturgyDate: string;
-  liturgicalSchedule: LiturgicalSchedule | null;
+  liturgicalYear: number;
+  liturgicalMonth: number;
+  liturgicalSchedules: LiturgicalSchedule[];
 };
 
-export function LandingPage({ liturgyDate, liturgicalSchedule }: Props) {
+export function LandingPage({
+  liturgicalYear,
+  liturgicalMonth,
+  liturgicalSchedules,
+}: Props) {
   return (
     <div className="flex min-h-full flex-col bg-[#faf8f5] text-stone-900 dark:bg-stone-950 dark:text-stone-100">
       <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-[#faf8f5]/90 backdrop-blur-md dark:border-stone-800 dark:bg-stone-950/90">
@@ -71,9 +77,11 @@ export function LandingPage({ liturgyDate, liturgicalSchedule }: Props) {
           </div>
         </section>
 
-        <LiturgicalMinistrySection
-          liturgyDate={liturgyDate}
-          schedule={liturgicalSchedule}
+        <LiturgicalMonthSection
+          year={liturgicalYear}
+          month={liturgicalMonth}
+          schedules={liturgicalSchedules}
+          variant="home"
         />
 
         <section className="border-t border-stone-200/60 bg-stone-100/50 px-5 py-10 dark:border-stone-800 dark:bg-stone-900/30">
