@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "도미네 캘린더 | 도미네",
-  description: "청년회 공용 일정 캘린더입니다.",
+  description: "도미네 일정",
 };
 
 export default async function CalendarPage({
@@ -58,11 +58,7 @@ export default async function CalendarPage({
         >
           도미네 캘린더
         </h1>
-        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600 dark:text-slate-400">
-          공동으로 쓰는 일정입니다. 회장님 포함 누구나 추가·삭제할 수
-          있어요. (로그인 없음)
-        </p>
-        <div className="mt-8">
+        <div className="mt-10">
           <CalendarPageClient year={year} month={month} events={events} />
         </div>
       </main>

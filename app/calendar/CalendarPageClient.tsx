@@ -153,10 +153,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
         <h2 className="text-base font-bold text-indigo-950 dark:text-amber-200">
           일정 추가
         </h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-          로그인 없이 누구나 추가할 수 있습니다.
-        </p>
-        <form onSubmit={onAdd} className="mt-4 space-y-4">
+        <form onSubmit={onAdd} className="mt-5 space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
               날짜
