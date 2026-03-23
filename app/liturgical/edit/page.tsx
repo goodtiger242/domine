@@ -31,10 +31,6 @@ export default async function LiturgicalEditPage({
         <h1 className="mt-8 text-3xl font-bold tracking-tight text-indigo-950 dark:text-amber-50">
           전례 봉사 편집
         </h1>
-        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600 dark:text-slate-400">
-          달력에서 미사 날짜를 고른 뒤 내용을 입력하고 저장하세요. 로그인 없이
-          누구나 수정할 수 있습니다.
-        </p>
         <LiturgicalEditForm
           key={`${liturgyDate}-${schedule?.updated_at ?? "none"}`}
           liturgyDate={liturgyDate}

@@ -57,7 +57,7 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
         organist: form.organist,
       });
       if (r.ok) {
-        setMsg("저장했습니다. 메인에서 확인해 주세요.");
+        setMsg("저장했습니다.");
         router.refresh();
       } else {
         setMsg(r.error);
@@ -159,11 +159,15 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-950 dark:text-amber-200">
           지휘 · 반주
         </h2>
-        <p className="rounded-xl border border-indigo-950/10 bg-indigo-950/[0.03] px-4 py-3 text-sm text-slate-700 dark:border-amber-200/20 dark:bg-slate-900/50 dark:text-slate-300">
-          지휘는 <span className="font-semibold text-indigo-950 dark:text-amber-100">{FIXED_CONDUCTOR_NAME}</span>
-          로 고정입니다.
-        </p>
-        <div className="max-w-md">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              지휘
+            </label>
+            <p className="mt-0.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100">
+              {FIXED_CONDUCTOR_NAME}
+            </p>
+          </div>
           <MemberOrCustomInput
             label="반주"
             value={form.organist}
