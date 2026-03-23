@@ -1,17 +1,14 @@
-/** 유머용 상수 — 실제 전역일과 다를 수 있음 */
+/** 유머용 복무 일정 상수 */
 
 const KST = "Asia/Seoul";
 
 export const HAK_JUN_NAME = "이학준";
 
-/** 입대일 (2025년 3월 9일) */
-export const HAK_JUN_ENLIST = new Date("2025-03-09T12:00:00+09:00");
+/** 입대일 */
+export const HAK_JUN_ENLIST = new Date("2026-03-29T12:00:00+09:00");
 
-/**
- * 전역일 가정: 육군 현역 약 18개월 복무 (유머·표시용)
- * 실제와 다르면 이 날짜만 수정하면 됨.
- */
-export const HAK_JUN_DISCHARGE = new Date("2026-09-09T12:00:00+09:00");
+/** 전역일 */
+export const HAK_JUN_DISCHARGE = new Date("2027-09-08T12:00:00+09:00");
 
 const MS_DAY = 86_400_000;
 

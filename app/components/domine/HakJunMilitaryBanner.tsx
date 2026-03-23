@@ -63,7 +63,7 @@ export function HakJunMilitaryBanner() {
                   ·
                 </span>
                 <span>
-                  <span className="text-slate-500 dark:text-slate-500">전역(가정)</span>{" "}
+                  <span className="text-slate-500 dark:text-slate-500">전역</span>{" "}
                   <span className="font-semibold text-indigo-950 dark:text-amber-100">
                     {formatKoreanDate(HAK_JUN_DISCHARGE)}
                   </span>
