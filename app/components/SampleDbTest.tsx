@@ -16,28 +16,43 @@ export function SampleDbTest() {
   async function handleSave() {
     setMessage(null);
     setLoading("save");
-    const result = await saveSampleNote(text);
-    setLoading(null);
-    if (!result.ok) {
-      setMessage(result.error);
-      return;
+    try {
+      const result = await saveSampleNote(text);
+      if (!result.ok) {
+        setMessage(result.error);
+        return;
+      }
+      setMessage("저장했습니다.");
+      setText("");
+    } catch (e) {
+      setMessage(
+        e instanceof Error ? e.message : "저장 요청이 실패했습니다. 네트워크를 확인하세요."
+      );
+    } finally {
+      setLoading(null);
     }
-    setMessage("저장했습니다.");
-    setText("");
   }
 
   async function handleLoadAll() {
     setMessage(null);
     setLoading("load");
-    const result = await listSampleNotes();
-    setLoading(null);
-    if (!result.ok) {
-      setMessage(result.error);
+    try {
+      const result = await listSampleNotes();
+      if (!result.ok) {
+        setMessage(result.error);
+        setRows([]);
+        return;
+      }
+      setRows(result.rows);
+      setMessage(`${result.rows.length}개 항목을 불러왔습니다.`);
+    } catch (e) {
+      setMessage(
+        e instanceof Error ? e.message : "불러오기 요청이 실패했습니다."
+      );
       setRows([]);
-      return;
+    } finally {
+      setLoading(null);
     }
-    setRows(result.rows);
-    setMessage(`${result.rows.length}개 항목을 불러왔습니다.`);
   }
 
   return (
