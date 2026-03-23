@@ -15,11 +15,11 @@ const nav = [
 ];
 
 type Props = {
-  weekSunday: string;
+  liturgyDate: string;
   liturgicalSchedule: LiturgicalSchedule | null;
 };
 
-export function LandingPage({ weekSunday, liturgicalSchedule }: Props) {
+export function LandingPage({ liturgyDate, liturgicalSchedule }: Props) {
   return (
     <div className="flex min-h-full flex-col bg-[#faf8f5] text-stone-900 dark:bg-stone-950 dark:text-stone-100">
       <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-[#faf8f5]/90 backdrop-blur-md dark:border-stone-800 dark:bg-stone-950/90">
@@ -72,7 +72,7 @@ export function LandingPage({ weekSunday, liturgicalSchedule }: Props) {
         </section>
 
         <LiturgicalMinistrySection
-          weekSunday={weekSunday}
+          liturgyDate={liturgyDate}
           schedule={liturgicalSchedule}
         />
 

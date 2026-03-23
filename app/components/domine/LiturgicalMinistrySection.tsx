@@ -8,7 +8,7 @@ const display = Cormorant_Garamond({
 });
 
 type Props = {
-  weekSunday: string;
+  liturgyDate: string;
   schedule: LiturgicalSchedule | null;
 };
 
@@ -36,7 +36,7 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function LiturgicalMinistrySection({ weekSunday, schedule }: Props) {
+export function LiturgicalMinistrySection({ liturgyDate, schedule }: Props) {
   const hasAnyRole =
     !!schedule &&
     [
@@ -59,7 +59,7 @@ export function LiturgicalMinistrySection({ weekSunday, schedule }: Props) {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#1a2f4a]/70 dark:text-amber-200/70">
-              이번 주 · {formatWeekLabel(weekSunday)}
+              미사 일정 · {formatWeekLabel(liturgyDate)}
             </p>
             <h2
               className={`${display.className} mt-2 text-3xl text-[#1a2f4a] dark:text-amber-50`}
@@ -68,7 +68,7 @@ export function LiturgicalMinistrySection({ weekSunday, schedule }: Props) {
             </h2>
           </div>
           <Link
-            href="/liturgical/edit"
+            href={`/liturgical/edit?date=${liturgyDate}`}
             className="inline-flex h-10 items-center justify-center rounded-full border border-[#1a2f4a]/30 bg-white px-5 text-sm font-medium text-[#1a2f4a] transition hover:bg-[#1a2f4a]/5 dark:border-amber-200/30 dark:bg-stone-900 dark:text-amber-100 dark:hover:bg-stone-800"
           >
             수정하기
@@ -77,9 +77,9 @@ export function LiturgicalMinistrySection({ weekSunday, schedule }: Props) {
 
         {!schedule ? (
           <div className="rounded-2xl border border-dashed border-stone-300 bg-[#faf8f5] p-8 text-center text-stone-600 dark:border-stone-600 dark:bg-stone-950/50 dark:text-stone-400">
-            <p>아직 이번 주 전례 봉사 정보가 등록되지 않았습니다.</p>
+            <p>선택한 미사 날짜에 등록된 전례 봉사 정보가 없습니다.</p>
             <Link
-              href="/liturgical/edit"
+              href={`/liturgical/edit?date=${liturgyDate}`}
               className="mt-4 inline-block text-sm font-medium text-[#1a2f4a] underline dark:text-amber-200"
             >
               전례 편집에서 입력하기

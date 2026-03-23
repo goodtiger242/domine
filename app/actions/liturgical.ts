@@ -1,10 +1,10 @@
 "use server";
 
 import { createAnonServerClient } from "@/lib/supabase/anon-server";
-import { getTargetSundayISO, normalizeToSundayISO } from "@/lib/date/sunday";
+import { getTodayISO } from "@/lib/date/local";
 
 export type LiturgicalSchedule = {
-  week_sunday: string;
+  liturgy_date: string;
   title: string;
   announcement_detail: string;
   role_commentator: string;
@@ -18,17 +18,19 @@ export type LiturgicalSchedule = {
   updated_at: string;
 };
 
-export async function getScheduleForWeek(weekSundayISO: string): Promise<LiturgicalSchedule | null> {
+export async function getScheduleForDate(
+  liturgyDateISO: string
+): Promise<LiturgicalSchedule | null> {
   try {
     const supabase = createAnonServerClient();
     const { data, error } = await supabase
       .from("liturgical_weekly_schedule")
       .select("*")
-      .eq("week_sunday", weekSundayISO)
+      .eq("liturgy_date", liturgyDateISO)
       .maybeSingle();
 
     if (error) {
-      console.error("getScheduleForWeek", error);
+      console.error("getScheduleForDate", error);
       return null;
     }
     return data as LiturgicalSchedule | null;
@@ -37,36 +39,70 @@ export async function getScheduleForWeek(weekSundayISO: string): Promise<Liturgi
   }
 }
 
-/** 메인: 다가오는 주일(포함) 기준 한 행 */
-export async function getScheduleForUpcomingSunday(): Promise<{
-  week_sunday: string;
+/** 메인: 오늘 이후 가장 가까운 미사 → 없으면 가장 최근 과거 */
+export async function getScheduleForMainDisplay(): Promise<{
+  liturgy_date: string;
   schedule: LiturgicalSchedule | null;
 }> {
-  const week = getTargetSundayISO();
-  const schedule = await getScheduleForWeek(week);
-  return { week_sunday: week, schedule };
+  try {
+    const supabase = createAnonServerClient();
+    const today = getTodayISO();
+
+    const { data: future } = await supabase
+      .from("liturgical_weekly_schedule")
+      .select("*")
+      .gte("liturgy_date", today)
+      .order("liturgy_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (future) {
+      return {
+        liturgy_date: future.liturgy_date,
+        schedule: future as LiturgicalSchedule,
+      };
+    }
+
+    const { data: past } = await supabase
+      .from("liturgical_weekly_schedule")
+      .select("*")
+      .order("liturgy_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (past) {
+      return {
+        liturgy_date: past.liturgy_date,
+        schedule: past as LiturgicalSchedule,
+      };
+    }
+
+    return { liturgy_date: today, schedule: null };
+  } catch {
+    return { liturgy_date: getTodayISO(), schedule: null };
+  }
 }
 
-export async function listWeeksFromDb(limit = 24): Promise<string[]> {
+export async function listLiturgyDatesFromDb(limit = 32): Promise<string[]> {
   try {
     const supabase = createAnonServerClient();
     const { data, error } = await supabase
       .from("liturgical_weekly_schedule")
-      .select("week_sunday")
-      .order("week_sunday", { ascending: false })
+      .select("liturgy_date")
+      .order("liturgy_date", { ascending: false })
       .limit(limit);
 
     if (error || !data) {
       return [];
     }
-    return data.map((r) => r.week_sunday as string);
+    return data.map((r) => r.liturgy_date as string);
   } catch {
     return [];
   }
 }
 
 export type UpsertLiturgicalInput = {
-  week_sunday: string;
+  liturgy_date: string;
   title: string;
   announcement_detail: string;
   role_commentator: string;
@@ -83,11 +119,10 @@ export async function upsertLiturgicalSchedule(
   input: UpsertLiturgicalInput
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const weekSunday = normalizeToSundayISO(input.week_sunday);
     const supabase = createAnonServerClient();
     const row = {
-      week_sunday: weekSunday,
-      title: input.title,
+      liturgy_date: input.liturgy_date,
+      title: input.title.trim(),
       announcement_detail: input.announcement_detail,
       role_commentator: input.role_commentator,
       role_reader_1: input.role_reader_1,
@@ -102,7 +137,7 @@ export async function upsertLiturgicalSchedule(
 
     const { error } = await supabase
       .from("liturgical_weekly_schedule")
-      .upsert(row, { onConflict: "week_sunday" });
+      .upsert(row, { onConflict: "liturgy_date" });
 
     if (error) {
       return { ok: false, error: error.message };

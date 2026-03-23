@@ -1,54 +1,61 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import {
   upsertLiturgicalSchedule,
   type LiturgicalSchedule,
 } from "@/app/actions/liturgical";
+import { MassDatePicker } from "@/app/components/liturgical/MassDatePicker";
+import { MemberOrCustomInput } from "@/app/components/liturgical/MemberOrCustomInput";
 
 const fieldClass =
-  "mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:ring-2 focus:ring-[#1a2f4a]/30 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100";
+  "mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 shadow-sm outline-none transition focus:border-[#1a2f4a]/40 focus:ring-2 focus:ring-[#1a2f4a]/15 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100";
 
 type Props = {
-  weekSunday: string;
+  liturgyDate: string;
   initial: LiturgicalSchedule | null;
-  weekOptions: string[];
 };
 
-export function LiturgicalEditForm({ weekSunday, initial, weekOptions }: Props) {
+export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
-  const defaults = useMemo(
-    () => ({
-      week_sunday: weekSunday,
-      title: initial?.title ?? "",
-      announcement_detail: initial?.announcement_detail ?? "",
-      role_commentator: initial?.role_commentator ?? "",
-      role_reader_1: initial?.role_reader_1 ?? "",
-      role_reader_2: initial?.role_reader_2 ?? "",
-      role_gospel_acclamation: initial?.role_gospel_acclamation ?? "",
-      thurifer_main: initial?.thurifer_main ?? "",
-      thurifer_sub: initial?.thurifer_sub ?? "",
-      conductor: initial?.conductor ?? "",
-      organist: initial?.organist ?? "",
-    }),
-    [initial, weekSunday]
-  );
+  const [form, setForm] = useState({
+    title: initial?.title ?? "",
+    announcement_detail: initial?.announcement_detail ?? "",
+    role_commentator: initial?.role_commentator ?? "",
+    role_reader_1: initial?.role_reader_1 ?? "",
+    role_reader_2: initial?.role_reader_2 ?? "",
+    role_gospel_acclamation: initial?.role_gospel_acclamation ?? "",
+    thurifer_main: initial?.thurifer_main ?? "",
+    thurifer_sub: initial?.thurifer_sub ?? "",
+    conductor: initial?.conductor ?? "",
+    organist: initial?.organist ?? "",
+  });
 
-  const [form, setForm] = useState(defaults);
-
-  function onWeekChange(next: string) {
-    router.push(`/liturgical/edit?week=${encodeURIComponent(next)}`);
+  function onDateChange(nextIso: string) {
+    router.push(`/liturgical/edit?date=${encodeURIComponent(nextIso)}`);
   }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setMsg(null);
     startTransition(async () => {
-      const r = await upsertLiturgicalSchedule(form);
+      const r = await upsertLiturgicalSchedule({
+        liturgy_date: liturgyDate,
+        title: form.title,
+        announcement_detail: form.announcement_detail,
+        role_commentator: form.role_commentator,
+        role_reader_1: form.role_reader_1,
+        role_reader_2: form.role_reader_2,
+        role_gospel_acclamation: form.role_gospel_acclamation,
+        thurifer_main: form.thurifer_main,
+        thurifer_sub: form.thurifer_sub,
+        conductor: form.conductor,
+        organist: form.organist,
+      });
       if (r.ok) {
         setMsg("저장했습니다. 메인에서 확인해 주세요.");
         router.refresh();
@@ -59,188 +66,117 @@ export function LiturgicalEditForm({ weekSunday, initial, weekOptions }: Props) 
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-8 space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
-          적용 주일
-        </label>
-        <select
-          value={weekSunday}
-          onChange={(e) => onWeekChange(e.target.value)}
-          className={fieldClass}
-        >
-          {weekOptions.map((w) => (
-            <option key={w} value={w}>
-              {w}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-stone-500">
-          날짜는 자동으로 그 주의 주일로 맞춰 저장됩니다.
-        </p>
+    <form onSubmit={onSubmit} className="mt-8 space-y-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr] lg:items-start">
+        <MassDatePicker value={liturgyDate} onChange={onDateChange} />
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-stone-800 dark:text-stone-200">
+              제목
+            </label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, title: e.target.value }))
+              }
+              className={fieldClass}
+              placeholder="선택 사항입니다"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-800 dark:text-stone-200">
+              추가 안내
+            </label>
+            <textarea
+              value={form.announcement_detail}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  announcement_detail: e.target.value,
+                }))
+              }
+              rows={8}
+              className={fieldClass}
+              placeholder="투표 마감, 연습 일정 등 자유롭게 입력"
+            />
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
-          제목 · 한 줄 공지
-        </label>
-        <input
-          type="text"
-          value={form.title}
-          onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-          className={fieldClass}
-          placeholder="예: 03월 29일 주님 수난 성지 주일 미사 투표"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
-          추가 안내 (투표 마감, 일정 등)
-        </label>
-        <textarea
-          value={form.announcement_detail}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, announcement_detail: e.target.value }))
-          }
-          rows={8}
-          className={fieldClass}
-          placeholder="여러 줄로 입력 가능합니다."
-        />
-      </div>
-
-      <fieldset className="rounded-xl border border-stone-200 bg-white/60 p-4 dark:border-stone-700 dark:bg-stone-950/40">
-        <legend className="px-1 text-sm font-semibold text-[#1a2f4a] dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-stone-200/90 bg-white/70 p-5 shadow-sm dark:border-stone-700 dark:bg-stone-950/40 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1a2f4a] dark:text-amber-200">
           전례 봉사
-        </legend>
-        <div className="mt-3 space-y-3">
-          <div>
-            <label className="text-xs text-stone-600 dark:text-stone-400">
-              해설
-            </label>
-            <input
-              type="text"
-              value={form.role_commentator}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, role_commentator: e.target.value }))
-              }
-              className={fieldClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs text-stone-600 dark:text-stone-400">
-              1독서
-            </label>
-            <input
-              type="text"
-              value={form.role_reader_1}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, role_reader_1: e.target.value }))
-              }
-              className={fieldClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs text-stone-600 dark:text-stone-400">
-              2독서
-            </label>
-            <input
-              type="text"
-              value={form.role_reader_2}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, role_reader_2: e.target.value }))
-              }
-              className={fieldClass}
-            />
-          </div>
+        </h2>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <MemberOrCustomInput
+            label="해설"
+            value={form.role_commentator}
+            onChange={(v) =>
+              setForm((f) => ({ ...f, role_commentator: v }))
+            }
+          />
+          <MemberOrCustomInput
+            label="1독서"
+            value={form.role_reader_1}
+            onChange={(v) => setForm((f) => ({ ...f, role_reader_1: v }))}
+          />
+          <MemberOrCustomInput
+            label="2독서"
+            value={form.role_reader_2}
+            onChange={(v) => setForm((f) => ({ ...f, role_reader_2: v }))}
+          />
+          <MemberOrCustomInput
+            label="복음 환호송"
+            value={form.role_gospel_acclamation}
+            onChange={(v) =>
+              setForm((f) => ({ ...f, role_gospel_acclamation: v }))
+            }
+          />
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset className="rounded-xl border border-stone-200 bg-white/60 p-4 dark:border-stone-700 dark:bg-stone-950/40">
-        <legend className="px-1 text-sm font-semibold text-[#1a2f4a] dark:text-amber-200">
-          복음 환호송
-        </legend>
-        <input
-          type="text"
-          value={form.role_gospel_acclamation}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, role_gospel_acclamation: e.target.value }))
-          }
-          className={fieldClass}
-        />
-      </fieldset>
-
-      <fieldset className="rounded-xl border border-stone-200 bg-white/60 p-4 dark:border-stone-700 dark:bg-stone-950/40">
-        <legend className="px-1 text-sm font-semibold text-[#1a2f4a] dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-stone-200/90 bg-white/70 p-5 shadow-sm dark:border-stone-700 dark:bg-stone-950/40 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1a2f4a] dark:text-amber-200">
           복사단
-        </legend>
-        <div className="mt-3 space-y-3">
-          <div>
-            <label className="text-xs text-stone-600 dark:text-stone-400">
-              대복
-            </label>
-            <input
-              type="text"
-              value={form.thurifer_main}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, thurifer_main: e.target.value }))
-              }
-              className={fieldClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs text-stone-600 dark:text-stone-400">
-              소복
-            </label>
-            <input
-              type="text"
-              value={form.thurifer_sub}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, thurifer_sub: e.target.value }))
-              }
-              className={fieldClass}
-            />
-          </div>
+        </h2>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <MemberOrCustomInput
+            label="대복"
+            value={form.thurifer_main}
+            onChange={(v) => setForm((f) => ({ ...f, thurifer_main: v }))}
+          />
+          <MemberOrCustomInput
+            label="소복"
+            value={form.thurifer_sub}
+            onChange={(v) => setForm((f) => ({ ...f, thurifer_sub: v }))}
+          />
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset className="rounded-xl border border-stone-200 bg-white/60 p-4 dark:border-stone-700 dark:bg-stone-950/40">
-        <legend className="px-1 text-sm font-semibold text-[#1a2f4a] dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-stone-200/90 bg-white/70 p-5 shadow-sm dark:border-stone-700 dark:bg-stone-950/40 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1a2f4a] dark:text-amber-200">
           지휘 · 반주
-        </legend>
-        <div className="mt-3 space-y-3">
-          <div>
-            <label className="text-xs text-stone-600 dark:text-stone-400">
-              지휘
-            </label>
-            <input
-              type="text"
-              value={form.conductor}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, conductor: e.target.value }))
-              }
-              className={fieldClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs text-stone-600 dark:text-stone-400">
-              반주
-            </label>
-            <input
-              type="text"
-              value={form.organist}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, organist: e.target.value }))
-              }
-              className={fieldClass}
-            />
-          </div>
+        </h2>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <MemberOrCustomInput
+            label="지휘"
+            value={form.conductor}
+            onChange={(v) => setForm((f) => ({ ...f, conductor: v }))}
+          />
+          <MemberOrCustomInput
+            label="반주"
+            value={form.organist}
+            onChange={(v) => setForm((f) => ({ ...f, organist: v }))}
+          />
         </div>
-      </fieldset>
+      </div>
 
       <button
         type="submit"
         disabled={pending}
-        className="h-10 w-full rounded-full bg-[#1a2f4a] text-sm font-medium text-white transition hover:bg-[#142340] disabled:opacity-50 dark:bg-amber-100 dark:text-stone-900 dark:hover:bg-white"
+        className="h-12 w-full rounded-full bg-[#1a2f4a] text-sm font-semibold text-white shadow-md transition hover:bg-[#142340] disabled:opacity-50 dark:bg-amber-100 dark:text-stone-900 dark:hover:bg-white"
       >
         {pending ? "저장 중…" : "저장"}
       </button>
