@@ -12,9 +12,6 @@ const display = Cormorant_Garamond({
 const nav = [
   { href: "/#liturgical", label: "전례 안내" },
   { href: "/liturgical/edit", label: "전례 편집" },
-  { href: "/#intro", label: "소개" },
-  { href: "/#life", label: "함께하는 삶" },
-  { href: "/#contact", label: "문의" },
 ];
 
 type Props = {
@@ -78,90 +75,6 @@ export function LandingPage({ weekSunday, liturgicalSchedule }: Props) {
           weekSunday={weekSunday}
           schedule={liturgicalSchedule}
         />
-
-        <section
-          id="intro"
-          className="scroll-mt-20 border-b border-stone-200/60 px-5 py-16 sm:px-8 dark:border-stone-800"
-        >
-          <div className="mx-auto max-w-3xl">
-            <h2
-              className={`${display.className} mb-6 text-3xl text-[#1a2f4a] dark:text-amber-50`}
-            >
-              우리는
-            </h2>
-            <div className="space-y-4 text-stone-600 leading-relaxed dark:text-stone-400">
-              <p>
-                <strong className="font-medium text-stone-800 dark:text-stone-200">
-                  도미네
-                </strong>
-                는 용호성당에 속한 청년회로, 천주교 신앙 안에서 서로를
-                격려하고 성장하는 것을 지향합니다. 예배와 나눔, 봉사와 친교를
-                통해 &ldquo;함께하는 교회&rdquo;를 살아가고자 합니다.
-              </p>
-              <p>
-                아직은 이곳에 담을 이야기가 많지 않을 수 있어요. 앞으로 소식과
-                일정, 나눔의 글을 차례로 채워 나갈 예정입니다.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="life"
-          className="scroll-mt-20 border-b border-stone-200/60 bg-white/50 px-5 py-16 sm:px-8 dark:border-stone-800 dark:bg-stone-900/40"
-        >
-          <div className="mx-auto max-w-5xl">
-            <h2
-              className={`${display.className} mb-10 text-center text-3xl text-[#1a2f4a] dark:text-amber-50`}
-            >
-              함께하는 삶
-            </h2>
-            <div className="grid gap-6 sm:grid-cols-3">
-              {[
-                {
-                  title: "예배 · 기도",
-                  body: "미사와 기도 모임을 통해 한 자리에 머뭅니다.",
-                },
-                {
-                  title: "나눔 · 교제",
-                  body: "말씀과 일상을 나누며 서로를 세워 갑니다.",
-                },
-                {
-                  title: "봉사 · 선교",
-                  body: "교회와 지역을 향한 작은 발걸음을 이어 갑니다.",
-                },
-              ].map((card) => (
-                <article
-                  key={card.title}
-                  className="rounded-2xl border border-stone-200/80 bg-[#faf8f5] p-6 shadow-sm dark:border-stone-700 dark:bg-stone-950/60"
-                >
-                  <h3 className="mb-3 font-semibold text-stone-900 dark:text-stone-100">
-                    {card.title}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">
-                    {card.body}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="contact"
-          className="scroll-mt-20 px-5 py-16 sm:px-8"
-        >
-          <div className="mx-auto max-w-3xl text-center">
-            <h2
-              className={`${display.className} mb-4 text-3xl text-[#1a2f4a] dark:text-amber-50`}
-            >
-              문의
-            </h2>
-            <p className="text-stone-600 dark:text-stone-400">
-              연락처와 오시는 길 등은 추후 이곳에 안내드릴 예정입니다.
-            </p>
-          </div>
-        </section>
 
         <section className="border-t border-stone-200/60 bg-stone-100/50 px-5 py-10 dark:border-stone-800 dark:bg-stone-900/30">
           <details className="mx-auto max-w-lg rounded-xl border border-dashed border-stone-300 bg-white/60 p-4 text-left dark:border-stone-600 dark:bg-stone-950/40">
