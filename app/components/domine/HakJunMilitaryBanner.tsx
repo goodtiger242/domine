@@ -2,7 +2,6 @@ import Image from "next/image";
 import {
   formatKoreanDate,
   formatProgressPercentDisplay,
-  getBannerProgressPercent,
   getHakJunMilitaryStats,
   HAK_JUN_DISCHARGE,
   HAK_JUN_ENLIST,
@@ -16,7 +15,7 @@ const PHOTO = "/image/이학준.jpg";
  */
 export function HakJunMilitaryBanner() {
   const stats = getHakJunMilitaryStats();
-  const displayPct = getBannerProgressPercent(stats);
+  const displayPct = stats.isDischarged ? 100 : stats.progressPercent;
   const pctLabel = formatProgressPercentDisplay(displayPct);
 
   let ddayLabel: string;
