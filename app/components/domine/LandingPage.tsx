@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { HakJunMilitaryBanner } from "@/app/components/domine/HakJunMilitaryBanner";
+import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { outfitDisplay } from "@/lib/fonts/display";
 
@@ -80,6 +81,8 @@ export function LandingPage({
           schedules={liturgicalSchedules}
           variant="home"
         />
+
+        <LiturgicalMinisterPrayersSection />
       </main>
 
       <footer className="border-t border-slate-800/80 bg-indigo-950 px-5 py-12 text-center text-sm text-amber-50/95 dark:border-slate-800">
