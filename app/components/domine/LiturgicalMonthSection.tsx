@@ -10,6 +10,8 @@ type Props = {
   month: number;
   schedules: LiturgicalSchedule[];
   variant: "home" | "page";
+  /** 메인 전용: 강조할 미사 날짜(ISO) */
+  highlightLiturgyDate?: string | null;
 };
 
 export function LiturgicalMonthSection({
@@ -17,6 +19,7 @@ export function LiturgicalMonthSection({
   month,
   schedules,
   variant,
+  highlightLiturgyDate = null,
 }: Props) {
   const label = formatMonthLabelKo(year, month);
 
@@ -72,6 +75,11 @@ export function LiturgicalMonthSection({
                 <LiturgicalScheduleCard
                   schedule={s}
                   showEditLink={variant !== "home"}
+                  emphasize={
+                    variant === "home" &&
+                    highlightLiturgyDate !== null &&
+                    s.liturgy_date === highlightLiturgyDate
+                  }
                 />
               </li>
             ))}

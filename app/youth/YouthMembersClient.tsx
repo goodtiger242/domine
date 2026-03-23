@@ -2,7 +2,10 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
-import type { YouthProfile } from "@/lib/constants/youth-profiles";
+import {
+  feastDayDateOnly,
+  type YouthProfile,
+} from "@/lib/constants/youth-profiles";
 
 const STORAGE_KEY = "domine-youth-profiles-v1";
 
@@ -20,7 +23,11 @@ function mergeByLegalName(
     if (!s) {
       return d;
     }
-    return { ...d, ...s, legalName: d.legalName };
+    const merged = { ...d, ...s, legalName: d.legalName };
+    return {
+      ...merged,
+      feastDay: feastDayDateOnly(merged.feastDay),
+    };
   });
 }
 
@@ -54,9 +61,13 @@ export function YouthMembersClient({ initialProfiles }: Props) {
   }, [profiles]);
 
   const saveEdit = useCallback(() => {
-    setProfiles(draft);
+    const next = draft.map((p) => ({
+      ...p,
+      feastDay: feastDayDateOnly(p.feastDay),
+    }));
+    setProfiles(next);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     } catch {
       /* ignore */
     }
@@ -84,9 +95,6 @@ export function YouthMembersClient({ initialProfiles }: Props) {
           <h1 className="text-3xl font-bold tracking-tight text-indigo-950 dark:text-amber-50">
             청년회 멤버
           </h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            {profiles.length}명 · 가나다순
-          </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {isEditing ? (
@@ -118,14 +126,6 @@ export function YouthMembersClient({ initialProfiles }: Props) {
         </div>
       </div>
 
-      <p className="text-sm text-slate-600 dark:text-slate-400">
-        가나다순 · 사진은 나중에{" "}
-        <code className="rounded bg-slate-200/80 px-1.5 py-0.5 text-xs dark:bg-slate-800">
-          public/image/members/
-        </code>{" "}
-        등에 넣고 &quot;사진 경로&quot;에 연결하면 표시됩니다.
-      </p>
-
       <ul className="grid gap-8 sm:grid-cols-2 xl:grid-cols-3">
         {rows.map((p, index) => (
           <li
@@ -147,9 +147,6 @@ export function YouthMembersClient({ initialProfiles }: Props) {
                 <div className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100/90 to-amber-50/80 ring-2 ring-white/80 dark:from-indigo-950/80 dark:to-slate-900 dark:ring-slate-700/80">
                   <span className="text-4xl font-bold text-indigo-950/40 dark:text-amber-200/50">
                     {p.legalName.slice(0, 1)}
-                  </span>
-                  <span className="mt-2 text-[0.65rem] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-500">
-                    사진 예정
                   </span>
                 </div>
               )}
@@ -174,13 +171,11 @@ export function YouthMembersClient({ initialProfiles }: Props) {
                   label="생일"
                   value={p.birthday}
                   onChange={(v) => updateDraft(index, { birthday: v })}
-                  placeholder="예: 3월 15일"
                 />
                 <Field
                   label="축일"
                   value={p.feastDay}
                   onChange={(v) => updateDraft(index, { feastDay: v })}
-                  placeholder="예: 성 ○○○ 축일"
                 />
                 <Field
                   label="특기"
@@ -202,7 +197,6 @@ export function YouthMembersClient({ initialProfiles }: Props) {
                       imageSrc: v.trim() ? v.trim() : null,
                     })
                   }
-                  placeholder="/image/members/홍길동.jpg"
                 />
               </div>
             ) : (
@@ -254,11 +248,6 @@ export function YouthMembersClient({ initialProfiles }: Props) {
           </li>
         ))}
       </ul>
-
-      <p className="text-center text-xs text-slate-500 dark:text-slate-500">
-        편집 후 저장하면 이 기기 브라우저에만 보관됩니다. 나중에 서버 저장을 붙이면
-        모두에게 공유할 수 있어요.
-      </p>
     </div>
   );
 }

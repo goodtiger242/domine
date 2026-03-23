@@ -13,7 +13,7 @@ export const HAK_JUN_DISCHARGE = new Date("2027-09-08T12:00:00+09:00");
 const MS_DAY = 86_400_000;
 
 export type HakJunMilitaryStats = {
-  /** 0–100, 입대~전역 복무 구간 기준 진행률 (입대 전이면 0) */
+  /** 0–100, 입대~전역 복무 구간 기준 진행률. 입대 전에는 미세 표시용(0.0000x%대) */
   progressPercent: number;
   /** 전역일까지 남은 일 수 */
   daysToDischarge: number;
@@ -42,7 +42,11 @@ export function getHakJunMilitaryStats(now: Date = new Date()): HakJunMilitarySt
 
   let progressPercent: number;
   if (isPreEnlist) {
-    progressPercent = 0;
+    /** 입대 전: 입대에 가까워질수록 아주 미세하게 올라감(0% 고정 방지). until > total 이면 바닥값만 부여 */
+    const until = t0 - now.getTime();
+    const ratio = until / total;
+    const raw = 1 - Math.min(1, ratio);
+    progressPercent = Math.max(1e-12, raw * 0.000074);
   } else if (isDischarged) {
     progressPercent = 100;
   } else {

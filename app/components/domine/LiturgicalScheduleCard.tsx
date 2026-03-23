@@ -67,11 +67,14 @@ type Props = {
   schedule: LiturgicalSchedule;
   /** 메인 등 조회 전용 화면에서는 수정 링크 숨김 */
   showEditLink?: boolean;
+  /** 메인: 현재 달에서 시선이 가도록 테두리·그림자 강조 */
+  emphasize?: boolean;
 };
 
 export function LiturgicalScheduleCard({
   schedule,
   showEditLink = true,
+  emphasize = false,
 }: Props) {
   const enrich = !showEditLink;
 
@@ -86,7 +89,19 @@ export function LiturgicalScheduleCard({
   ].some((s) => s.trim());
 
   return (
-    <article className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-950/80 dark:shadow-none sm:p-7">
+    <article
+      className={
+        emphasize
+          ? "relative overflow-hidden rounded-3xl border-2 border-indigo-950/45 bg-gradient-to-br from-white via-white to-indigo-50/60 p-6 shadow-[0_14px_44px_rgb(30,27,75,0.14)] ring-2 ring-indigo-950/20 dark:border-amber-400/40 dark:from-slate-950 dark:via-slate-950 dark:to-indigo-950/50 dark:shadow-[0_12px_40px_rgba(0,0,0,0.45)] dark:ring-amber-400/25 sm:p-7"
+          : "rounded-3xl border border-slate-200/90 bg-white p-6 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-950/80 dark:shadow-none sm:p-7"
+      }
+    >
+      {emphasize ? (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-indigo-950 via-indigo-600 to-amber-500 dark:from-amber-200 dark:via-amber-400 dark:to-amber-600"
+          aria-hidden
+        />
+      ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-indigo-950/80 dark:text-amber-200/90">

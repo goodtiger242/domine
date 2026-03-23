@@ -21,6 +21,8 @@ const fieldClass =
 type Props = {
   liturgyDate: string;
   initial: LiturgicalSchedule | null;
+  /** ISO 날짜 → 저장된 미사·전례 건수(달력 점 표시용) */
+  savedDateCounts: Record<string, number>;
 };
 
 function isValidRoleField(v: string): boolean {
@@ -45,7 +47,11 @@ function emptyFormState() {
   };
 }
 
-export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
+export function LiturgicalEditForm({
+  liturgyDate,
+  initial,
+  savedDateCounts,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -147,7 +153,11 @@ export function LiturgicalEditForm({ liturgyDate, initial }: Props) {
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-8">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,34rem)_1fr] xl:grid-cols-[minmax(0,44rem)_1fr] 2xl:grid-cols-[minmax(0,52rem)_1fr] lg:items-start">
-        <MassDatePicker value={liturgyDate} onChange={onDateChange} />
+        <MassDatePicker
+          value={liturgyDate}
+          onChange={onDateChange}
+          savedDateCounts={savedDateCounts}
+        />
         <div className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-800 dark:text-slate-200">

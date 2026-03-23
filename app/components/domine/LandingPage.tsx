@@ -16,12 +16,15 @@ type Props = {
   liturgicalYear: number;
   liturgicalMonth: number;
   liturgicalSchedules: LiturgicalSchedule[];
+  /** 메인: 오늘 기준 가장 가까운 미사 카드 강조용 ISO 날짜 */
+  highlightLiturgyDate?: string | null;
 };
 
 export function LandingPage({
   liturgicalYear,
   liturgicalMonth,
   liturgicalSchedules,
+  highlightLiturgyDate = null,
 }: Props) {
   return (
     <div className="flex min-h-full flex-col bg-[#f4f6fb] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -74,6 +77,7 @@ export function LandingPage({
           month={liturgicalMonth}
           schedules={liturgicalSchedules}
           variant="home"
+          highlightLiturgyDate={highlightLiturgyDate}
         />
 
         <LiturgicalMinisterPrayersSection />

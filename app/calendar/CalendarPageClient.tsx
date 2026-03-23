@@ -76,9 +76,11 @@ export function CalendarPageClient({ year, month, events }: Props) {
     (d: Date) => {
       const y = d.getFullYear();
       const m = d.getMonth() + 1;
-      router.push(`/calendar?year=${y}&month=${m}`, { scroll: false });
+      startTransition(() => {
+        router.push(`/calendar?year=${y}&month=${m}`, { scroll: false });
+      });
     },
-    [router]
+    [router, startTransition]
   );
 
   function onAdd(e: FormEvent<HTMLFormElement>) {

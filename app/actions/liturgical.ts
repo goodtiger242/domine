@@ -64,6 +64,33 @@ export async function getScheduleForDate(
   }
 }
 
+/** ISO 날짜 → 해당 날짜에 ‘내용 있는’ 전례 행 개수 (같은 날 2행이면 2) */
+export async function listLiturgicalDateCounts(): Promise<
+  Record<string, number>
+> {
+  try {
+    const supabase = createAnonServerClient();
+    const { data, error } = await supabase
+      .from("liturgical_weekly_schedule")
+      .select("*");
+
+    if (error || !data) {
+      return {};
+    }
+    const counts: Record<string, number> = {};
+    for (const row of data as LiturgicalSchedule[]) {
+      if (!hasLiturgicalContent(row)) {
+        continue;
+      }
+      const d = row.liturgy_date;
+      counts[d] = (counts[d] ?? 0) + 1;
+    }
+    return counts;
+  } catch {
+    return {};
+  }
+}
+
 export async function listLiturgyDatesFromDb(limit = 32): Promise<string[]> {
   try {
     const supabase = createAnonServerClient();

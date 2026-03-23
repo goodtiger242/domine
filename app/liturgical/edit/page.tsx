@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { LiturgicalEditForm } from "./LiturgicalEditForm";
-import { getScheduleForDate } from "@/app/actions/liturgical";
+import {
+  getScheduleForDate,
+  listLiturgicalDateCounts,
+} from "@/app/actions/liturgical";
 import { getTodayISO } from "@/lib/date/local";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +20,10 @@ export default async function LiturgicalEditPage({
 }) {
   const sp = await searchParams;
   const liturgyDate = sp.date ?? getTodayISO();
-  const schedule = await getScheduleForDate(liturgyDate);
+  const [schedule, savedDateCounts] = await Promise.all([
+    getScheduleForDate(liturgyDate),
+    listLiturgicalDateCounts(),
+  ]);
 
   return (
     <div className="min-h-full bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-[#fff7ed] px-5 py-12 text-slate-900 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
@@ -35,6 +41,7 @@ export default async function LiturgicalEditPage({
           key={`${liturgyDate}-${schedule?.updated_at ?? "none"}`}
           liturgyDate={liturgyDate}
           initial={schedule}
+          savedDateCounts={savedDateCounts}
         />
       </div>
     </div>
