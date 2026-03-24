@@ -69,9 +69,9 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
                 onChange("");
               }
             }}
-            className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] ${
+            className={`rounded-sm px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] ${
               mode === "member"
-                ? "bg-[var(--lit-bg-elevated)] text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)]"
+                ? "bg-[var(--lit-bg-elevated)] text-[var(--lit-ink)] ring-1 ring-[var(--lit-border)]"
                 : "text-[var(--lit-ink-subtle)]"
             }`}
           >
@@ -80,9 +80,9 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
           <button
             type="button"
             onClick={() => setEmptyTab("custom")}
-            className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] ${
+            className={`rounded-sm px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] ${
               mode === "custom"
-                ? "bg-[var(--lit-bg-elevated)] text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)]"
+                ? "bg-[var(--lit-bg-elevated)] text-[var(--lit-ink)] ring-1 ring-[var(--lit-border)]"
                 : "text-[var(--lit-ink-subtle)]"
             }`}
           >
@@ -103,7 +103,7 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
             }
             onChange(formatYouthMemberDisplay(legal));
           }}
-          className="mt-0.5 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
+          className="mt-0.5 w-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-3 py-2.5 text-sm text-[var(--lit-ink)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
         >
           <option value="">선택하세요</option>
           {members.map((n) => (
@@ -158,7 +158,7 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
             }}
             placeholder="예: 홍길동"
             aria-invalid={value.length > 0 && !isValidCustomLiturgicalName(value)}
-            className="mt-0.5 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] outline-none transition placeholder:text-[var(--lit-ink-subtle)] focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] aria-invalid:border-[var(--lit-gold)]"
+            className="mt-0.5 w-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-3 py-2.5 text-sm text-[var(--lit-ink)] outline-none transition placeholder:text-[var(--lit-ink-subtle)] focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] aria-invalid:border-[var(--lit-ink)]"
           />
           <p className="text-[11px] leading-snug text-[var(--lit-ink-subtle)]">
             직접 입력은 <span className="font-medium">한글 성명만 2~4자</span>

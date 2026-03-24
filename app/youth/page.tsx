@@ -15,13 +15,13 @@ export default function YouthPage() {
   return (
     <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)]">
       <SiteHeader navLinks={SITE_NAV_YOUTH} />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:px-10 sm:py-12">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-16 md:px-8 md:py-20">
         <YouthMembersClient initialProfiles={profiles} />
       </main>
-      <footer className="border-t border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-5 py-8 text-center text-sm text-[var(--lit-ink-muted)]">
+      <footer className="border-t border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-6 py-10 text-center text-sm text-[var(--lit-ink-muted)]">
         <Link
           href="/"
-          className="font-medium text-[var(--lit-gold)] underline decoration-[var(--lit-gold)]/35 underline-offset-4 transition hover:text-[var(--lit-ink)]"
+          className="font-medium underline decoration-[var(--lit-border-strong)] underline-offset-4 transition hover:text-[var(--lit-ink)]"
         >
           메인으로
         </Link>

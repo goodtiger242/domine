@@ -16,7 +16,7 @@ import {
 } from "@/lib/constants/youth-members";
 
 const fieldClass =
-  "mt-1 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--lit-bg-elevated)]";
+  "mt-1 w-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-3 py-2.5 text-sm text-[var(--lit-ink)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2";
 
 type Props = {
   liturgyDate: string;
@@ -194,8 +194,8 @@ export function LiturgicalEditForm({
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)] sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-gold)]">
+      <div className="space-y-6 border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-ink-subtle)]">
           전례 봉사
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -226,8 +226,8 @@ export function LiturgicalEditForm({
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)] sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-gold)]">
+      <div className="space-y-6 border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-ink-subtle)]">
           복사단
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -244,8 +244,8 @@ export function LiturgicalEditForm({
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)] sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-gold)]">
+      <div className="space-y-6 border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-ink-subtle)]">
           지휘 · 반주
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -253,7 +253,7 @@ export function LiturgicalEditForm({
             <label className="text-xs font-medium text-[var(--lit-ink-muted)]">
               지휘
             </label>
-            <p className="mt-0.5 rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)]">
+            <p className="mt-0.5 border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)]">
               {FIXED_CONDUCTOR_NAME}
             </p>
           </div>
@@ -269,7 +269,7 @@ export function LiturgicalEditForm({
         <button
           type="submit"
           disabled={pending}
-          className="h-12 flex-1 rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-ink)] text-sm font-semibold text-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow)] transition hover:bg-[var(--lit-accent)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+          className="h-12 flex-1 border border-[var(--lit-ink)] bg-[var(--lit-ink)] text-sm font-semibold text-[var(--lit-bg-elevated)] transition hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
         >
           {pending ? "저장 중…" : "저장"}
         </button>

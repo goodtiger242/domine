@@ -35,7 +35,7 @@ export function MonthNav({ year, month, basePath }: Props) {
   const now = new Date();
 
   const navBtnClass =
-    "inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] text-sm font-semibold text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2";
+    "inline-flex h-11 min-w-[2.75rem] items-center justify-center border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] text-sm font-semibold text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2";
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -70,7 +70,7 @@ export function MonthNav({ year, month, basePath }: Props) {
         type="button"
         disabled={pending}
         onClick={() => go(now.getFullYear(), now.getMonth() + 1)}
-        className="flex h-11 items-center justify-center rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-5 text-sm font-semibold text-[var(--lit-ink-muted)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+        className="flex h-11 items-center justify-center border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-5 text-sm font-semibold text-[var(--lit-ink-muted)] transition hover:text-[var(--lit-ink)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
       >
         이번 달
       </button>

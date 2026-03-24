@@ -31,23 +31,23 @@ export default async function LiturgicalEditPage({
   return (
     <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)]">
       <SiteHeader navLinks={SITE_NAV_EDIT} />
-      <main className="flex-1 px-5 py-10 sm:px-10 sm:py-12">
+      <main className="flex-1 px-6 py-16 md:px-8 md:py-20">
         <div className="mx-auto max-w-5xl">
-          <div className="border-b border-[var(--lit-border)] pb-8">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[var(--lit-gold-muted)]">
+          <div className="border-b border-[var(--lit-border)] pb-10 md:pb-12">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]">
               관리
             </p>
             <h1
-              className={`${litDisplay.className} mt-2 text-3xl tracking-tight text-[var(--lit-ink)] sm:text-4xl`}
+              className={`${litDisplay.className} mt-4 text-3xl font-semibold tracking-tight text-[var(--lit-ink)] md:text-4xl`}
             >
               전례 봉사 편집
             </h1>
-            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
+            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
               미사 날짜를 고른 뒤 봉사자를 입력하고 저장합니다. 메인·전례 안내에 반영됩니다.
             </p>
             <Link
               href="/"
-              className="mt-6 inline-flex text-sm font-semibold text-[var(--lit-gold)] underline decoration-[var(--lit-gold)]/35 underline-offset-4 transition hover:text-[var(--lit-ink)]"
+              className="mt-8 inline-flex text-sm font-semibold text-[var(--lit-ink-muted)] underline decoration-[var(--lit-border-strong)] underline-offset-4 transition hover:text-[var(--lit-ink)]"
             >
               ← 메인으로
             </Link>

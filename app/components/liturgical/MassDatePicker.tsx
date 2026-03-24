@@ -85,7 +85,7 @@ export function MassDatePicker({
     "relative font-semibold text-[var(--lit-ink)] after:pointer-events-none after:absolute after:bottom-0.5 after:left-1/2 after:z-[1] after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-[var(--lit-gold)] after:shadow-[7px_0_0_0_var(--lit-gold-muted),0_0_0_1px_rgba(255,252,246,0.4)]";
 
   return (
-    <div className="w-full rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-6 shadow-[var(--lit-paper-shadow)] sm:p-8">
+    <div className="w-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-6 sm:p-8">
       <p className="mb-5 text-lg font-semibold text-[var(--lit-ink)]">
         미사 날짜
       </p>
@@ -110,7 +110,7 @@ export function MassDatePicker({
           classNames={{
             today: "font-bold text-[var(--lit-ink)]",
             selected:
-              "bg-[var(--lit-ink)] text-[var(--lit-bg-elevated)] rounded-xl",
+              "bg-[var(--lit-ink)] text-[var(--lit-bg-elevated)] rounded-sm",
             root: "w-full max-w-none",
             month_caption:
               "flex justify-center pt-1 relative items-center mb-3 text-xl font-semibold sm:text-2xl",

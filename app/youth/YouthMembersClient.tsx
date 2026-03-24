@@ -143,7 +143,7 @@ export function YouthMembersClient({ initialProfiles }: Props) {
               <button
                 type="button"
                 onClick={saveEdit}
-                className="h-10 rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-ink)] px-6 text-sm font-semibold text-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow)] transition hover:bg-[var(--lit-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+                className="h-10 border border-[var(--lit-ink)] bg-[var(--lit-ink)] px-6 text-sm font-semibold text-[var(--lit-bg-elevated)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
               >
                 저장
               </button>
@@ -152,7 +152,7 @@ export function YouthMembersClient({ initialProfiles }: Props) {
             <button
               type="button"
               onClick={startEdit}
-              className="h-10 rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-6 text-sm font-semibold text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
+              className="h-10 border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-6 text-sm font-semibold text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
             >
               편집
             </button>
@@ -164,7 +164,7 @@ export function YouthMembersClient({ initialProfiles }: Props) {
         {rows.map((p, index) => (
           <li
             key={p.legalName}
-            className="rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)]"
+            className="border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-6"
           >
             <div className="mx-auto mb-4 w-full max-w-[220px]">
               {p.imageSrc?.trim() ? (

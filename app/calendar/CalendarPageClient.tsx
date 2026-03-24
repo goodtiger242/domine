@@ -152,7 +152,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
       <MonthNav year={year} month={month} basePath="/calendar" />
 
       <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-start lg:justify-center">
-        <div className="[&_.rdp-month_caption]:hidden w-full max-w-md rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)]">
+        <div className="[&_.rdp-month_caption]:hidden w-full max-w-md border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5">
           <DayPicker
             key={`${year}-${month}`}
             mode="single"
@@ -184,7 +184,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
               {events.map((ev) => (
                 <li
                   key={ev.id}
-                  className="rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-4 shadow-[var(--lit-paper-shadow)]"
+                  className="border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -235,7 +235,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-lg rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-7 shadow-[var(--lit-paper-shadow)]">
+      <div className="mx-auto max-w-lg border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-7">
         <h2 className="text-base font-bold text-[var(--lit-ink)]">
           일정 추가
         </h2>
@@ -278,7 +278,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
           <button
             type="submit"
             disabled={pending}
-            className="h-12 w-full rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-ink)] text-sm font-semibold text-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow)] transition hover:bg-[var(--lit-accent)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+            className="h-12 w-full border border-[var(--lit-ink)] bg-[var(--lit-ink)] text-sm font-semibold text-[var(--lit-bg-elevated)] transition hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
           >
             {pending ? "저장 중…" : "일정 저장"}
           </button>
@@ -304,7 +304,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="calendar-edit-title"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-6 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h3
@@ -389,7 +389,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
                 <button
                   type="submit"
                   disabled={pending}
-                  className="h-11 rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-ink)] px-6 text-sm font-semibold text-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow)] transition hover:bg-[var(--lit-accent)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+                  className="h-11 border border-[var(--lit-ink)] bg-[var(--lit-ink)] px-6 text-sm font-semibold text-[var(--lit-bg-elevated)] transition hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
                 >
                   {pending ? "저장 중…" : "저장"}
                 </button>

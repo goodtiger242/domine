@@ -1,47 +1,45 @@
 @import "tailwindcss";
 
-/* 클래식 리터지컬 — 양피지·잉크·브론즈 악센트 */
+/* 에디토리얼 미니멀 — 잡지·브랜드: 넓은 여백, 단색, 보더 위주, 2~3색 */
 :root {
-  --background: #f6f1e8;
-  --foreground: #1a1f2c;
-  --lit-bg: #f6f1e8;
-  --lit-bg-elevated: #fffcf6;
-  --lit-bg-hero: #f0e9de;
-  --lit-ink: #1a1f2c;
-  --lit-ink-muted: #4a4f5c;
-  --lit-ink-subtle: #6b7280;
-  --lit-border: #d4cfc3;
-  --lit-border-strong: #b8b0a0;
-  --lit-ink-footer: #0f1218;
-  --lit-gold: #7d6b4a;
-  --lit-gold-light: #c4a574;
-  --lit-gold-muted: #9a8b6f;
-  --lit-accent: #2c3544;
-  --lit-ring: #7d6b4a;
-  --lit-paper-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    0 1px 2px rgba(26, 31, 44, 0.06);
+  --background: #fafafa;
+  --foreground: #0a0a0a;
+  --lit-bg: #fafafa;
+  --lit-bg-elevated: #ffffff;
+  --lit-bg-hero: #ffffff;
+  --lit-ink: #0a0a0a;
+  --lit-ink-muted: #525252;
+  --lit-ink-subtle: #737373;
+  --lit-border: #e5e5e5;
+  --lit-border-strong: #d4d4d4;
+  --lit-ink-footer: #fafafa;
+  --lit-gold: #0a0a0a;
+  --lit-gold-light: #0a0a0a;
+  --lit-gold-muted: #737373;
+  --lit-accent: #0a0a0a;
+  --lit-ring: #0a0a0a;
+  --lit-paper-shadow: none;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0f1218;
-    --foreground: #ece8df;
-    --lit-bg: #0f1218;
-    --lit-bg-elevated: #171d26;
-    --lit-bg-hero: #121920;
-    --lit-ink: #ece8df;
-    --lit-ink-muted: #a8a29e;
-    --lit-ink-subtle: #78716c;
-    --lit-border: #2d333d;
-    --lit-border-strong: #3d4654;
-    --lit-ink-footer: #080a0e;
-    --lit-gold: #c4a574;
-    --lit-gold-light: #d4bc8a;
-    --lit-gold-muted: #a89072;
-    --lit-accent: #e8e4dc;
-    --lit-ring: #c4a574;
-    --lit-paper-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      0 1px 3px rgba(0, 0, 0, 0.35);
+    --background: #0a0a0a;
+    --foreground: #fafafa;
+    --lit-bg: #0a0a0a;
+    --lit-bg-elevated: #171717;
+    --lit-bg-hero: #0a0a0a;
+    --lit-ink: #fafafa;
+    --lit-ink-muted: #a3a3a3;
+    --lit-ink-subtle: #737373;
+    --lit-border: #262626;
+    --lit-border-strong: #404040;
+    --lit-ink-footer: #0a0a0a;
+    --lit-gold: #fafafa;
+    --lit-gold-light: #fafafa;
+    --lit-gold-muted: #a3a3a3;
+    --lit-accent: #fafafa;
+    --lit-ring: #fafafa;
+    --lit-paper-shadow: none;
   }
 }
 
@@ -61,8 +59,8 @@ body {
 
 /* 전례 편집용 DayPicker */
 .rdp-mass-calendar {
-  --rdp-accent-color: var(--lit-accent);
-  --rdp-accent-background-color: rgba(125, 107, 74, 0.12);
+  --rdp-accent-color: var(--lit-ink);
+  --rdp-accent-background-color: rgba(10, 10, 10, 0.06);
   --rdp-day-height: 3.75rem;
   --rdp-day-width: 3.75rem;
   --rdp-day_button-height: 3.5rem;
@@ -96,8 +94,8 @@ body {
 
 @media (prefers-color-scheme: dark) {
   .rdp-mass-calendar {
-    --rdp-accent-color: var(--lit-gold-light);
-    --rdp-accent-background-color: rgba(196, 165, 116, 0.12);
+    --rdp-accent-color: var(--lit-ink);
+    --rdp-accent-background-color: rgba(250, 250, 250, 0.08);
   }
 }
 

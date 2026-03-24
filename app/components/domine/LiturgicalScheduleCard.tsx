@@ -68,7 +68,7 @@ type Props = {
 };
 
 const cardBase =
-  "rounded-2xl border bg-[var(--lit-bg-elevated)] p-6 shadow-[var(--lit-paper-shadow)] sm:p-7";
+  "rounded-sm border bg-[var(--lit-bg-elevated)] p-6 sm:p-8";
 
 export function LiturgicalScheduleCard({
   schedule,
@@ -91,16 +91,10 @@ export function LiturgicalScheduleCard({
     <article
       className={
         emphasize
-          ? `relative overflow-hidden ${cardBase} border-2 border-[var(--lit-gold)]/55 ring-1 ring-[var(--lit-gold)]/25`
+          ? `${cardBase} border-2 border-[var(--lit-ink)]`
           : `${cardBase} border-[var(--lit-border)]`
       }
     >
-      {emphasize ? (
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[var(--lit-accent)] via-[var(--lit-gold-muted)] to-[var(--lit-gold)]"
-          aria-hidden
-        />
-      ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-[var(--lit-gold-muted)]">
@@ -115,7 +109,7 @@ export function LiturgicalScheduleCard({
         {showEditLink ? (
           <Link
             href={`/liturgical/edit?date=${schedule.liturgy_date}`}
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-bg)] px-5 text-sm font-medium text-[var(--lit-ink)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+            className="inline-flex h-10 shrink-0 items-center justify-center border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-5 text-sm font-medium text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
           >
             수정
           </Link>
@@ -123,7 +117,7 @@ export function LiturgicalScheduleCard({
       </div>
 
       {schedule.announcement_detail.trim() ? (
-        <div className="mb-5 rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4">
+        <div className="mb-5 border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4">
           <p className="whitespace-pre-wrap text-base leading-relaxed text-[var(--lit-ink-muted)]">
             {schedule.announcement_detail}
           </p>
@@ -131,11 +125,11 @@ export function LiturgicalScheduleCard({
       ) : null}
 
       {hasLiturgicalRoles ? (
-        <div className="space-y-4 rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)]/80 p-4 sm:p-5">
+        <div className="space-y-4 border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4 sm:p-5">
           {enrich ? (
             <>
               <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
+                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
                   전례 봉사
                 </h4>
                 <div className="space-y-2">
@@ -162,7 +156,7 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
+                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
                   복사단
                 </h4>
                 <div className="space-y-2">
@@ -172,7 +166,7 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
+                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
                   지휘 · 반주
                 </h4>
                 <div className="space-y-2">
@@ -184,7 +178,7 @@ export function LiturgicalScheduleCard({
           ) : (
             <>
               <div>
-                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
+                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
                   전례 봉사
                 </h4>
                 <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-2">
@@ -207,7 +201,7 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div>
-                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
+                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
                   복음 환호송
                 </h4>
                 {schedule.role_gospel_acclamation.trim() ? (
@@ -246,10 +240,10 @@ export function LiturgicalScheduleCard({
           )}
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)]/80 p-4 sm:p-5">
+        <div className="border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4 sm:p-5">
           {enrich ? (
             <div className="space-y-2">
-              <h4 className="mb-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
+              <h4 className="mb-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
                 지휘 · 반주
               </h4>
               <RoleLine label="지휘" value={FIXED_CONDUCTOR_NAME} />
