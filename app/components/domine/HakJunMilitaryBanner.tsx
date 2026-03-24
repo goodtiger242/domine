@@ -82,9 +82,9 @@ export function HakJunMilitaryBanner() {
                     %
                   </span>
                 </p>
-                <div className="mt-2 h-[2px] w-full overflow-hidden bg-[var(--lit-border)] md:mt-4">
+                <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--lit-border)] md:mt-4">
                   <div
-                    className="h-full bg-[var(--lit-ink)] transition-[width] duration-700 ease-out"
+                    className="h-full rounded-full bg-[var(--lit-ink)] transition-[width] duration-700 ease-out"
                     style={{
                       width:
                         displayPct <= 0

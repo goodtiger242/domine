@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
-import { LiturgicalScheduleCard } from "@/app/components/domine/LiturgicalScheduleCard";
+import { LiturgicalHomeModules } from "@/app/components/domine/home/LiturgicalHomeModules";
 
 type Props = {
   eventKeys: string[];
@@ -29,9 +29,6 @@ function emptySchedule(liturgyDate: string): LiturgicalSchedule {
 
 const navBtn =
   "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-xl font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-[transform,background-color,border-color,box-shadow] duration-300 ease-out hover:border-[var(--lit-border-strong)] hover:bg-[var(--lit-bg)] hover:shadow-[var(--lit-paper-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-30 motion-reduce:transition-none";
-
-const cardSoft =
-  "rounded-2xl border-[var(--lit-border)]/85 shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.02] motion-reduce:shadow-none motion-reduce:ring-0 dark:ring-white/[0.04]";
 
 export function HomeLiturgicalSpotlight({
   eventKeys,
@@ -76,12 +73,9 @@ export function HomeLiturgicalSpotlight({
         </button>
 
         <div className="min-w-0 flex-1">
-          <LiturgicalScheduleCard
+          <LiturgicalHomeModules
             schedule={schedule}
-            showEditLink={false}
-            showEmptyRolePlaceholders
             syntheticEmpty={syntheticEmpty}
-            articleClassName={cardSoft}
           />
         </div>
 

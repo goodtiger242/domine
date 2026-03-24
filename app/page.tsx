@@ -7,6 +7,7 @@ import {
   buildMassEventKeys,
   pickDefaultMassDate,
 } from "@/lib/liturgical/mass-timeline";
+import { buildTodaySummaryPayload } from "@/lib/home/today-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,13 @@ export default async function Home() {
     initialIndex = 0;
   }
 
+  const scheduleForDefault = schedulesByDate[defaultDate] ?? null;
+  const todaySummary = buildTodaySummaryPayload(
+    defaultDate,
+    scheduleForDefault,
+    scheduleForDefault === null
+  );
+
   return (
     <LandingPage
       liturgicalYear={year}
@@ -35,6 +43,7 @@ export default async function Home() {
         schedulesByDate,
         initialIndex,
       }}
+      todaySummary={todaySummary}
     />
   );
 }

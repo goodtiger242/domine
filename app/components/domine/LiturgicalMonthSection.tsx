@@ -16,6 +16,8 @@ type Props = {
     schedulesByDate: Record<string, LiturgicalSchedule>;
     initialIndex: number;
   } | null;
+  /** 랜딩 등에서 순서·스크롤 마진 조정 */
+  sectionClassName?: string;
 };
 
 export function LiturgicalMonthSection({
@@ -24,13 +26,16 @@ export function LiturgicalMonthSection({
   schedules,
   variant,
   homeSpotlight = null,
+  sectionClassName = "",
 }: Props) {
   const label = formatMonthLabelKo(year, month);
 
   return (
     <section
       id={variant === "home" ? "liturgical" : undefined}
-      className="scroll-mt-20 border-b border-[var(--lit-border)]/80 bg-[var(--lit-bg)] px-5 py-24 md:px-10 md:py-32 lg:px-12"
+      className={`scroll-mt-28 border-b border-[var(--lit-border)]/80 bg-[var(--lit-bg)] px-5 py-24 md:px-10 md:py-32 lg:scroll-mt-24 lg:px-12${
+        sectionClassName ? ` ${sectionClassName}` : ""
+      }`}
     >
       <div className="mx-auto max-w-3xl">
         <div className="mb-12 flex flex-col gap-8 md:mb-16 md:gap-10">
@@ -54,6 +59,12 @@ export function LiturgicalMonthSection({
                   </>
                 )}
               </h2>
+              {variant === "home" && homeSpotlight ? (
+                <p className="mt-3 max-w-prose text-[15px] leading-relaxed text-[var(--lit-ink-muted)] md:mt-4">
+                  오늘 일정·공지·담당을 나누어 보여 줍니다. 날짜는 좌우 버튼으로
+                  바꿀 수 있습니다.
+                </p>
+              ) : null}
             </div>
             {variant === "page" ? (
               <Link

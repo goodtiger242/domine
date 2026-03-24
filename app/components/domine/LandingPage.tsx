@@ -4,9 +4,13 @@ import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteBrandLink } from "@/app/components/layout/SiteBrandLink";
 import { FamilyPhotoCarousel } from "@/app/components/domine/FamilyPhotoCarousel";
 import { HakJunMilitaryBanner } from "@/app/components/domine/HakJunMilitaryBanner";
+import { HomeAnchorNav } from "@/app/components/domine/home/HomeAnchorNav";
+import { ScrollToTop } from "@/app/components/domine/home/ScrollToTop";
+import { TodaySummaryCard } from "@/app/components/domine/home/TodaySummaryCard";
 import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { familyGalleryImages } from "@/lib/domine/family-gallery";
+import type { TodaySummaryPayload } from "@/lib/home/today-summary";
 import { SiteHeaderNav } from "@/app/components/layout/SiteHeaderNav";
 import { SITE_NAV_HOME } from "@/lib/nav/site-nav";
 
@@ -18,12 +22,14 @@ type Props = {
     schedulesByDate: Record<string, LiturgicalSchedule>;
     initialIndex: number;
   };
+  todaySummary: TodaySummaryPayload;
 };
 
 export function LandingPage({
   liturgicalYear,
   liturgicalMonth,
   homeSpotlight,
+  todaySummary,
 }: Props) {
   return (
     <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)] antialiased">
@@ -34,51 +40,98 @@ export function LandingPage({
         </div>
       </header>
 
+      <HomeAnchorNav />
+
       <main className="flex-1">
-        <section
-          className="cos-grid-bg relative flex min-h-0 flex-col justify-center overflow-hidden border-b border-[var(--lit-border)]/70 lg:min-h-[min(88dvh,920px)]"
-          aria-labelledby="hero-title"
-        >
-          <h1 id="hero-title" className="sr-only">
-            도미네
-          </h1>
-          <div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--lit-bg-hero)] via-[var(--lit-bg-hero)]/40 to-[var(--lit-bg)] opacity-[0.92]"
-            aria-hidden
+        <h1 className="sr-only">도미네 · 용호성당 청년회</h1>
+
+        <div className="flex flex-col">
+          <section
+            id="home-today"
+            className="order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] px-4 py-6 md:px-10 lg:order-2 lg:border-b-0 lg:py-10 lg:pt-8"
+          >
+            <div className="mx-auto max-w-3xl lg:px-2">
+              <TodaySummaryCard summary={todaySummary} />
+            </div>
+          </section>
+
+          <section id="home-military" className="order-2 lg:order-3">
+            <HakJunMilitaryBanner />
+          </section>
+
+          <LiturgicalMonthSection
+            year={liturgicalYear}
+            month={liturgicalMonth}
+            schedules={[]}
+            variant="home"
+            homeSpotlight={homeSpotlight}
+            sectionClassName="order-3 lg:order-4"
           />
-          <div className="relative mx-auto w-full max-w-[90rem] px-4 py-12 md:px-10 md:py-24 lg:px-12 lg:py-32">
-            <div className="cos-stagger-2 mx-auto flex w-full max-w-[min(100%,42rem)] flex-col items-center gap-2">
-              <div className="mb-2 flex w-full justify-center px-2 md:mb-4">
-                <Image
-                  src="/image/domine_logo.jpg"
-                  alt="Domine"
-                  width={480}
-                  height={180}
-                  priority
-                  className="h-auto max-h-[4.75rem] w-auto max-w-[min(100%,18rem)] object-contain object-center drop-shadow-[0_2px_20px_rgba(0,0,0,0.06)] md:max-h-[5.5rem] lg:max-h-[6rem] dark:drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
+
+          <section
+            id="home-gallery"
+            className="relative cos-grid-bg order-4 border-b border-[var(--lit-border)]/70 lg:order-1 lg:min-h-0 lg:border-b"
+          >
+            <div className="relative hidden overflow-hidden lg:block">
+              <div
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--lit-bg-hero)] via-[var(--lit-bg-hero)]/40 to-[var(--lit-bg)] opacity-[0.92]"
+                aria-hidden
+              />
+              <div className="relative mx-auto w-full max-w-[90rem] px-4 py-12 md:px-10 md:py-24 lg:px-12 lg:py-28">
+                <div className="cos-stagger-2 mx-auto flex w-full max-w-[min(100%,42rem)] flex-col items-center gap-2">
+                  <div className="mb-2 flex w-full justify-center px-2 md:mb-4">
+                    <Image
+                      src="/image/domine_logo.jpg"
+                      alt="Domine"
+                      width={480}
+                      height={180}
+                      priority
+                      className="h-auto max-h-[4.75rem] w-auto max-w-[min(100%,18rem)] object-contain object-center drop-shadow-[0_2px_20px_rgba(0,0,0,0.06)] md:max-h-[5.5rem] lg:max-h-[6rem] dark:drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
+                    />
+                  </div>
+                  <FamilyPhotoCarousel
+                    images={familyGalleryImages}
+                    imageClassName="object-contain object-center lg:object-cover lg:object-[center_28%]"
+                    sizes="(max-width: 1024px) 100vw, 42rem"
+                    layout="hero"
+                    autoPlayMs={0}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="relative border-t border-[var(--lit-border)]/50 bg-[var(--lit-bg-hero)] px-4 py-10 lg:hidden">
+              <div className="mx-auto w-full max-w-[min(100%,26rem)]">
+                <p className="mb-4 text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lit-ink-muted)]">
+                  Gallery
+                </p>
+                <div className="mb-5 flex justify-center">
+                  <Image
+                    src="/image/domine_logo.jpg"
+                    alt="Domine"
+                    width={320}
+                    height={120}
+                    className="h-auto max-h-9 w-auto object-contain opacity-90"
+                  />
+                </div>
+                <FamilyPhotoCarousel
+                  images={familyGalleryImages}
+                  imageClassName="object-cover object-center"
+                  sizes="(max-width: 1024px) 100vw, 26rem"
+                  layout="compact"
+                  autoPlayMs={0}
                 />
               </div>
-              <FamilyPhotoCarousel
-                images={familyGalleryImages}
-                imageClassName="object-contain object-center lg:object-cover lg:object-[center_28%]"
-                sizes="(max-width: 1024px) 100vw, 42rem"
-              />
             </div>
+          </section>
+
+          <div className="order-5 lg:order-5">
+            <LiturgicalMinisterPrayersSection />
           </div>
-        </section>
-
-        <HakJunMilitaryBanner />
-
-        <LiturgicalMonthSection
-          year={liturgicalYear}
-          month={liturgicalMonth}
-          schedules={[]}
-          variant="home"
-          homeSpotlight={homeSpotlight}
-        />
-
-        <LiturgicalMinisterPrayersSection />
+        </div>
       </main>
+
+      <ScrollToTop />
 
       <footer className="border-t border-[var(--lit-border)]/80 bg-[var(--lit-bg-elevated)]">
         <div className="mx-auto max-w-[90rem] px-5 py-16 md:px-10 md:py-24 lg:px-12">
