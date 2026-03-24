@@ -31,8 +31,29 @@ function mergeByLegalName(
   });
 }
 
+function readStoredMerged(initial: YouthProfile[]): YouthProfile[] {
+  if (typeof window === "undefined") {
+    return initial;
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return initial;
+    }
+    const parsed = JSON.parse(raw) as YouthProfile[];
+    if (!Array.isArray(parsed)) {
+      return initial;
+    }
+    return mergeByLegalName(initial, parsed);
+  } catch {
+    return initial;
+  }
+}
+
 export function YouthMembersClient({ initialProfiles }: Props) {
-  const [profiles, setProfiles] = useState<YouthProfile[]>(initialProfiles);
+  const [profiles, setProfiles] = useState<YouthProfile[]>(() =>
+    readStoredMerged(initialProfiles)
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<YouthProfile[]>(initialProfiles);
 
@@ -42,12 +63,16 @@ export function YouthMembersClient({ initialProfiles }: Props) {
       if (raw) {
         const parsed = JSON.parse(raw) as YouthProfile[];
         if (Array.isArray(parsed)) {
-          setProfiles(mergeByLegalName(initialProfiles, parsed));
+          queueMicrotask(() =>
+            setProfiles(mergeByLegalName(initialProfiles, parsed))
+          );
+          return;
         }
       }
     } catch {
       /* ignore */
     }
+    queueMicrotask(() => setProfiles(initialProfiles));
   }, [initialProfiles]);
 
   const startEdit = useCallback(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   formatYouthMemberDisplay,
   isYouthMemberName,
@@ -27,26 +27,26 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
   const memberSelectValue =
     isYouthMemberName(value) ? (resolveYouthMemberLegalName(value) ?? "") : "";
 
-  const [mode, setMode] = useState<"member" | "custom">(() =>
-    !value.trim()
-      ? "member"
-      : isYouthMemberName(value)
-        ? "member"
-        : "custom"
-  );
+  /** 값이 비어 있을 때만 탭 상태 사용(직접 입력 + 빈 칸). 값이 있으면 value에 따라 member/custom 고정 */
+  const [emptyTab, setEmptyTab] = useState<"member" | "custom">("member");
+
+  const mode = useMemo((): "member" | "custom" => {
+    const v = value.trim();
+    if (v) {
+      return isYouthMemberName(value) ? "member" : "custom";
+    }
+    return emptyTab;
+  }, [value, emptyTab]);
 
   const [customHint, setCustomHint] = useState<string | null>(null);
 
+  const hadValueRef = useRef(false);
   useEffect(() => {
-    if (!value.trim()) {
-      setMode("member");
-      return;
+    const nonEmpty = value.trim().length > 0;
+    if (!nonEmpty && hadValueRef.current) {
+      queueMicrotask(() => setEmptyTab("member"));
     }
-    if (isYouthMemberName(value)) {
-      setMode("member");
-    } else {
-      setMode("custom");
-    }
+    hadValueRef.current = nonEmpty;
   }, [value]);
 
   return (
@@ -63,7 +63,7 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
           <button
             type="button"
             onClick={() => {
-              setMode("member");
+              setEmptyTab("member");
               setCustomHint(null);
               if (!isYouthMemberName(value)) {
                 onChange("");
@@ -79,7 +79,7 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => setMode("custom")}
+            onClick={() => setEmptyTab("custom")}
             className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs ${
               mode === "custom"
                 ? "bg-white text-indigo-950 shadow-sm dark:bg-slate-950 dark:text-amber-100"

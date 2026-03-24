@@ -3,7 +3,6 @@ export function getMonthRangeISO(
   year: number,
   month: number
 ): { start: string; end: string } {
-  const startD = new Date(year, month - 1, 1);
   const endD = new Date(year, month, 0);
   const pad = (n: number) => String(n).padStart(2, "0");
   const start = `${year}-${pad(month)}-01`;

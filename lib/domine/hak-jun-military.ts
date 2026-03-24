@@ -5,7 +5,7 @@ const KST = "Asia/Seoul";
 export const HAK_JUN_NAME = "이학준";
 
 /** 입대일 */
-export const HAK_JUN_ENLIST = new Date("2026-03-29T12:00:00+09:00");
+export const HAK_JUN_ENLIST = new Date("2026-03-09T12:00:00+09:00");
 
 /** 전역일 */
 export const HAK_JUN_DISCHARGE = new Date("2027-09-08T12:00:00+09:00");
@@ -86,7 +86,7 @@ function trimTrailingZeros(s: string): string {
 
 /**
  * 진행률 표시 (% 단위, 0–100).
- * 1% 미만은 소수 자릿수 제한을 두지 않고(최대 16자리) 끝 0만 제거해 최대한 그대로 보여 줌.
+ * 1% 미만: 소수 여섯째 자리까지, 1% 이상: 소수 셋째 자리까지(끝의 불필요한 0은 제거).
  */
 export function formatProgressPercentDisplay(p: number): string {
   if (p >= 99.995) {
@@ -96,13 +96,9 @@ export function formatProgressPercentDisplay(p: number): string {
     return "0";
   }
   if (p >= 1) {
-    return trimTrailingZeros(p.toFixed(2));
+    return trimTrailingZeros(p.toFixed(3));
   }
 
   // 0 < p < 1
-  if (p >= 0.999) {
-    return trimTrailingZeros(p.toFixed(6));
-  }
-
-  return trimTrailingZeros(p.toFixed(16));
+  return trimTrailingZeros(p.toFixed(6));
 }
