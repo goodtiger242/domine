@@ -52,7 +52,7 @@ export function LandingPage({
                 <div className="cos-stagger-2 mx-auto flex w-full max-w-[min(100%,42rem)] flex-col items-center gap-6">
                   <FamilyPhotoCarousel
                     images={familyGalleryImages}
-                    imageClassName="object-contain object-center lg:object-cover lg:object-[center_28%]"
+                    imageClassName="object-contain object-center"
                     sizes="(max-width: 1024px) 100vw, 42rem"
                     layout="hero"
                     autoPlayMs={0}
@@ -75,7 +75,7 @@ export function LandingPage({
               <div className="mx-auto flex w-full max-w-[min(100%,26rem)] flex-col items-center gap-6">
                 <FamilyPhotoCarousel
                   images={familyGalleryImages}
-                  imageClassName="object-cover object-center"
+                  imageClassName="object-contain object-center"
                   sizes="(max-width: 1024px) 100vw, 26rem"
                   layout="compact"
                   autoPlayMs={0}
