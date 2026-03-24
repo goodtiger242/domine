@@ -71,7 +71,7 @@ export function FamilyPhotoCarousel({
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden border border-[var(--lit-border)] bg-[var(--lit-bg)] shadow-[0_1px_0_rgba(0,0,0,0.04)] sm:aspect-[5/4] lg:aspect-[4/5] xl:aspect-[3/4]">
+      <div className="relative aspect-[5/4] w-full overflow-hidden border border-[var(--lit-border)] bg-[var(--lit-bg)] shadow-[0_1px_0_rgba(0,0,0,0.04)] sm:aspect-[4/3] md:aspect-[5/4] lg:aspect-[4/5] xl:aspect-[3/4]">
         {images.map((img, i) => (
           <div
             key={img.src}
@@ -94,7 +94,7 @@ export function FamilyPhotoCarousel({
 
       {len > 1 ? (
         <div
-          className="mt-2 flex flex-wrap items-center justify-center gap-1 py-1"
+          className="mt-1 flex flex-wrap items-center justify-center gap-1 py-0.5 md:mt-2 md:py-1"
           role="tablist"
           aria-label="단체 사진 선택"
         >
@@ -105,7 +105,7 @@ export function FamilyPhotoCarousel({
               role="tab"
               aria-selected={i === index}
               tabIndex={i === index ? 0 : -1}
-              className="flex h-11 min-w-[2.75rem] items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+              className="flex h-9 min-w-9 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 md:h-11 md:min-w-[2.75rem]"
               onClick={() => setIndex(i)}
               aria-label={`${i + 1}번째 사진 보기`}
             >

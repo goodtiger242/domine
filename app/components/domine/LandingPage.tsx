@@ -64,7 +64,7 @@ export function LandingPage({
 
       <main className="flex-1">
         <section
-          className="cos-grid-bg relative flex min-h-[88dvh] flex-col justify-center overflow-hidden border-b border-[var(--lit-border)]"
+          className="cos-grid-bg relative flex min-h-0 flex-col justify-center overflow-hidden border-b border-[var(--lit-border)] lg:min-h-[88dvh]"
           aria-labelledby="hero-title"
         >
           <h1 id="hero-title" className="sr-only">
@@ -74,7 +74,7 @@ export function LandingPage({
             className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--lit-bg-hero)] via-transparent to-[var(--lit-bg)] opacity-90"
             aria-hidden
           />
-          <div className="relative mx-auto w-full max-w-[90rem] px-5 py-16 md:px-10 md:py-20 lg:px-12 lg:py-28">
+          <div className="relative mx-auto w-full max-w-[90rem] px-4 py-8 md:px-10 md:py-20 lg:px-12 lg:py-28">
             <div className="cos-stagger-2 mx-auto w-full max-w-[min(100%,42rem)]">
               <FamilyPhotoCarousel
                 images={familyGalleryImages}

@@ -26,32 +26,32 @@ export function HakJunMilitaryBanner() {
 
   return (
     <div className="border-b border-[var(--lit-border)] bg-[var(--lit-bg-elevated)]">
-      <div className="mx-auto max-w-[90rem] px-5 py-12 md:px-10 md:py-16 lg:px-12">
-        <div className="grid gap-10 md:grid-cols-[minmax(0,280px)_1fr] md:items-center md:gap-16 lg:gap-24">
-          <div className="relative mx-auto aspect-[3/4] w-full max-w-[220px] overflow-hidden bg-[var(--lit-bg)] md:mx-0 md:max-w-none">
+      <div className="mx-auto max-w-[90rem] px-4 py-6 md:px-10 md:py-12 lg:px-12 lg:py-16">
+        <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-start gap-3 md:grid-cols-[minmax(0,280px)_1fr] md:items-center md:gap-16 lg:gap-24">
+          <div className="relative aspect-[3/4] w-full max-w-[7rem] shrink-0 overflow-hidden bg-[var(--lit-bg)] md:max-w-none">
             <Image
               src={PHOTO}
               alt={`${HAK_JUN_NAME} 사진`}
               fill
-              sizes="(max-width: 768px) 220px, 320px"
+              sizes="(max-width: 768px) 112px, 320px"
               className="object-cover object-top"
               priority
             />
           </div>
 
-          <div className="min-w-0 space-y-8 text-center md:text-left">
+          <div className="min-w-0 space-y-4 text-left md:space-y-8 md:text-left">
             <div>
-              <p className="break-keep text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.16em]">
+              <p className="break-keep text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)] md:text-[11px] md:tracking-[0.22em]">
                 {HAK_JUN_NAME} · 복무 카운트
               </p>
-              <div className="mt-6 flex flex-col items-center gap-3 text-sm text-[var(--lit-ink-muted)] max-lg:gap-2 md:flex-row md:flex-wrap md:items-center md:justify-start md:gap-x-6 md:gap-y-2">
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--lit-ink-muted)] md:mt-6 md:gap-x-6 md:text-sm">
                 <span className="break-keep">
                   <span className="text-[var(--lit-ink-subtle)]">입대</span>{" "}
                   <span className="font-medium text-[var(--lit-ink)]">
                     {formatKoreanDate(HAK_JUN_ENLIST)}
                   </span>
                 </span>
-                <span className="hidden text-[var(--lit-border-strong)] md:inline" aria-hidden>
+                <span className="text-[var(--lit-border-strong)]" aria-hidden>
                   /
                 </span>
                 <span className="break-keep">
@@ -63,24 +63,26 @@ export function HakJunMilitaryBanner() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-10">
+            <div className="flex flex-row flex-wrap items-end gap-4 sm:gap-10 md:gap-10">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]">
+                <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)] md:text-[10px] md:tracking-[0.2em]">
                   남은 일수
                 </p>
-                <p className="mt-2 font-light text-5xl tabular-nums tracking-tight text-[var(--lit-ink)] md:text-6xl">
+                <p className="mt-1 font-light text-3xl tabular-nums tracking-tight text-[var(--lit-ink)] md:mt-2 md:text-5xl lg:text-6xl">
                   {ddayLabel}
                 </p>
               </div>
-              <div className="flex-1">
-                <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]">
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)] md:text-[10px] md:tracking-[0.2em]">
                   진행률
                 </p>
-                <p className="mt-2 text-2xl font-light tabular-nums text-[var(--lit-ink)] md:text-3xl">
+                <p className="mt-1 text-xl font-light tabular-nums text-[var(--lit-ink)] md:mt-2 md:text-2xl lg:text-3xl">
                   {pctLabel}
-                  <span className="text-lg font-normal text-[var(--lit-ink-muted)]">%</span>
+                  <span className="text-base font-normal text-[var(--lit-ink-muted)] md:text-lg">
+                    %
+                  </span>
                 </p>
-                <div className="mt-4 h-[2px] w-full overflow-hidden bg-[var(--lit-border)]">
+                <div className="mt-2 h-[2px] w-full overflow-hidden bg-[var(--lit-border)] md:mt-4">
                   <div
                     className="h-full bg-[var(--lit-ink)] transition-[width] duration-700 ease-out"
                     style={{
