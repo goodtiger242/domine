@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FamilyGalleryItem } from "@/lib/domine/family-gallery";
 
-/** 자동 슬라이드 간격 (우측 방향 = 다음 장) */
+/** 자동 슬라이드 간격 (우측 방향 = 다음 장). 수동 조작 시 타이머 리셋 */
 const AUTO_MS = 2000;
 const SWIPE_PX = 48;
 
@@ -23,6 +23,7 @@ export function FamilyPhotoCarousel({
   const [index, setIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -33,21 +34,37 @@ export function FamilyPhotoCarousel({
   }, []);
 
   const len = images.length;
-  const go = useCallback(
-    (dir: -1 | 1) => {
-      if (len <= 1) return;
-      setIndex((i) => (i + dir + len) % len);
-    },
-    [len]
-  );
 
-  useEffect(() => {
+  const clearAuto = useCallback(() => {
+    if (intervalRef.current != null) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const scheduleAuto = useCallback(() => {
+    clearAuto();
     if (len <= 1 || reducedMotion) return;
-    const id = window.setInterval(() => {
+    intervalRef.current = window.setInterval(() => {
       setIndex((i) => (i + 1) % len);
     }, AUTO_MS);
-    return () => window.clearInterval(id);
-  }, [len, reducedMotion]);
+  }, [len, reducedMotion, clearAuto]);
+
+  useEffect(() => {
+    scheduleAuto();
+    return () => clearAuto();
+  }, [scheduleAuto, clearAuto]);
+
+  const go = useCallback(
+    (dir: -1 | 1, userInitiated: boolean) => {
+      if (len <= 1) return;
+      setIndex((i) => (i + dir + len) % len);
+      if (userInitiated) {
+        scheduleAuto();
+      }
+    },
+    [len, scheduleAuto]
+  );
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -58,8 +75,8 @@ export function FamilyPhotoCarousel({
     const x = e.changedTouches[0].clientX;
     const dx = x - touchStartX.current;
     touchStartX.current = null;
-    if (dx > SWIPE_PX) go(-1);
-    else if (dx < -SWIPE_PX) go(1);
+    if (dx > SWIPE_PX) go(-1, true);
+    else if (dx < -SWIPE_PX) go(1, true);
   };
 
   if (len === 0) {
@@ -106,7 +123,7 @@ export function FamilyPhotoCarousel({
         <div className="mt-3 flex items-center justify-center gap-3">
           <button
             type="button"
-            onClick={() => go(-1)}
+            onClick={() => go(-1, true)}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-lg font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_0_rgba(0,0,0,0.04)] transition hover:border-[var(--lit-ink)] hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] active:scale-[0.97]"
             aria-label="이전 사진"
           >
@@ -128,7 +145,7 @@ export function FamilyPhotoCarousel({
           </div>
           <button
             type="button"
-            onClick={() => go(1)}
+            onClick={() => go(1, true)}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-lg font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_0_rgba(0,0,0,0.04)] transition hover:border-[var(--lit-ink)] hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] active:scale-[0.97]"
             aria-label="다음 사진"
           >
