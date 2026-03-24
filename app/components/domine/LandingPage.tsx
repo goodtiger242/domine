@@ -4,13 +4,10 @@ import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteBrandLink } from "@/app/components/layout/SiteBrandLink";
 import { FamilyPhotoCarousel } from "@/app/components/domine/FamilyPhotoCarousel";
 import { HakJunMilitaryBanner } from "@/app/components/domine/HakJunMilitaryBanner";
-import { HomeAnchorNav } from "@/app/components/domine/home/HomeAnchorNav";
 import { ScrollToTop } from "@/app/components/domine/home/ScrollToTop";
-import { TodaySummaryCard } from "@/app/components/domine/home/TodaySummaryCard";
 import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { familyGalleryImages } from "@/lib/domine/family-gallery";
-import type { TodaySummaryPayload } from "@/lib/home/today-summary";
 import { SiteHeaderNav } from "@/app/components/layout/SiteHeaderNav";
 import { SITE_NAV_HOME } from "@/lib/nav/site-nav";
 
@@ -22,14 +19,12 @@ type Props = {
     schedulesByDate: Record<string, LiturgicalSchedule>;
     initialIndex: number;
   };
-  todaySummary: TodaySummaryPayload;
 };
 
 export function LandingPage({
   liturgicalYear,
   liturgicalMonth,
   homeSpotlight,
-  todaySummary,
 }: Props) {
   return (
     <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)] antialiased">
@@ -40,22 +35,14 @@ export function LandingPage({
         </div>
       </header>
 
-      <HomeAnchorNav />
-
       <main className="flex-1">
         <h1 className="sr-only">도미네 · 용호성당 청년회</h1>
 
         <div className="flex flex-col">
           <section
-            id="home-today"
-            className="order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] px-4 py-6 md:px-10 lg:order-2 lg:border-b-0 lg:py-10 lg:pt-8"
+            id="home-military"
+            className="order-1 border-b border-[var(--lit-border)]/70 lg:order-2"
           >
-            <div className="mx-auto max-w-3xl lg:px-2">
-              <TodaySummaryCard summary={todaySummary} />
-            </div>
-          </section>
-
-          <section id="home-military" className="order-2 lg:order-3">
             <HakJunMilitaryBanner />
           </section>
 
@@ -65,12 +52,12 @@ export function LandingPage({
             schedules={[]}
             variant="home"
             homeSpotlight={homeSpotlight}
-            sectionClassName="order-3 lg:order-4"
+            sectionClassName="order-2 lg:order-3"
           />
 
           <section
             id="home-gallery"
-            className="relative cos-grid-bg order-4 border-b border-[var(--lit-border)]/70 lg:order-1 lg:min-h-0 lg:border-b"
+            className="relative cos-grid-bg order-3 border-b border-[var(--lit-border)]/70 lg:order-1 lg:min-h-0 lg:border-b"
           >
             <div className="relative hidden overflow-hidden lg:block">
               <div
@@ -125,7 +112,7 @@ export function LandingPage({
             </div>
           </section>
 
-          <div className="order-5 lg:order-5">
+          <div className="order-4 lg:order-4">
             <LiturgicalMinisterPrayersSection />
           </div>
         </div>

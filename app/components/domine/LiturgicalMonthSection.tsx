@@ -59,12 +59,6 @@ export function LiturgicalMonthSection({
                   </>
                 )}
               </h2>
-              {variant === "home" && homeSpotlight ? (
-                <p className="mt-3 max-w-prose text-[15px] leading-relaxed text-[var(--lit-ink-muted)] md:mt-4">
-                  오늘 일정·공지·담당을 나누어 보여 줍니다. 날짜는 좌우 버튼으로
-                  바꿀 수 있습니다.
-                </p>
-              ) : null}
             </div>
             {variant === "page" ? (
               <Link
@@ -72,13 +66,6 @@ export function LiturgicalMonthSection({
                 className="inline-flex h-12 shrink-0 items-center justify-center border border-[var(--lit-ink)] bg-[var(--lit-ink)] px-8 text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--lit-bg-elevated)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
               >
                 편집
-              </Link>
-            ) : variant === "home" && homeSpotlight ? (
-              <Link
-                href="/liturgical"
-                className="inline-flex h-11 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)]/80 px-7 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--lit-ink-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-[color,background-color,border-color,box-shadow] duration-300 ease-out hover:border-[var(--lit-border-strong)] hover:bg-[var(--lit-bg-elevated)] hover:text-[var(--lit-ink)] hover:shadow-[var(--lit-paper-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
-              >
-                월별
               </Link>
             ) : null}
           </div>

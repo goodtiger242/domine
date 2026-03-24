@@ -136,8 +136,8 @@ export function LiturgicalScheduleCard({
       </div>
 
       {schedule.announcement_detail.trim() ? (
-        <div className="mb-5 border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4">
-          <p className="whitespace-pre-wrap text-base leading-relaxed text-[var(--lit-ink-muted)]">
+        <div className="mb-6">
+          <p className="whitespace-pre-wrap text-[15px] leading-[1.75] text-[var(--lit-ink)]">
             {schedule.announcement_detail}
           </p>
         </div>
