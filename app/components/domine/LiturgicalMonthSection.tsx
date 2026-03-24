@@ -30,13 +30,17 @@ export function LiturgicalMonthSection({
         <div className="mb-14 flex flex-col gap-8 md:mb-20 md:gap-10">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)]">
+              <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.28em]">
                 Liturgy
               </p>
-              <h2 className="mt-4 font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] md:text-5xl">
-                {label}
-                <span className="font-normal text-[var(--lit-ink-muted)]"> · </span>
-                <span className="text-[var(--lit-ink-muted)]">전례 봉사</span>
+              <h2 className="mt-4 font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.65rem,6.5vw,2.1rem)] max-lg:leading-snug md:text-5xl">
+                <span className="break-keep">{label}</span>
+                <span className="mt-1.5 block max-lg:mt-2 lg:mt-0 lg:inline">
+                  <span className="font-normal text-[var(--lit-ink-muted)]">
+                    <span className="max-lg:hidden"> · </span>
+                    전례 봉사
+                  </span>
+                </span>
               </h2>
             </div>
             {variant === "page" ? (

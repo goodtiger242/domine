@@ -31,7 +31,7 @@ function NavLinks() {
         <Link
           key={item.href}
           href={item.href}
-          className="group relative px-2 py-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--lit-ink-muted)] transition-colors hover:text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 sm:px-3 sm:py-2 sm:text-[11px] sm:tracking-[0.18em]"
+          className="group relative break-keep px-2 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--lit-ink-muted)] transition-colors hover:text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 sm:px-3 sm:py-2 sm:text-[11px] sm:tracking-[0.18em]"
         >
           {item.label}
           <span className="absolute bottom-0.5 left-2 right-2 h-px origin-left scale-x-0 bg-current transition-transform duration-300 ease-out group-hover:scale-x-100 sm:bottom-1 sm:left-3 sm:right-3" />
@@ -73,7 +73,7 @@ export function LandingPage({
           <div className="relative mx-auto w-full max-w-[90rem] px-5 py-16 md:px-10 md:py-20 lg:px-12 lg:py-28">
             <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-16 xl:gap-20">
               <div className="order-2 text-center lg:order-1 lg:text-left">
-                <p className="cos-stagger-1 text-[10px] font-medium uppercase tracking-[0.45em] text-[var(--lit-ink-subtle)] md:text-[11px]">
+                <p className="cos-stagger-1 break-keep text-[10px] font-medium uppercase tracking-[0.45em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.26em] md:text-[11px]">
                   용호성당 · 청년회
                 </p>
                 <h1
@@ -82,21 +82,6 @@ export function LandingPage({
                 >
                   도미네
                 </h1>
-                <p className="cos-stagger-3 mx-auto mt-8 max-w-md text-[15px] font-normal leading-[1.75] text-[var(--lit-ink-muted)] md:mt-10 md:text-base lg:mx-0">
-                  천주교 신앙 안에서 함께 걷는 공동체.
-                  <br className="hidden sm:block" />
-                  전례·일정·멤버 정보를 한곳에서.
-                </p>
-                <div className="cos-stagger-4 mt-12 flex flex-col items-center gap-4 sm:mt-14 lg:items-start">
-                  <Link
-                    href="#liturgical"
-                    className="group inline-flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.3em] text-[var(--lit-ink)] transition hover:opacity-70"
-                  >
-                    <span className="h-px w-8 bg-[var(--lit-ink)] transition-all group-hover:w-12" />
-                    전례 안내
-                    <span className="h-px w-8 bg-[var(--lit-ink)] transition-all group-hover:w-12" />
-                  </Link>
-                </div>
               </div>
 
               <figure className="order-1 lg:order-2">
@@ -110,7 +95,7 @@ export function LandingPage({
                     priority
                   />
                 </div>
-                <figcaption className="cos-stagger-3 mt-4 text-center text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--lit-ink-subtle)] lg:text-right">
+                <figcaption className="cos-stagger-3 mt-4 break-keep text-center text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.2em] lg:text-right">
                   도미네 패밀리
                 </figcaption>
               </figure>
@@ -134,18 +119,18 @@ export function LandingPage({
       <footer className="border-t border-[var(--lit-border)] bg-[var(--lit-bg-elevated)]">
         <div className="mx-auto max-w-[90rem] px-5 py-20 md:px-10 lg:px-12">
           <div className="flex flex-col items-center justify-between gap-10 text-center md:flex-row md:text-left">
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)]">
+            <div className="max-lg:text-balance">
+              <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.28em]">
                 Domine
               </p>
               <p className="mt-3 text-lg font-medium tracking-[-0.02em] text-[var(--lit-ink)]">
                 도미네
               </p>
-              <p className="mt-2 text-sm text-[var(--lit-ink-muted)]">
+              <p className="mt-2 break-keep text-sm text-[var(--lit-ink-muted)]">
                 용호성당 청년회
               </p>
             </div>
-            <p className="text-xs tracking-wide text-[var(--lit-ink-subtle)]">
+            <p className="text-xs tracking-wide text-[var(--lit-ink-subtle)] max-lg:text-balance">
               © {new Date().getFullYear()}
             </p>
           </div>

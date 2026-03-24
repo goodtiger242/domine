@@ -27,10 +27,7 @@ export function HakJunMilitaryBanner() {
   return (
     <div className="border-b border-[var(--lit-border)] bg-[var(--lit-bg-elevated)]">
       <div className="mx-auto max-w-[90rem] px-5 py-12 md:px-10 md:py-16 lg:px-12">
-        <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)]">
-          Feature
-        </p>
-        <div className="mt-6 grid gap-10 md:grid-cols-[minmax(0,280px)_1fr] md:items-center md:gap-16 lg:gap-24">
+        <div className="grid gap-10 md:grid-cols-[minmax(0,280px)_1fr] md:items-center md:gap-16 lg:gap-24">
           <div className="relative mx-auto aspect-[3/4] w-full max-w-[220px] overflow-hidden bg-[var(--lit-bg)] md:mx-0 md:max-w-none">
             <Image
               src={PHOTO}
@@ -44,20 +41,20 @@ export function HakJunMilitaryBanner() {
 
           <div className="min-w-0 space-y-8 text-center md:text-left">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--lit-ink-subtle)]">
+              <p className="break-keep text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.16em]">
                 {HAK_JUN_NAME} · 복무 카운트
               </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-[var(--lit-ink-muted)] md:justify-start">
-                <span>
+              <div className="mt-6 flex flex-col items-center gap-3 text-sm text-[var(--lit-ink-muted)] max-lg:gap-2 md:flex-row md:flex-wrap md:items-center md:justify-start md:gap-x-6 md:gap-y-2">
+                <span className="break-keep">
                   <span className="text-[var(--lit-ink-subtle)]">입대</span>{" "}
                   <span className="font-medium text-[var(--lit-ink)]">
                     {formatKoreanDate(HAK_JUN_ENLIST)}
                   </span>
                 </span>
-                <span className="hidden text-[var(--lit-border-strong)] sm:inline" aria-hidden>
+                <span className="hidden text-[var(--lit-border-strong)] md:inline" aria-hidden>
                   /
                 </span>
-                <span>
+                <span className="break-keep">
                   <span className="text-[var(--lit-ink-subtle)]">전역</span>{" "}
                   <span className="font-medium text-[var(--lit-ink)]">
                     {formatKoreanDate(HAK_JUN_DISCHARGE)}

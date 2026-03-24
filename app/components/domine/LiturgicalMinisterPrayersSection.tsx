@@ -31,12 +31,12 @@ export function LiturgicalMinisterPrayersSection() {
       aria-labelledby="liturgical-prayers-heading"
     >
       <div className="mx-auto max-w-5xl">
-        <p className="text-center text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)]">
+        <p className="text-center text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.28em]">
           Prayers
         </p>
         <h2
           id="liturgical-prayers-heading"
-          className="mt-4 text-center font-light text-[clamp(1.75rem,4.5vw,2.5rem)] tracking-[-0.03em] text-[var(--lit-ink)] md:mt-6"
+          className="mt-4 text-center font-light text-[clamp(1.75rem,4.5vw,2.5rem)] tracking-[-0.03em] text-[var(--lit-ink)] text-pretty max-lg:text-[clamp(1.5rem,5.2vw,1.95rem)] max-lg:leading-snug md:mt-6"
         >
           전례 봉사자 기도
         </h2>
