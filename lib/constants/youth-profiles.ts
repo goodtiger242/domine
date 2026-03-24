@@ -1,4 +1,8 @@
 import { YOUTH_MEMBERS } from "@/lib/constants/youth-members";
+import {
+  normalizeYouthNotes,
+  normalizeYouthTalents,
+} from "@/lib/domine/youth-fields";
 
 /** 축일 문자열에서 날짜만 남김 (` · ` 또는 `·` 뒤 성인명 등 제거) */
 export function feastDayDateOnly(raw: string): string {
@@ -190,6 +194,8 @@ export function getDefaultYouthProfiles(): YouthProfile[] {
       legalName: m.legalName,
       baptismalNameKo: m.baptismalNameKo,
       ...s,
+      notes: normalizeYouthNotes(s.notes),
+      talents: normalizeYouthTalents(s.talents),
     };
   });
   return list.sort((a, b) => a.legalName.localeCompare(b.legalName, "ko"));

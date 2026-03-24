@@ -1,116 +1,78 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { saveYouthProfiles } from "@/app/actions/youth";
 import {
   feastDayDateOnly,
   type YouthProfile,
 } from "@/lib/constants/youth-profiles";
 import { litDisplay } from "@/lib/fonts/display";
 
-const STORAGE_KEY = "domine-youth-profiles-v1";
-
 type Props = {
   initialProfiles: YouthProfile[];
 };
 
-function mergeByLegalName(
-  defaults: YouthProfile[],
-  stored: YouthProfile[]
-): YouthProfile[] {
-  const map = new Map(stored.map((p) => [p.legalName, p]));
-  return defaults.map((d) => {
-    const s = map.get(d.legalName);
-    if (!s) {
-      return d;
-    }
-    const merged = { ...d, ...s, legalName: d.legalName };
-    return {
-      ...merged,
-      feastDay: feastDayDateOnly(merged.feastDay),
-    };
-  });
-}
-
-function readStoredMerged(initial: YouthProfile[]): YouthProfile[] {
-  if (typeof window === "undefined") {
-    return initial;
-  }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return initial;
-    }
-    const parsed = JSON.parse(raw) as YouthProfile[];
-    if (!Array.isArray(parsed)) {
-      return initial;
-    }
-    return mergeByLegalName(initial, parsed);
-  } catch {
-    return initial;
-  }
-}
-
 export function YouthMembersClient({ initialProfiles }: Props) {
-  const [profiles, setProfiles] = useState<YouthProfile[]>(() =>
-    readStoredMerged(initialProfiles)
-  );
+  const router = useRouter();
+  const [profiles, setProfiles] = useState<YouthProfile[]>(initialProfiles);
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<YouthProfile[]>(initialProfiles);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as YouthProfile[];
-        if (Array.isArray(parsed)) {
-          queueMicrotask(() =>
-            setProfiles(mergeByLegalName(initialProfiles, parsed))
-          );
-          return;
-        }
-      }
-    } catch {
-      /* ignore */
+    setProfiles(initialProfiles);
+    if (!isEditing) {
+      setDraft(initialProfiles);
     }
-    queueMicrotask(() => setProfiles(initialProfiles));
-  }, [initialProfiles]);
+  }, [initialProfiles, isEditing]);
 
   const startEdit = useCallback(() => {
     setDraft(structuredClone(profiles));
+    setError(null);
     setIsEditing(true);
   }, [profiles]);
 
   const cancelEdit = useCallback(() => {
     setDraft(structuredClone(profiles));
+    setError(null);
     setIsEditing(false);
   }, [profiles]);
 
-  const saveEdit = useCallback(() => {
+  const saveEdit = useCallback(async () => {
     const next = draft.map((p) => ({
       ...p,
       feastDay: feastDayDateOnly(p.feastDay),
     }));
-    setProfiles(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* ignore */
+    setSaving(true);
+    setError(null);
+    const res = await saveYouthProfiles(next);
+    setSaving(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
     }
+    setProfiles(next);
     setIsEditing(false);
-  }, [draft]);
+    router.refresh();
+  }, [draft, router]);
 
-  const updateDraft = useCallback((index: number, patch: Partial<YouthProfile>) => {
-    setDraft((prev) => {
-      const next = [...prev];
-      const row = next[index];
-      if (!row) {
-        return prev;
-      }
-      next[index] = { ...row, ...patch };
-      return next;
-    });
-  }, []);
+  const updateDraft = useCallback(
+    (index: number, patch: Partial<YouthProfile>) => {
+      setDraft((prev) => {
+        const copy = [...prev];
+        const row = copy[index];
+        if (!row) {
+          return prev;
+        }
+        copy[index] = { ...row, ...patch };
+        return copy;
+      });
+    },
+    []
+  );
 
   const rows = isEditing ? draft : profiles;
 
@@ -127,7 +89,11 @@ export function YouthMembersClient({ initialProfiles }: Props) {
             청년회 멤버
           </h1>
           <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
-            생일·축일·세례명을 확인합니다. 편집 시 이 브라우저에만 저장됩니다.
+            생일·축일·세례명을 확인합니다. 편집 후 저장하면{" "}
+            <strong className="font-medium text-[var(--lit-ink)]">
+              모든 사람에게 동일하게
+            </strong>{" "}
+            반영됩니다 (Supabase DB).
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -136,16 +102,18 @@ export function YouthMembersClient({ initialProfiles }: Props) {
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="h-10 rounded-lg border border-[var(--lit-border)] px-5 text-sm font-medium text-[var(--lit-ink-muted)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
+                disabled={saving}
+                className="h-10 rounded-lg border border-[var(--lit-border)] px-5 text-sm font-medium text-[var(--lit-ink-muted)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] disabled:opacity-50"
               >
                 취소
               </button>
               <button
                 type="button"
-                onClick={saveEdit}
-                className="h-10 border border-[var(--lit-ink)] bg-[var(--lit-ink)] px-6 text-sm font-semibold text-[var(--lit-bg-elevated)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+                onClick={() => void saveEdit()}
+                disabled={saving}
+                className="h-10 border border-[var(--lit-ink)] bg-[var(--lit-ink)] px-6 text-sm font-semibold text-[var(--lit-bg-elevated)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 disabled:opacity-50"
               >
-                저장
+                {saving ? "저장 중…" : "저장"}
               </button>
             </>
           ) : (
@@ -159,6 +127,15 @@ export function YouthMembersClient({ initialProfiles }: Props) {
           )}
         </div>
       </div>
+
+      {error ? (
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
 
       <ul className="grid gap-8 sm:grid-cols-2 xl:grid-cols-3">
         {rows.map((p, index) => (
@@ -179,7 +156,9 @@ export function YouthMembersClient({ initialProfiles }: Props) {
                 </div>
               ) : (
                 <div className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
-                  <span className={`${litDisplay.className} text-4xl font-semibold text-[var(--lit-gold-muted)]/50`}>
+                  <span
+                    className={`${litDisplay.className} text-4xl font-semibold text-[var(--lit-gold-muted)]/50`}
+                  >
                     {p.legalName.slice(0, 1)}
                   </span>
                 </div>
@@ -196,11 +175,14 @@ export function YouthMembersClient({ initialProfiles }: Props) {
                     {p.legalName}
                   </p>
                 </div>
-                <Field
-                  label="세례명"
-                  value={p.baptismalNameKo}
-                  onChange={(v) => updateDraft(index, { baptismalNameKo: v })}
-                />
+                <div>
+                  <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
+                    세례명
+                  </label>
+                  <p className="font-medium text-[var(--lit-ink-muted)]">
+                    {p.baptismalNameKo}
+                  </p>
+                </div>
                 <Field
                   label="생일"
                   value={p.birthday}
@@ -236,7 +218,9 @@ export function YouthMembersClient({ initialProfiles }: Props) {
             ) : (
               <div className="space-y-3 text-sm">
                 <div>
-                  <h2 className={`${litDisplay.className} text-lg font-semibold text-[var(--lit-ink)]`}>
+                  <h2
+                    className={`${litDisplay.className} text-lg font-semibold text-[var(--lit-ink)]`}
+                  >
                     {p.legalName}
                   </h2>
                   <p className="text-sm font-medium text-[var(--lit-ink-muted)]">

@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { listYouthProfilesMerged } from "@/app/actions/youth";
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteHeader } from "@/app/components/layout/SiteHeader";
-import { getDefaultYouthProfiles } from "@/lib/constants/youth-profiles";
 import { YouthMembersClient } from "./YouthMembersClient";
 import { SITE_NAV_YOUTH } from "@/lib/nav/site-nav";
 
@@ -10,8 +10,10 @@ export const metadata = {
   description: "청년회 멤버 생일·축일·세례명",
 };
 
-export default function YouthPage() {
-  const profiles = getDefaultYouthProfiles();
+export const dynamic = "force-dynamic";
+
+export default async function YouthPage() {
+  const profiles = await listYouthProfilesMerged();
 
   return (
     <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)]">

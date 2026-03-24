@@ -103,31 +103,37 @@ export function FamilyPhotoCarousel({
       </div>
 
       {len > 1 ? (
-        <div
-          className="mt-1 flex flex-wrap items-center justify-center gap-1 py-0.5 md:mt-2 md:py-1"
-          role="tablist"
-          aria-label="단체 사진 선택"
-        >
-          {images.map((img, i) => (
-            <button
-              key={img.src}
-              type="button"
-              role="tab"
-              aria-selected={i === index}
-              tabIndex={i === index ? 0 : -1}
-              className="flex h-9 min-w-9 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 md:h-11 md:min-w-[2.75rem]"
-              onClick={() => setIndex(i)}
-              aria-label={`${i + 1}번째 사진 보기`}
-            >
-              <span
-                className={`block h-1.5 rounded-full transition-[width,background-color] duration-300 ${
-                  i === index
-                    ? "w-6 bg-[var(--lit-ink)]"
-                    : "w-1.5 bg-[var(--lit-border-strong)] hover:bg-[var(--lit-ink-muted)]"
-                }`}
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => go(-1)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-lg font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_0_rgba(0,0,0,0.04)] transition hover:border-[var(--lit-ink)] hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] active:scale-[0.97]"
+            aria-label="이전 사진"
+          >
+            ‹
+          </button>
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-2 px-2">
+            <p className="text-[11px] font-medium tabular-nums tracking-[0.12em] text-[var(--lit-ink-muted)]">
+              {index + 1} / {len}
+            </p>
+            <div className="h-0.5 w-full max-w-[120px] overflow-hidden rounded-full bg-[var(--lit-border)]">
+              <div
+                className="h-full rounded-full bg-[var(--lit-ink)] transition-[width] duration-300 ease-out"
+                style={{
+                  width:
+                    len <= 0 ? "0%" : `${((index + 1) / len) * 100}%`,
+                }}
               />
-            </button>
-          ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => go(1)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-lg font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_0_rgba(0,0,0,0.04)] transition hover:border-[var(--lit-ink)] hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] active:scale-[0.97]"
+            aria-label="다음 사진"
+          >
+            ›
+          </button>
         </div>
       ) : null}
     </div>
