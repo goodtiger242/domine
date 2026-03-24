@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FamilyGalleryItem } from "@/lib/domine/family-gallery";
 
 /** 자동 슬라이드 간격 (우측 방향 = 다음 장). 수동 조작 시 타이머 리셋 */
-const AUTO_MS = 2000;
+const AUTO_MS = 4200;
 const SWIPE_PX = 48;
 
 type Props = {
@@ -91,9 +91,9 @@ export function FamilyPhotoCarousel({
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      <div className="relative aspect-[5/4] w-full overflow-hidden border border-[var(--lit-border)] bg-[var(--lit-bg)] shadow-[0_1px_0_rgba(0,0,0,0.04)] sm:aspect-[4/3] md:aspect-[5/4] lg:aspect-[4/5] xl:aspect-[3/4]">
+      <div className="relative aspect-[5/4] w-full overflow-hidden rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.02] sm:aspect-[4/3] md:aspect-[5/4] lg:aspect-[4/5] xl:aspect-[3/4] dark:ring-white/[0.04]">
         <div
-          className="flex h-full transition-transform duration-500 ease-out motion-reduce:duration-0"
+          className="flex h-full transition-transform duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:duration-0"
           style={{
             width: `${len * 100}%`,
             transform: `translateX(-${String(slidePct)}%)`,
@@ -120,22 +120,22 @@ export function FamilyPhotoCarousel({
       </div>
 
       {len > 1 ? (
-        <div className="mt-3 flex items-center justify-center gap-3">
+        <div className="mt-5 flex items-center justify-center gap-4">
           <button
             type="button"
             onClick={() => go(-1, true)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-lg font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_0_rgba(0,0,0,0.04)] transition hover:border-[var(--lit-ink)] hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] active:scale-[0.97]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-xl font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-[transform,background-color,border-color,box-shadow] duration-300 ease-out hover:border-[var(--lit-border-strong)] hover:bg-[var(--lit-bg)] hover:shadow-[var(--lit-paper-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] active:scale-[0.96] motion-reduce:transition-none"
             aria-label="이전 사진"
           >
             ‹
           </button>
-          <div className="flex min-w-0 flex-1 flex-col items-center gap-2 px-2">
-            <p className="text-[11px] font-medium tabular-nums tracking-[0.12em] text-[var(--lit-ink-muted)]">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-2.5 px-2">
+            <p className="text-[11px] font-medium tabular-nums tracking-[0.14em] text-[var(--lit-ink-muted)]">
               {index + 1} / {len}
             </p>
-            <div className="h-0.5 w-full max-w-[120px] overflow-hidden rounded-full bg-[var(--lit-border)]">
+            <div className="h-1 w-full max-w-[140px] overflow-hidden rounded-full bg-[var(--lit-border)]/80">
               <div
-                className="h-full rounded-full bg-[var(--lit-ink)] transition-[width] duration-300 ease-out"
+                className="h-full rounded-full bg-[var(--lit-ink)]/35 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none dark:bg-[var(--lit-ink)]/25"
                 style={{
                   width:
                     len <= 0 ? "0%" : `${((index + 1) / len) * 100}%`,
@@ -146,7 +146,7 @@ export function FamilyPhotoCarousel({
           <button
             type="button"
             onClick={() => go(1, true)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-lg font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_0_rgba(0,0,0,0.04)] transition hover:border-[var(--lit-ink)] hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] active:scale-[0.97]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] text-xl font-light leading-none text-[var(--lit-ink)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-[transform,background-color,border-color,box-shadow] duration-300 ease-out hover:border-[var(--lit-border-strong)] hover:bg-[var(--lit-bg)] hover:shadow-[var(--lit-paper-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] active:scale-[0.96] motion-reduce:transition-none"
             aria-label="다음 사진"
           >
             ›

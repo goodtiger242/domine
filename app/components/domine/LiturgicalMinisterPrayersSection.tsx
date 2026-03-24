@@ -11,7 +11,7 @@ function PrayerBlock({
   lines: readonly string[];
 }) {
   return (
-    <div className="flex flex-col border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-6 sm:p-8">
+    <div className="flex flex-col rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] p-6 shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.02] sm:p-8 dark:ring-white/[0.04]">
       <h3 className="mb-6 border-b border-[var(--lit-border)] pb-4 text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--lit-ink-subtle)]">
         {title}
       </h3>
@@ -27,7 +27,7 @@ function PrayerBlock({
 export function LiturgicalMinisterPrayersSection() {
   return (
     <section
-      className="border-t border-[var(--lit-border)] bg-[var(--lit-bg)] px-5 py-20 md:px-10 md:py-28 lg:px-12"
+      className="border-t border-[var(--lit-border)]/80 bg-[var(--lit-bg)] px-5 py-24 md:px-10 md:py-32 lg:px-12"
       aria-labelledby="liturgical-prayers-heading"
     >
       <div className="mx-auto max-w-5xl">

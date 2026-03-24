@@ -30,10 +30,10 @@ export function LiturgicalMonthSection({
   return (
     <section
       id={variant === "home" ? "liturgical" : undefined}
-      className="scroll-mt-20 border-b border-[var(--lit-border)] bg-[var(--lit-bg)] px-5 py-20 md:px-10 md:py-28 lg:px-12"
+      className="scroll-mt-20 border-b border-[var(--lit-border)]/80 bg-[var(--lit-bg)] px-5 py-24 md:px-10 md:py-32 lg:px-12"
     >
       <div className="mx-auto max-w-3xl">
-        <div className="mb-14 flex flex-col gap-8 md:mb-20 md:gap-10">
+        <div className="mb-12 flex flex-col gap-8 md:mb-16 md:gap-10">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.28em]">
@@ -65,7 +65,7 @@ export function LiturgicalMonthSection({
             ) : variant === "home" && homeSpotlight ? (
               <Link
                 href="/liturgical"
-                className="inline-flex h-12 shrink-0 items-center justify-center border border-[var(--lit-border)] bg-transparent px-6 text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink)] transition hover:border-[var(--lit-ink)] hover:bg-[var(--lit-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-full border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)]/80 px-7 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--lit-ink-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-[color,background-color,border-color,box-shadow] duration-300 ease-out hover:border-[var(--lit-border-strong)] hover:bg-[var(--lit-bg-elevated)] hover:text-[var(--lit-ink)] hover:shadow-[var(--lit-paper-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
               >
                 월별
               </Link>

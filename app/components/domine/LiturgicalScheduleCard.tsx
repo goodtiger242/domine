@@ -75,6 +75,8 @@ type Props = {
   showEmptyRolePlaceholders?: boolean;
   /** DB에 해당 날짜 행이 없을 때(일요일 슬롯만 있는 경우) — 지휘 고정명도 비움 */
   syntheticEmpty?: boolean;
+  /** 카드 래퍼 추가 클래스 (메인 톤 조정 등) */
+  articleClassName?: string;
 };
 
 const cardBase =
@@ -86,6 +88,7 @@ export function LiturgicalScheduleCard({
   emphasize = false,
   showEmptyRolePlaceholders = false,
   syntheticEmpty = false,
+  articleClassName = "",
 }: Props) {
   const enrich = !showEditLink;
   const showEmpty = showEmptyRolePlaceholders && enrich;
@@ -105,11 +108,11 @@ export function LiturgicalScheduleCard({
 
   return (
     <article
-      className={
+      className={`${
         emphasize
           ? `${cardBase} border-2 border-[var(--lit-ink)]`
           : `${cardBase} border-[var(--lit-border)]`
-      }
+      }${articleClassName ? ` ${articleClassName}` : ""}`}
     >
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
