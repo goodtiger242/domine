@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listLiturgicalInMonth } from "@/app/actions/liturgical";
+import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteHeader } from "@/app/components/layout/SiteHeader";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { parseYearMonthParams } from "@/lib/date/month";
@@ -55,6 +56,7 @@ export default async function LiturgicalGuidePage({
         >
           메인으로
         </Link>
+        <DeployStamp />
       </footer>
     </div>
   );

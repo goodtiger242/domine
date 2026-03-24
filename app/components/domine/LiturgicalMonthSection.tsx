@@ -3,14 +3,12 @@ import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { formatMonthLabelKo } from "@/lib/date/month";
 import { LiturgicalScheduleCard } from "@/app/components/domine/LiturgicalScheduleCard";
 import { MonthNav } from "@/app/components/ui/MonthNav";
-import { litDisplay } from "@/lib/fonts/display";
 
 type Props = {
   year: number;
   month: number;
   schedules: LiturgicalSchedule[];
   variant: "home" | "page";
-  /** 메인 전용: 강조할 미사 날짜(ISO) */
   highlightLiturgyDate?: string | null;
 };
 
@@ -26,30 +24,28 @@ export function LiturgicalMonthSection({
   return (
     <section
       id={variant === "home" ? "liturgical" : undefined}
-      className="scroll-mt-20 border-b border-[var(--lit-border)] bg-[var(--lit-bg)] px-6 py-20 md:px-8 md:py-24"
+      className="scroll-mt-20 border-b border-[var(--lit-border)] bg-[var(--lit-bg)] px-5 py-20 md:px-10 md:py-28 lg:px-12"
     >
       <div className="mx-auto max-w-3xl">
-        <div className="mb-12 flex flex-col gap-6 md:mb-16">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-14 flex flex-col gap-8 md:mb-20 md:gap-10">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]">
-                전례 안내
+              <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)]">
+                Liturgy
               </p>
-              <h2
-                className={`${litDisplay.className} mt-3 text-3xl font-semibold tracking-tight text-[var(--lit-ink)] md:text-[2.25rem]`}
-              >
-                {label} 전례 봉사
+              <h2 className="mt-4 font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] md:text-5xl">
+                {label}
+                <span className="font-normal text-[var(--lit-ink-muted)]"> · </span>
+                <span className="text-[var(--lit-ink-muted)]">전례 봉사</span>
               </h2>
             </div>
             {variant === "page" ? (
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href="/liturgical/edit"
-                  className="inline-flex h-11 items-center justify-center border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-6 text-sm font-semibold text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
-                >
-                  전례 편집
-                </Link>
-              </div>
+              <Link
+                href="/liturgical/edit"
+                className="inline-flex h-12 shrink-0 items-center justify-center border border-[var(--lit-ink)] bg-[var(--lit-ink)] px-8 text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--lit-bg-elevated)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+              >
+                편집
+              </Link>
             ) : null}
           </div>
 
@@ -59,17 +55,19 @@ export function LiturgicalMonthSection({
         </div>
 
         {schedules.length === 0 ? (
-          <div className="border border-dashed border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] p-12 text-center text-[var(--lit-ink-muted)]">
-            <p className="text-base leading-relaxed">{label}에 등록된 전례 봉사 정보가 없습니다.</p>
+          <div className="border border-dashed border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-8 py-16 text-center">
+            <p className="text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
+              {label}에 등록된 전례 봉사 정보가 없습니다.
+            </p>
             <Link
               href="/liturgical/edit"
-              className="mt-5 inline-block text-sm font-semibold text-[var(--lit-ink)] underline decoration-[var(--lit-border-strong)] underline-offset-4 transition hover:opacity-70"
+              className="mt-8 inline-block text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink)] underline decoration-[var(--lit-border-strong)] underline-offset-[6px] transition hover:opacity-70"
             >
-              전례 편집에서 입력하기
+              입력하기
             </Link>
           </div>
         ) : (
-          <ul className="flex flex-col gap-12 md:gap-16">
+          <ul className="flex flex-col gap-10 md:gap-14">
             {schedules.map((s) => (
               <li key={s.liturgy_date}>
                 <LiturgicalScheduleCard

@@ -29,7 +29,7 @@ function RoleCell({
     enrichDisplay ? formatYouthMemberDisplay(value) : value;
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
+      <span className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-[var(--lit-ink-subtle)]">
         {label}
       </span>
       <span className="break-words text-sm font-medium leading-snug text-[var(--lit-ink)]">
@@ -97,11 +97,11 @@ export function LiturgicalScheduleCard({
     >
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-[var(--lit-gold-muted)]">
+          <p className="text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]">
             {formatDateLabel(schedule.liturgy_date)}
           </p>
           {schedule.title.trim() ? (
-            <h3 className="mt-2 text-lg font-semibold tracking-tight text-[var(--lit-ink)]">
+            <h3 className="mt-2 text-xl font-light tracking-tight text-[var(--lit-ink)]">
               {schedule.title}
             </h3>
           ) : null}
@@ -109,7 +109,7 @@ export function LiturgicalScheduleCard({
         {showEditLink ? (
           <Link
             href={`/liturgical/edit?date=${schedule.liturgy_date}`}
-            className="inline-flex h-10 shrink-0 items-center justify-center border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-5 text-sm font-medium text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+            className="inline-flex h-10 shrink-0 items-center justify-center border border-[var(--lit-ink)] bg-transparent px-5 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--lit-ink)] transition hover:bg-[var(--lit-ink)] hover:text-[var(--lit-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
           >
             수정
           </Link>

@@ -1,45 +1,46 @@
 @import "tailwindcss";
 
-/* 에디토리얼 미니멀 — 잡지·브랜드: 넓은 여백, 단색, 보더 위주, 2~3색 */
+/* COS-inspired — 뉴트럴 그리드·대형 산세리프·절제된 보더 */
 :root {
-  --background: #fafafa;
-  --foreground: #0a0a0a;
-  --lit-bg: #fafafa;
+  --background: #f5f5f5;
+  --foreground: #111111;
+  --lit-bg: #f5f5f5;
   --lit-bg-elevated: #ffffff;
-  --lit-bg-hero: #ffffff;
-  --lit-ink: #0a0a0a;
-  --lit-ink-muted: #525252;
-  --lit-ink-subtle: #737373;
-  --lit-border: #e5e5e5;
-  --lit-border-strong: #d4d4d4;
+  --lit-bg-hero: #fafafa;
+  --lit-ink: #111111;
+  --lit-ink-muted: #5c5c5c;
+  --lit-ink-subtle: #8a8a8a;
+  --lit-border: #e8e8e8;
+  --lit-border-strong: #d0d0d0;
   --lit-ink-footer: #fafafa;
-  --lit-gold: #0a0a0a;
-  --lit-gold-light: #0a0a0a;
-  --lit-gold-muted: #737373;
-  --lit-accent: #0a0a0a;
-  --lit-ring: #0a0a0a;
-  --lit-paper-shadow: none;
+  --lit-gold: #111111;
+  --lit-gold-light: #111111;
+  --lit-gold-muted: #8a8a8a;
+  --lit-accent: #111111;
+  --lit-ring: #111111;
+  --lit-paper-shadow: 0 2px 24px rgba(0, 0, 0, 0.04);
+  --cos-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #fafafa;
-    --lit-bg: #0a0a0a;
-    --lit-bg-elevated: #171717;
-    --lit-bg-hero: #0a0a0a;
-    --lit-ink: #fafafa;
-    --lit-ink-muted: #a3a3a3;
+    --background: #0c0c0c;
+    --foreground: #f5f5f5;
+    --lit-bg: #0c0c0c;
+    --lit-bg-elevated: #141414;
+    --lit-bg-hero: #101010;
+    --lit-ink: #f5f5f5;
+    --lit-ink-muted: #a8a8a8;
     --lit-ink-subtle: #737373;
-    --lit-border: #262626;
-    --lit-border-strong: #404040;
-    --lit-ink-footer: #0a0a0a;
-    --lit-gold: #fafafa;
-    --lit-gold-light: #fafafa;
-    --lit-gold-muted: #a3a3a3;
-    --lit-accent: #fafafa;
-    --lit-ring: #fafafa;
-    --lit-paper-shadow: none;
+    --lit-border: #2a2a2a;
+    --lit-border-strong: #3a3a3a;
+    --lit-ink-footer: #0c0c0c;
+    --lit-gold: #f5f5f5;
+    --lit-gold-light: #f5f5f5;
+    --lit-gold-muted: #737373;
+    --lit-accent: #f5f5f5;
+    --lit-ring: #f5f5f5;
+    --lit-paper-shadow: 0 2px 32px rgba(0, 0, 0, 0.45);
   }
 }
 
@@ -51,16 +52,87 @@
   --font-display: var(--font-lit-display);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .cos-stagger-1,
+  .cos-stagger-2,
+  .cos-stagger-3,
+  .cos-stagger-4 {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+@keyframes cos-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.cos-stagger-1 {
+  animation: cos-reveal 1s var(--cos-ease) 0.08s both;
+}
+.cos-stagger-2 {
+  animation: cos-reveal 1s var(--cos-ease) 0.2s both;
+}
+.cos-stagger-3 {
+  animation: cos-reveal 1s var(--cos-ease) 0.32s both;
+}
+.cos-stagger-4 {
+  animation: cos-reveal 1s var(--cos-ease) 0.44s both;
+}
+
+/* 잔잔한 에디토리얼 그리드 (히어로 배경) */
+.cos-grid-bg {
+  background-color: var(--lit-bg-hero);
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: center top;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cos-grid-bg {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  }
+}
+
 body {
   background: var(--lit-bg);
   color: var(--lit-ink);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
+::selection {
+  background: rgba(17, 17, 17, 0.12);
+  color: var(--lit-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::selection {
+    background: rgba(245, 245, 245, 0.15);
+  }
+}
+
 /* 전례 편집용 DayPicker */
 .rdp-mass-calendar {
   --rdp-accent-color: var(--lit-ink);
-  --rdp-accent-background-color: rgba(10, 10, 10, 0.06);
+  --rdp-accent-background-color: rgba(17, 17, 17, 0.06);
   --rdp-day-height: 3.75rem;
   --rdp-day-width: 3.75rem;
   --rdp-day_button-height: 3.5rem;
@@ -95,14 +167,15 @@ body {
 @media (prefers-color-scheme: dark) {
   .rdp-mass-calendar {
     --rdp-accent-color: var(--lit-ink);
-    --rdp-accent-background-color: rgba(250, 250, 250, 0.08);
+    --rdp-accent-background-color: rgba(245, 245, 245, 0.08);
   }
 }
 
 .rdp-mass-calendar .rdp-caption_label,
 .rdp-mass-calendar .rdp-month_caption {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   margin-bottom: 0.5rem;
 }
 
@@ -115,8 +188,8 @@ body {
 
 .rdp-mass-calendar .rdp-weekday {
   font-size: 0.9rem;
-  font-weight: 600;
-  opacity: 0.9;
+  font-weight: 500;
+  opacity: 0.85;
 }
 
 @media (min-width: 640px) {
@@ -127,7 +200,7 @@ body {
 
 .rdp-mass-calendar .rdp-day_button {
   font-size: 1.0625rem;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 @media (min-width: 640px) {

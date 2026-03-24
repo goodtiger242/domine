@@ -4,6 +4,7 @@ import {
   getScheduleForDate,
   listLiturgicalDateCounts,
 } from "@/app/actions/liturgical";
+import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteHeader } from "@/app/components/layout/SiteHeader";
 import { getTodayISO } from "@/lib/date/local";
 import { litDisplay } from "@/lib/fonts/display";
@@ -60,6 +61,9 @@ export default async function LiturgicalEditPage({
           />
         </div>
       </main>
+      <footer className="border-t border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-6 py-10">
+        <DeployStamp className="!mt-0" />
+      </footer>
     </div>
   );
 }

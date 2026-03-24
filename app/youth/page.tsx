@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteHeader } from "@/app/components/layout/SiteHeader";
 import { getDefaultYouthProfiles } from "@/lib/constants/youth-profiles";
 import { YouthMembersClient } from "./YouthMembersClient";
@@ -25,6 +26,7 @@ export default function YouthPage() {
         >
           메인으로
         </Link>
+        <DeployStamp />
       </footer>
     </div>
   );

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listCalendarEventsInMonth } from "@/app/actions/calendar";
+import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteHeader } from "@/app/components/layout/SiteHeader";
 import { CalendarPageClient } from "./CalendarPageClient";
 import { parseYearMonthParams } from "@/lib/date/month";
@@ -53,6 +54,7 @@ export default async function CalendarPage({
         >
           메인으로
         </Link>
+        <DeployStamp />
       </footer>
     </div>
   );
