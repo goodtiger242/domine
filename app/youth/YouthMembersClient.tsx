@@ -89,11 +89,7 @@ export function YouthMembersClient({ initialProfiles }: Props) {
             청년회 멤버
           </h1>
           <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
-            생일·축일·세례명을 확인합니다. 편집 후 저장하면{" "}
-            <strong className="font-medium text-[var(--lit-ink)]">
-              모든 사람에게 동일하게
-            </strong>{" "}
-            반영됩니다 (Supabase DB).
+            생일·축일·세례명을 확인합니다.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
