@@ -105,7 +105,7 @@ export function LandingPage({
                     src="/image/domine_familiy.jpg"
                     alt="도미네 단체 사진 — 도미네 패밀리"
                     fill
-                    className="object-cover object-[center_28%]"
+                    className="object-contain object-center lg:object-cover lg:object-[center_28%]"
                     sizes="(max-width: 1024px) 100vw, 45vw"
                     priority
                   />
