@@ -40,24 +40,8 @@ export function LandingPage({
 
         <div className="flex flex-col">
           <section
-            id="home-military"
-            className="order-1 border-b border-[var(--lit-border)]/70 lg:order-2"
-          >
-            <HakJunMilitaryBanner />
-          </section>
-
-          <LiturgicalMonthSection
-            year={liturgicalYear}
-            month={liturgicalMonth}
-            schedules={[]}
-            variant="home"
-            homeSpotlight={homeSpotlight}
-            sectionClassName="order-2 lg:order-3"
-          />
-
-          <section
             id="home-gallery"
-            className="relative cos-grid-bg order-3 border-b border-[var(--lit-border)]/70 lg:order-1 lg:min-h-0 lg:border-b"
+            className="relative cos-grid-bg order-1 border-b border-[var(--lit-border)]/70 lg:order-1 lg:min-h-0 lg:border-b"
           >
             <div className="relative hidden overflow-hidden lg:block">
               <div
@@ -87,12 +71,9 @@ export function LandingPage({
               </div>
             </div>
 
-            <div className="relative border-t border-[var(--lit-border)]/50 bg-[var(--lit-bg-hero)] px-4 py-10 lg:hidden">
+            <div className="relative bg-[var(--lit-bg-hero)] px-4 pb-12 pt-10 lg:hidden">
               <div className="mx-auto w-full max-w-[min(100%,26rem)]">
-                <p className="mb-4 text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lit-ink-muted)]">
-                  Gallery
-                </p>
-                <div className="mb-5 flex justify-center">
+                <div className="mb-6 flex justify-center">
                   <Image
                     src="/image/domine_logo.jpg"
                     alt="Domine"
@@ -111,6 +92,28 @@ export function LandingPage({
               </div>
             </div>
           </section>
+
+          <section
+            id="home-military"
+            className="order-2 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-2"
+          >
+            <div className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-14 lg:px-2">
+              <div className="overflow-hidden rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]">
+                <div className="p-5 md:p-8">
+                  <HakJunMilitaryBanner embedded />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <LiturgicalMonthSection
+            year={liturgicalYear}
+            month={liturgicalMonth}
+            schedules={[]}
+            variant="home"
+            homeSpotlight={homeSpotlight}
+            sectionClassName="order-3 lg:order-3"
+          />
 
           <div className="order-4 lg:order-4">
             <LiturgicalMinisterPrayersSection />

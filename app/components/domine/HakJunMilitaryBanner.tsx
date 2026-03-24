@@ -10,7 +10,12 @@ import {
 
 const PHOTO = "/image/이학준.jpg";
 
-export function HakJunMilitaryBanner() {
+type Props = {
+  /** 메인 등: 바깥 카드가 있을 때 테두리·배경 생략 */
+  embedded?: boolean;
+};
+
+export function HakJunMilitaryBanner({ embedded = false }: Props) {
   const stats = getHakJunMilitaryStats();
   const displayPct = stats.isDischarged ? 100 : stats.progressPercent;
   const pctLabel = formatProgressPercentDisplay(displayPct);
@@ -25,8 +30,20 @@ export function HakJunMilitaryBanner() {
   }
 
   return (
-    <div className="border-b border-[var(--lit-border)] bg-[var(--lit-bg-elevated)]">
-      <div className="mx-auto max-w-[90rem] px-4 py-6 md:px-10 md:py-12 lg:px-12 lg:py-16">
+    <div
+      className={
+        embedded
+          ? "bg-transparent"
+          : "border-b border-[var(--lit-border)] bg-[var(--lit-bg-elevated)]"
+      }
+    >
+      <div
+        className={
+          embedded
+            ? "mx-auto w-full max-w-none px-0 py-0"
+            : "mx-auto max-w-[90rem] px-4 py-6 md:px-10 md:py-12 lg:px-12 lg:py-16"
+        }
+      >
         <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-start gap-3 md:grid-cols-[minmax(0,280px)_1fr] md:items-center md:gap-16 lg:gap-24">
           <div className="relative aspect-[3/4] w-full max-w-[7rem] shrink-0 overflow-hidden bg-[var(--lit-bg)] md:max-w-none">
             <Image

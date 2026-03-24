@@ -41,10 +41,16 @@ export function LiturgicalMonthSection({
         <div className="mb-12 flex flex-col gap-8 md:mb-16 md:gap-10">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.28em]">
-                Liturgy
-              </p>
-              <h2 className="mt-4 font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.65rem,6.5vw,2.1rem)] max-lg:leading-snug md:text-5xl">
+              {variant === "page" ? (
+                <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.28em]">
+                  Liturgy
+                </p>
+              ) : null}
+              <h2
+                className={`font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.65rem,6.5vw,2.1rem)] max-lg:leading-snug md:text-5xl ${
+                  variant === "page" ? "mt-4" : "mt-0"
+                }`}
+              >
                 {variant === "home" && homeSpotlight ? (
                   <span className="break-keep">전례 봉사</span>
                 ) : (
