@@ -30,7 +30,9 @@ export default function RootLayout({
       lang="ko"
       className={`${notoSansKr.variable} ${geistMono.variable} ${litDisplay.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col font-sans">{children}</body>
+      <body className="flex min-h-dvh min-h-full flex-col font-sans [padding-left:env(safe-area-inset-left)] [padding-right:env(safe-area-inset-right)]">
+        {children}
+      </body>
     </html>
   );
 }

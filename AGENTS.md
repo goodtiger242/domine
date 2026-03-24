@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## 배포 스탬프·푸시 (필수)
 
 코드 작업을 마치면 사용자가 따로 말하지 않아도 `lib/deploy-stamp.ts`의 `DEPLOYMENT_INDEX`를 **+1** 하고, **커밋·푸시**하며, 응답에 **`배포 인덱스: N → M`** 을 적는다. 상세는 `.cursor/rules/deploy-push.mdc` 를 따른다.
+
+## 모바일·브라우저
+
+모바일·주요 브라우저에서 깨짐 없이 읽히게 하는 보수적 기준은 `.cursor/rules/mobile-browser-baseline.mdc` 를 따른다.

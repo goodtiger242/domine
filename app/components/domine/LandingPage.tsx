@@ -1,10 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
+import { FamilyPhotoCarousel } from "@/app/components/domine/FamilyPhotoCarousel";
 import { HakJunMilitaryBanner } from "@/app/components/domine/HakJunMilitaryBanner";
 import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
+import { familyGalleryImages } from "@/lib/domine/family-gallery";
 
 const nav = [
   { href: "/liturgical", label: "전례 안내" },
@@ -63,42 +64,23 @@ export function LandingPage({
 
       <main className="flex-1">
         <section
-          className="cos-grid-bg relative flex min-h-[88vh] flex-col justify-center overflow-hidden border-b border-[var(--lit-border)]"
+          className="cos-grid-bg relative flex min-h-[88dvh] flex-col justify-center overflow-hidden border-b border-[var(--lit-border)]"
           aria-labelledby="hero-title"
         >
+          <h1 id="hero-title" className="sr-only">
+            도미네
+          </h1>
           <div
             className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--lit-bg-hero)] via-transparent to-[var(--lit-bg)] opacity-90"
             aria-hidden
           />
           <div className="relative mx-auto w-full max-w-[90rem] px-5 py-16 md:px-10 md:py-20 lg:px-12 lg:py-28">
-            <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-16 xl:gap-20">
-              <div className="order-2 text-center lg:order-1 lg:text-left">
-                <p className="cos-stagger-1 break-keep text-[10px] font-medium uppercase tracking-[0.45em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.26em] md:text-[11px]">
-                  용호성당 · 청년회
-                </p>
-                <h1
-                  id="hero-title"
-                  className="cos-stagger-2 mt-6 font-light text-[clamp(3.25rem,11vw,7rem)] leading-[0.92] tracking-[-0.055em] text-[var(--lit-ink)] lg:mt-8 xl:text-[clamp(3.5rem,9vw,7.5rem)]"
-                >
-                  도미네
-                </h1>
-              </div>
-
-              <figure className="order-1 lg:order-2">
-                <div className="cos-stagger-2 relative aspect-[4/3] w-full overflow-hidden border border-[var(--lit-border)] bg-[var(--lit-bg)] shadow-[0_1px_0_rgba(0,0,0,0.04)] sm:aspect-[5/4] lg:aspect-[4/5] xl:aspect-[3/4]">
-                  <Image
-                    src="/image/domine_familiy.jpg"
-                    alt="도미네 단체 사진 — 도미네 패밀리"
-                    fill
-                    className="object-contain object-center lg:object-cover lg:object-[center_28%]"
-                    sizes="(max-width: 1024px) 100vw, 45vw"
-                    priority
-                  />
-                </div>
-                <figcaption className="cos-stagger-3 mt-4 break-keep text-center text-[10px] font-medium uppercase tracking-[0.28em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.2em] lg:text-right">
-                  도미네 패밀리
-                </figcaption>
-              </figure>
+            <div className="cos-stagger-2 mx-auto w-full max-w-[min(100%,42rem)]">
+              <FamilyPhotoCarousel
+                images={familyGalleryImages}
+                imageClassName="object-contain object-center lg:object-cover lg:object-[center_28%]"
+                sizes="(max-width: 1024px) 100vw, 42rem"
+              />
             </div>
           </div>
         </section>
