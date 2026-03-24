@@ -54,7 +54,7 @@ export function HomeAnchorNav() {
       className="sticky top-14 z-40 border-b border-[var(--lit-border)]/85 bg-[var(--lit-bg-elevated)]/96 backdrop-blur-md lg:hidden"
       aria-label="페이지 구역 이동"
     >
-      <div className="scrollbar-none flex gap-1 overflow-x-auto px-3 py-2.5 [-webkit-overflow-scrolling:touch]">
+      <div className="flex gap-1 overflow-x-auto px-3 py-2.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => {
           const isOn = active === t.id;
           return (
