@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FamilyGalleryItem } from "@/lib/domine/family-gallery";
 
-const AUTO_MS = 5500;
+/** 자동 슬라이드 간격 (우측 방향 = 다음 장) */
+const AUTO_MS = 2000;
 const SWIPE_PX = 48;
 
 type Props = {
@@ -65,6 +66,8 @@ export function FamilyPhotoCarousel({
     return null;
   }
 
+  const slidePct = len > 0 ? (index * 100) / len : 0;
+
   return (
     <div
       className="relative w-full"
@@ -72,24 +75,31 @@ export function FamilyPhotoCarousel({
       onTouchEnd={onTouchEnd}
     >
       <div className="relative aspect-[5/4] w-full overflow-hidden border border-[var(--lit-border)] bg-[var(--lit-bg)] shadow-[0_1px_0_rgba(0,0,0,0.04)] sm:aspect-[4/3] md:aspect-[5/4] lg:aspect-[4/5] xl:aspect-[3/4]">
-        {images.map((img, i) => (
-          <div
-            key={img.src}
-            className={`absolute inset-0 transition-opacity duration-500 ease-out ${
-              i === index ? "z-[1] opacity-100" : "z-0 opacity-0"
-            }`}
-            aria-hidden={i !== index}
-          >
-            <Image
-              src={img.src}
-              alt={img.alt}
-              fill
-              className={imageClassName}
-              sizes={sizes}
-              priority={i === 0}
-            />
-          </div>
-        ))}
+        <div
+          className="flex h-full transition-transform duration-500 ease-out motion-reduce:duration-0"
+          style={{
+            width: `${len * 100}%`,
+            transform: `translateX(-${String(slidePct)}%)`,
+          }}
+        >
+          {images.map((img, i) => (
+            <div
+              key={img.src}
+              className="relative h-full shrink-0"
+              style={{ width: `${100 / len}%` }}
+              aria-hidden={i !== index}
+            >
+              <Image
+                src={img.src}
+                alt={img.alt}
+                fill
+                className={imageClassName}
+                sizes={sizes}
+                priority={i <= 1}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {len > 1 ? (
