@@ -1,7 +1,10 @@
-import { Outfit } from "next/font/google";
+import { Noto_Serif_KR } from "next/font/google";
 
-/** 로고·제목용 — 세리프 대신 기하학적 산세리프 */
-export const outfitDisplay = Outfit({
+/**
+ * 제목·로고용 — 클래식 리터지컬 톤(양피지·미사 책 연상)
+ */
+export const litDisplay = Noto_Serif_KR({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
+  variable: "--font-lit-display",
 });

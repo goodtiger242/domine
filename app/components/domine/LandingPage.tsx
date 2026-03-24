@@ -3,7 +3,7 @@ import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { HakJunMilitaryBanner } from "@/app/components/domine/HakJunMilitaryBanner";
 import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
-import { outfitDisplay } from "@/lib/fonts/display";
+import { litDisplay } from "@/lib/fonts/display";
 
 const nav = [
   { href: "/liturgical", label: "전례 안내" },
@@ -27,21 +27,24 @@ export function LandingPage({
   highlightLiturgyDate = null,
 }: Props) {
   return (
-    <div className="flex min-h-full flex-col bg-[#f4f6fb] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-[#f4f6fb]/92 backdrop-blur-lg dark:border-slate-800 dark:bg-slate-950/92">
+    <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)]">
+      <header className="sticky top-0 z-50 border-b border-[var(--lit-border)] bg-[var(--lit-bg-elevated)]/95 shadow-[inset_0_-1px_0_rgba(255,255,255,0.45)] backdrop-blur-md dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]">
         <div className="mx-auto flex h-[4.25rem] max-w-6xl items-center justify-between gap-4 px-5 sm:px-10">
           <Link
             href="/"
-            className={`${outfitDisplay.className} shrink-0 text-2xl tracking-tight text-indigo-950 dark:text-amber-50`}
+            className={`${litDisplay.className} shrink-0 text-2xl tracking-tight text-[var(--lit-ink)] transition-colors hover:text-[var(--lit-gold)] focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--lit-bg-elevated)]`}
           >
             도미네
           </Link>
-          <nav className="flex flex-wrap items-center justify-end gap-1 text-[15px] font-medium sm:gap-5">
+          <nav
+            className="flex flex-wrap items-center justify-end gap-0.5 text-[15px] font-medium sm:gap-1"
+            aria-label="주요 메뉴"
+          >
             {nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                className="rounded-md px-3 py-2 text-[var(--lit-ink-muted)] transition-colors hover:bg-[var(--lit-bg)] hover:text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--lit-bg-elevated)] dark:hover:bg-[var(--lit-bg)]"
               >
                 {item.label}
               </Link>
@@ -52,21 +55,33 @@ export function LandingPage({
 
       <main className="flex-1">
         <section
-          className="relative overflow-hidden border-b border-slate-200/70 bg-gradient-to-br from-[#eef2ff] via-[#f8fafc] to-[#fff7ed] px-5 py-20 sm:px-10 sm:py-28 dark:border-slate-800 dark:from-slate-900 dark:via-slate-950 dark:to-slate-950"
+          className="relative overflow-hidden border-b border-[var(--lit-border)] bg-[var(--lit-bg-hero)] px-5 py-20 sm:px-10 sm:py-24"
           aria-labelledby="hero-title"
         >
-          <div className="pointer-events-none absolute -right-28 top-8 h-80 w-80 rounded-full bg-amber-300/30 blur-3xl dark:bg-amber-600/10" />
-          <div className="pointer-events-none absolute -left-24 bottom-4 h-64 w-64 rounded-full bg-indigo-400/15 blur-3xl dark:bg-indigo-900/20" />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-25"
+            style={{
+              backgroundImage:
+                "radial-gradient(ellipse 80% 60% at 50% -20%, rgba(125, 107, 74, 0.12), transparent 55%)",
+            }}
+          />
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--lit-gold-muted)]/40 to-transparent"
+            aria-hidden
+          />
           <div className="relative mx-auto max-w-3xl text-center">
-            <p className="mb-4 text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-indigo-950/90 dark:text-amber-200/80">
+            <p className="mb-4 text-[0.7rem] font-semibold uppercase tracking-[0.35em] text-[var(--lit-gold)]">
               용호성당
             </p>
             <h1
               id="hero-title"
-              className={`${outfitDisplay.className} text-5xl leading-[1.05] text-indigo-950 sm:text-6xl md:text-7xl dark:text-amber-50`}
+              className={`${litDisplay.className} text-5xl leading-[1.08] text-[var(--lit-ink)] sm:text-6xl md:text-7xl`}
             >
               도미네
             </h1>
+            <p className="mx-auto mt-6 max-w-md text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
+              천주교 신앙 안에서 함께 걷는 청년 공동체
+            </p>
           </div>
         </section>
 
@@ -83,10 +98,12 @@ export function LandingPage({
         <LiturgicalMinisterPrayersSection />
       </main>
 
-      <footer className="border-t border-slate-800/80 bg-indigo-950 px-5 py-12 text-center text-sm text-amber-50/95 dark:border-slate-800">
-        <p className={`${outfitDisplay.className} text-xl text-amber-50`}>도미네</p>
-        <p className="mt-2 text-[15px] text-amber-100/85">용호성당 청년회</p>
-        <p className="mt-8 text-xs text-amber-200/55">
+      <footer className="border-t border-[var(--lit-border-strong)] bg-[var(--lit-ink-footer)] px-5 py-14 text-center text-sm text-[#e8e4dc]/95">
+        <p className={`${litDisplay.className} text-xl text-[var(--lit-gold-light)]`}>
+          도미네
+        </p>
+        <p className="mt-2 text-[15px] text-[#c4b8a8]/90">용호성당 청년회</p>
+        <p className="mt-10 text-xs tracking-wide text-[#8a8075]/85">
           © {new Date().getFullYear()} 도미네
         </p>
       </footer>

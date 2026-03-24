@@ -152,7 +152,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
       <MonthNav year={year} month={month} basePath="/calendar" />
 
       <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-start lg:justify-center">
-        <div className="[&_.rdp-month_caption]:hidden w-full max-w-md rounded-3xl border border-slate-200/90 bg-white p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700 dark:bg-slate-950/70 dark:shadow-none">
+        <div className="[&_.rdp-month_caption]:hidden w-full max-w-md rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)]">
           <DayPicker
             key={`${year}-${month}`}
             mode="single"
@@ -162,21 +162,21 @@ export function CalendarPageClient({ year, month, events }: Props) {
             modifiers={{ hasEvent: eventDates }}
             modifiersClassNames={{
               hasEvent:
-                "font-semibold text-indigo-950 dark:text-amber-200 relative after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-amber-500 dark:after:bg-amber-400",
+                "relative font-semibold text-[var(--lit-ink)] after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-[var(--lit-gold)]",
             }}
             className="w-full [--rdp-cell-size:2.75rem] sm:[--rdp-cell-size:3rem] text-base"
           />
-          <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-500">
+          <p className="mt-2 text-center text-xs text-[var(--lit-ink-subtle)]">
             표시된 달의 날짜에 점이 있으면 일정이 있습니다.
           </p>
         </div>
 
         <div className="w-full max-w-md space-y-4">
-          <h2 className="text-base font-bold text-indigo-950 dark:text-amber-200">
+          <h2 className="text-base font-bold text-[var(--lit-ink)]">
             {formatMonthLabelKo(year, month)} 일정
           </h2>
           {events.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-[var(--lit-ink-muted)]">
               등록된 일정이 없습니다.
             </p>
           ) : (
@@ -184,20 +184,20 @@ export function CalendarPageClient({ year, month, events }: Props) {
               {events.map((ev) => (
                 <li
                   key={ev.id}
-                  className="rounded-2xl border border-slate-200 bg-slate-50/90 p-4 dark:border-slate-700 dark:bg-slate-900/50"
+                  className="rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-4 shadow-[var(--lit-paper-shadow)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-slate-500 dark:text-slate-500">
+                      <p className="text-xs text-[var(--lit-ink-subtle)]">
                         {format(parseLocalYMD(ev.event_date), "M월 d일 (EEE)", {
                           locale: ko,
                         })}
                       </p>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      <p className="font-semibold text-[var(--lit-ink)]">
                         {ev.title || "(제목 없음)"}
                       </p>
                       {ev.body.trim() ? (
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--lit-ink-muted)]">
                           {ev.body}
                         </p>
                       ) : null}
@@ -214,7 +214,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
                           })
                         }
                         disabled={pending}
-                        className="rounded-full border border-indigo-900/25 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-950 shadow-sm transition hover:bg-indigo-50 disabled:opacity-50 dark:border-amber-200/30 dark:bg-slate-900 dark:text-amber-100 dark:hover:bg-slate-800"
+                        className="rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--lit-ink)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
                       >
                         편집
                       </button>
@@ -222,7 +222,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
                         type="button"
                         onClick={() => onDelete(ev.id)}
                         disabled={pending}
-                        className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900/50 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                        className="rounded-lg border border-red-200/90 bg-[var(--lit-bg)] px-3 py-1.5 text-xs font-semibold text-red-800 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
                       >
                         삭제
                       </button>
@@ -235,13 +235,13 @@ export function CalendarPageClient({ year, month, events }: Props) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-lg rounded-3xl border border-slate-200/90 bg-white/90 p-7 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700 dark:bg-slate-950/50 dark:shadow-none">
-        <h2 className="text-base font-bold text-indigo-950 dark:text-amber-200">
+      <div className="mx-auto max-w-lg rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-7 shadow-[var(--lit-paper-shadow)]">
+        <h2 className="text-base font-bold text-[var(--lit-ink)]">
           일정 추가
         </h2>
         <form onSubmit={onAdd} className="mt-5 space-y-4">
           <div>
-            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-sm font-medium text-[var(--lit-ink-muted)]">
               날짜
             </label>
             <input
@@ -250,41 +250,41 @@ export function CalendarPageClient({ year, month, events }: Props) {
               required
               value={formDate}
               onChange={(e) => setFormDate(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+              className="mt-1 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-sm font-medium text-[var(--lit-ink-muted)]">
               제목
             </label>
             <input
               name="title"
               type="text"
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+              className="mt-1 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
               placeholder="예: 청년회 모임"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-sm font-medium text-[var(--lit-ink-muted)]">
               내용
             </label>
             <textarea
               name="body"
               rows={3}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+              className="mt-1 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
               placeholder="선택"
             />
           </div>
           <button
             type="submit"
             disabled={pending}
-            className="h-12 w-full rounded-full bg-indigo-950 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-900 disabled:opacity-50 dark:bg-amber-100 dark:text-slate-900 dark:hover:bg-white"
+            className="h-12 w-full rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-ink)] text-sm font-semibold text-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow)] transition hover:bg-[var(--lit-accent)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
           >
             {pending ? "저장 중…" : "일정 저장"}
           </button>
         </form>
         {msg ? (
-          <p className="mt-3 text-center text-sm text-slate-600 dark:text-slate-400">
+          <p className="mt-3 text-center text-sm text-[var(--lit-ink-muted)]">
             {msg}
           </p>
         ) : null}
@@ -292,7 +292,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
 
       {editDraft ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-4 sm:items-center sm:p-6"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--lit-ink)]/45 p-4 backdrop-blur-[2px] sm:items-center sm:p-6"
           role="presentation"
           onClick={() => {
             if (!pending) {
@@ -304,23 +304,23 @@ export function CalendarPageClient({ year, month, events }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="calendar-edit-title"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-600 dark:bg-slate-950"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3
               id="calendar-edit-title"
-              className="text-lg font-bold text-indigo-950 dark:text-amber-100"
+              className="text-lg font-bold text-[var(--lit-ink)]"
             >
               일정 수정
             </h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm text-[var(--lit-ink-muted)]">
               날짜·제목·내용을 수정한 뒤 저장하세요.
             </p>
             <form onSubmit={onSaveEdit} className="mt-5 space-y-4">
               <div>
                 <label
                   htmlFor="edit-date"
-                  className="text-sm font-medium text-slate-600 dark:text-slate-400"
+                  className="text-sm font-medium text-[var(--lit-ink-muted)]"
                 >
                   날짜
                 </label>
@@ -334,13 +334,13 @@ export function CalendarPageClient({ year, month, events }: Props) {
                       d ? { ...d, event_date: e.target.value } : d
                     )
                   }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+                  className="mt-1 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
                 />
               </div>
               <div>
                 <label
                   htmlFor="edit-title"
-                  className="text-sm font-medium text-slate-600 dark:text-slate-400"
+                  className="text-sm font-medium text-[var(--lit-ink-muted)]"
                 >
                   제목
                 </label>
@@ -353,14 +353,14 @@ export function CalendarPageClient({ year, month, events }: Props) {
                       d ? { ...d, title: e.target.value } : d
                     )
                   }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+                  className="mt-1 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
                   placeholder="예: 청년회 모임"
                 />
               </div>
               <div>
                 <label
                   htmlFor="edit-body"
-                  className="text-sm font-medium text-slate-600 dark:text-slate-400"
+                  className="text-sm font-medium text-[var(--lit-ink-muted)]"
                 >
                   내용
                 </label>
@@ -373,7 +373,7 @@ export function CalendarPageClient({ year, month, events }: Props) {
                     )
                   }
                   rows={5}
-                  className="mt-1 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed dark:border-slate-600 dark:bg-slate-900"
+                  className="mt-1 w-full resize-y rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm leading-relaxed text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
                   placeholder="일정 상세 내용"
                 />
               </div>
@@ -382,14 +382,14 @@ export function CalendarPageClient({ year, month, events }: Props) {
                   type="button"
                   onClick={() => setEditDraft(null)}
                   disabled={pending}
-                  className="h-11 rounded-full border border-slate-200 px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="h-11 rounded-lg border border-[var(--lit-border)] px-5 text-sm font-medium text-[var(--lit-ink-muted)] transition hover:bg-[var(--lit-bg)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
                 >
                   취소
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="h-11 rounded-full bg-indigo-950 px-6 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-900 disabled:opacity-50 dark:bg-amber-100 dark:text-slate-900 dark:hover:bg-white"
+                  className="h-11 rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-ink)] px-6 text-sm font-semibold text-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow)] transition hover:bg-[var(--lit-accent)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
                 >
                   {pending ? "저장 중…" : "저장"}
                 </button>

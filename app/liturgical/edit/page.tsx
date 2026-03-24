@@ -4,7 +4,10 @@ import {
   getScheduleForDate,
   listLiturgicalDateCounts,
 } from "@/app/actions/liturgical";
+import { SiteHeader } from "@/app/components/layout/SiteHeader";
 import { getTodayISO } from "@/lib/date/local";
+import { litDisplay } from "@/lib/fonts/display";
+import { SITE_NAV_EDIT } from "@/lib/nav/site-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -26,24 +29,37 @@ export default async function LiturgicalEditPage({
   ]);
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-[#fff7ed] px-5 py-12 text-slate-900 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
-      <div className="mx-auto max-w-5xl">
-        <Link
-          href="/"
-          className="inline-flex text-sm font-semibold text-indigo-950 underline underline-offset-4 dark:text-amber-200"
-        >
-          ← 메인으로
-        </Link>
-        <h1 className="mt-8 text-3xl font-bold tracking-tight text-indigo-950 dark:text-amber-50">
-          전례 봉사 편집
-        </h1>
-        <LiturgicalEditForm
-          key={`${liturgyDate}-${schedule?.updated_at ?? "none"}`}
-          liturgyDate={liturgyDate}
-          initial={schedule}
-          savedDateCounts={savedDateCounts}
-        />
-      </div>
+    <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)]">
+      <SiteHeader navLinks={SITE_NAV_EDIT} />
+      <main className="flex-1 px-5 py-10 sm:px-10 sm:py-12">
+        <div className="mx-auto max-w-5xl">
+          <div className="border-b border-[var(--lit-border)] pb-8">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[var(--lit-gold-muted)]">
+              관리
+            </p>
+            <h1
+              className={`${litDisplay.className} mt-2 text-3xl tracking-tight text-[var(--lit-ink)] sm:text-4xl`}
+            >
+              전례 봉사 편집
+            </h1>
+            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
+              미사 날짜를 고른 뒤 봉사자를 입력하고 저장합니다. 메인·전례 안내에 반영됩니다.
+            </p>
+            <Link
+              href="/"
+              className="mt-6 inline-flex text-sm font-semibold text-[var(--lit-gold)] underline decoration-[var(--lit-gold)]/35 underline-offset-4 transition hover:text-[var(--lit-ink)]"
+            >
+              ← 메인으로
+            </Link>
+          </div>
+          <LiturgicalEditForm
+            key={`${liturgyDate}-${schedule?.updated_at ?? "none"}`}
+            liturgyDate={liturgyDate}
+            initial={schedule}
+            savedDateCounts={savedDateCounts}
+          />
+        </div>
+      </main>
     </div>
   );
 }

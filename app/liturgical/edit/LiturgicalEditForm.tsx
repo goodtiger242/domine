@@ -16,7 +16,7 @@ import {
 } from "@/lib/constants/youth-members";
 
 const fieldClass =
-  "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-950/35 focus:ring-2 focus:ring-indigo-950/12 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100";
+  "mt-1 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--lit-bg-elevated)]";
 
 type Props = {
   liturgyDate: string;
@@ -160,7 +160,7 @@ export function LiturgicalEditForm({
         />
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-800 dark:text-slate-200">
+            <label className="block text-sm font-medium text-[var(--lit-ink-muted)]">
               제목
             </label>
             <input
@@ -175,7 +175,7 @@ export function LiturgicalEditForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-800 dark:text-slate-200">
+            <label className="block text-sm font-medium text-[var(--lit-ink-muted)]">
               추가 안내
             </label>
             <textarea
@@ -194,8 +194,8 @@ export function LiturgicalEditForm({
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-slate-200/90 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/40 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-950 dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)] sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-gold)]">
           전례 봉사
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -226,8 +226,8 @@ export function LiturgicalEditForm({
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-slate-200/90 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/40 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-950 dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)] sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-gold)]">
           복사단
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -244,16 +244,16 @@ export function LiturgicalEditForm({
         </div>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-slate-200/90 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/40 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-950 dark:text-amber-200">
+      <div className="space-y-6 rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)] sm:p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-gold)]">
           지휘 · 반주
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-xs font-medium text-[var(--lit-ink-muted)]">
               지휘
             </label>
-            <p className="mt-0.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-100">
+            <p className="mt-0.5 rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)]">
               {FIXED_CONDUCTOR_NAME}
             </p>
           </div>
@@ -269,7 +269,7 @@ export function LiturgicalEditForm({
         <button
           type="submit"
           disabled={pending}
-          className="h-12 flex-1 rounded-full bg-indigo-950 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-900 disabled:opacity-50 dark:bg-amber-100 dark:text-slate-900 dark:hover:bg-white"
+          className="h-12 flex-1 rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-ink)] text-sm font-semibold text-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow)] transition hover:bg-[var(--lit-accent)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
         >
           {pending ? "저장 중…" : "저장"}
         </button>
@@ -278,7 +278,7 @@ export function LiturgicalEditForm({
             type="button"
             disabled={pending}
             onClick={onClickDelete}
-            className="h-12 shrink-0 rounded-full border border-red-300 bg-white px-6 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900/60 dark:bg-slate-950 dark:text-red-300 dark:hover:bg-red-950/40"
+            className="h-12 shrink-0 rounded-lg border border-red-200/90 bg-[var(--lit-bg-elevated)] px-6 text-sm font-semibold text-red-800 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
           >
             이 미사 정보 삭제
           </button>
@@ -286,7 +286,7 @@ export function LiturgicalEditForm({
       </div>
 
       {msg ? (
-        <p className="text-center text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-center text-sm text-[var(--lit-ink-muted)]">
           {msg}
         </p>
       ) : null}

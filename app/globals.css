@@ -1,8 +1,48 @@
 @import "tailwindcss";
 
+/* 클래식 리터지컬 — 양피지·잉크·브론즈 악센트 */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #f6f1e8;
+  --foreground: #1a1f2c;
+  --lit-bg: #f6f1e8;
+  --lit-bg-elevated: #fffcf6;
+  --lit-bg-hero: #f0e9de;
+  --lit-ink: #1a1f2c;
+  --lit-ink-muted: #4a4f5c;
+  --lit-ink-subtle: #6b7280;
+  --lit-border: #d4cfc3;
+  --lit-border-strong: #b8b0a0;
+  --lit-ink-footer: #0f1218;
+  --lit-gold: #7d6b4a;
+  --lit-gold-light: #c4a574;
+  --lit-gold-muted: #9a8b6f;
+  --lit-accent: #2c3544;
+  --lit-ring: #7d6b4a;
+  --lit-paper-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 1px 2px rgba(26, 31, 44, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f1218;
+    --foreground: #ece8df;
+    --lit-bg: #0f1218;
+    --lit-bg-elevated: #171d26;
+    --lit-bg-hero: #121920;
+    --lit-ink: #ece8df;
+    --lit-ink-muted: #a8a29e;
+    --lit-ink-subtle: #78716c;
+    --lit-border: #2d333d;
+    --lit-border-strong: #3d4654;
+    --lit-ink-footer: #080a0e;
+    --lit-gold: #c4a574;
+    --lit-gold-light: #d4bc8a;
+    --lit-gold-muted: #a89072;
+    --lit-accent: #e8e4dc;
+    --lit-ring: #c4a574;
+    --lit-paper-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 1px 3px rgba(0, 0, 0, 0.35);
+  }
 }
 
 @theme inline {
@@ -10,26 +50,19 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-lit-display);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--lit-bg);
+  color: var(--lit-ink);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* 전례 편집용 DayPicker — v9는 --rdp-day_* / --rdp-day_button_* 로 셀 크기 제어 */
+/* 전례 편집용 DayPicker */
 .rdp-mass-calendar {
-  --rdp-accent-color: #1e1b4b;
-  --rdp-accent-background-color: #eef2ff;
-  /* 기본(모바일): 큰 터치 영역 */
+  --rdp-accent-color: var(--lit-accent);
+  --rdp-accent-background-color: rgba(125, 107, 74, 0.12);
   --rdp-day-height: 3.75rem;
   --rdp-day-width: 3.75rem;
   --rdp-day_button-height: 3.5rem;
@@ -63,8 +96,8 @@ body {
 
 @media (prefers-color-scheme: dark) {
   .rdp-mass-calendar {
-    --rdp-accent-color: #fcd34d;
-    --rdp-accent-background-color: #1e293b;
+    --rdp-accent-color: var(--lit-gold-light);
+    --rdp-accent-background-color: rgba(196, 165, 116, 0.12);
   }
 }
 

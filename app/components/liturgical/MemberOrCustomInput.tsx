@@ -52,11 +52,11 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+        <label className="text-xs font-medium text-[var(--lit-ink-muted)]">
           {label}
         </label>
         <div
-          className="inline-flex rounded-full bg-slate-200/80 p-0.5 dark:bg-slate-800"
+          className="inline-flex rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] p-0.5"
           role="group"
           aria-label={`${label} 입력 방식`}
         >
@@ -69,10 +69,10 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
                 onChange("");
               }
             }}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs ${
+            className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] ${
               mode === "member"
-                ? "bg-white text-indigo-950 shadow-sm dark:bg-slate-950 dark:text-amber-100"
-                : "text-slate-600 dark:text-slate-400"
+                ? "bg-[var(--lit-bg-elevated)] text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)]"
+                : "text-[var(--lit-ink-subtle)]"
             }`}
           >
             멤버 선택
@@ -80,10 +80,10 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
           <button
             type="button"
             onClick={() => setEmptyTab("custom")}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs ${
+            className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] ${
               mode === "custom"
-                ? "bg-white text-indigo-950 shadow-sm dark:bg-slate-950 dark:text-amber-100"
-                : "text-slate-600 dark:text-slate-400"
+                ? "bg-[var(--lit-bg-elevated)] text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)]"
+                : "text-[var(--lit-ink-subtle)]"
             }`}
           >
             직접 입력
@@ -103,7 +103,7 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
             }
             onChange(formatYouthMemberDisplay(legal));
           }}
-          className="mt-0.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-950/35 focus:ring-2 focus:ring-indigo-950/12 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+          className="mt-0.5 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
         >
           <option value="">선택하세요</option>
           {members.map((n) => (
@@ -158,15 +158,15 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
             }}
             placeholder="예: 홍길동"
             aria-invalid={value.length > 0 && !isValidCustomLiturgicalName(value)}
-            className="mt-0.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-950/35 focus:ring-2 focus:ring-indigo-950/12 aria-invalid:border-amber-600/80 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+            className="mt-0.5 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] outline-none transition placeholder:text-[var(--lit-ink-subtle)] focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] aria-invalid:border-[var(--lit-gold)]"
           />
-          <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-500">
+          <p className="text-[11px] leading-snug text-[var(--lit-ink-subtle)]">
             직접 입력은 <span className="font-medium">한글 성명만 2~4자</span>
             입니다. &quot;최선호 프란치스코&quot;처럼 세례명을 붙이면 저장할 수
             없어요.
           </p>
           {customHint ? (
-            <p className="text-[11px] font-medium text-amber-800 dark:text-amber-200/95">
+            <p className="text-[11px] font-medium text-[var(--lit-gold)]">
               {customHint}
             </p>
           ) : null}

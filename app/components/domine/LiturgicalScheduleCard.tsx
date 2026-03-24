@@ -13,7 +13,6 @@ function formatDateLabel(iso: string) {
   });
 }
 
-/** 라벨 + 값, 한 칸(그리드 셀). enrichDisplay 시 청년회 멤버는 성명+세례명 */
 function RoleCell({
   label,
   value,
@@ -30,17 +29,16 @@ function RoleCell({
     enrichDisplay ? formatYouthMemberDisplay(value) : value;
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-indigo-950 dark:text-amber-200/90">
+      <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
         {label}
       </span>
-      <span className="break-words text-sm font-medium leading-snug text-slate-800 dark:text-slate-100">
+      <span className="break-words text-sm font-medium leading-snug text-[var(--lit-ink)]">
         {shown}
       </span>
     </div>
   );
 }
 
-/** 메인: "해설 : 이현아 마리아 도미니카" 형식으로 한 줄씩 순서대로 */
 function RoleLine({
   label,
   value,
@@ -53,10 +51,10 @@ function RoleLine({
   }
   const shown = formatYouthMemberDisplay(value);
   return (
-    <p className="break-words text-sm leading-relaxed text-slate-800 dark:text-slate-100">
-      <span className="text-slate-600 dark:text-slate-400">{label}</span>
-      <span className="text-slate-400 dark:text-slate-500"> : </span>
-      <span className="font-medium text-slate-900 dark:text-slate-50">
+    <p className="break-words text-sm leading-relaxed text-[var(--lit-ink-muted)]">
+      <span className="text-[var(--lit-ink-subtle)]">{label}</span>
+      <span className="text-[var(--lit-border-strong)]"> : </span>
+      <span className="font-medium text-[var(--lit-ink)]">
         {shown}
       </span>
     </p>
@@ -65,11 +63,12 @@ function RoleLine({
 
 type Props = {
   schedule: LiturgicalSchedule;
-  /** 메인 등 조회 전용 화면에서는 수정 링크 숨김 */
   showEditLink?: boolean;
-  /** 메인: 현재 달에서 시선이 가도록 테두리·그림자 강조 */
   emphasize?: boolean;
 };
+
+const cardBase =
+  "rounded-2xl border bg-[var(--lit-bg-elevated)] p-6 shadow-[var(--lit-paper-shadow)] sm:p-7";
 
 export function LiturgicalScheduleCard({
   schedule,
@@ -92,23 +91,23 @@ export function LiturgicalScheduleCard({
     <article
       className={
         emphasize
-          ? "relative overflow-hidden rounded-3xl border-2 border-indigo-950/45 bg-gradient-to-br from-white via-white to-indigo-50/60 p-6 shadow-[0_14px_44px_rgb(30,27,75,0.14)] ring-2 ring-indigo-950/20 dark:border-amber-400/40 dark:from-slate-950 dark:via-slate-950 dark:to-indigo-950/50 dark:shadow-[0_12px_40px_rgba(0,0,0,0.45)] dark:ring-amber-400/25 sm:p-7"
-          : "rounded-3xl border border-slate-200/90 bg-white p-6 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-950/80 dark:shadow-none sm:p-7"
+          ? `relative overflow-hidden ${cardBase} border-2 border-[var(--lit-gold)]/55 ring-1 ring-[var(--lit-gold)]/25`
+          : `${cardBase} border-[var(--lit-border)]`
       }
     >
       {emphasize ? (
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-indigo-950 via-indigo-600 to-amber-500 dark:from-amber-200 dark:via-amber-400 dark:to-amber-600"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[var(--lit-accent)] via-[var(--lit-gold-muted)] to-[var(--lit-gold)]"
           aria-hidden
         />
       ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-indigo-950/80 dark:text-amber-200/90">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-[var(--lit-gold-muted)]">
             {formatDateLabel(schedule.liturgy_date)}
           </p>
           {schedule.title.trim() ? (
-            <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+            <h3 className="mt-2 text-lg font-semibold tracking-tight text-[var(--lit-ink)]">
               {schedule.title}
             </h3>
           ) : null}
@@ -116,7 +115,7 @@ export function LiturgicalScheduleCard({
         {showEditLink ? (
           <Link
             href={`/liturgical/edit?date=${schedule.liturgy_date}`}
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-indigo-900/20 bg-white px-5 text-sm font-medium text-indigo-950 transition hover:bg-indigo-50 dark:border-amber-200/25 dark:bg-slate-900 dark:text-amber-100 dark:hover:bg-slate-800"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-bg)] px-5 text-sm font-medium text-[var(--lit-ink)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
           >
             수정
           </Link>
@@ -124,19 +123,19 @@ export function LiturgicalScheduleCard({
       </div>
 
       {schedule.announcement_detail.trim() ? (
-        <div className="mb-5 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4 dark:border-slate-600 dark:bg-slate-900/60">
-          <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-800 dark:text-slate-200">
+        <div className="mb-5 rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4">
+          <p className="whitespace-pre-wrap text-base leading-relaxed text-[var(--lit-ink-muted)]">
             {schedule.announcement_detail}
           </p>
         </div>
       ) : null}
 
       {hasLiturgicalRoles ? (
-        <div className="space-y-4 rounded-2xl border border-slate-200/70 bg-gradient-to-b from-amber-50/40 to-slate-50/30 p-4 dark:border-slate-700 dark:from-slate-900/40 dark:to-slate-950/50 sm:p-5">
+        <div className="space-y-4 rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)]/80 p-4 sm:p-5">
           {enrich ? (
             <>
               <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
+                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
                   전례 봉사
                 </h4>
                 <div className="space-y-2">
@@ -163,7 +162,7 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
+                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
                   복사단
                 </h4>
                 <div className="space-y-2">
@@ -173,7 +172,7 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
+                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
                   지휘 · 반주
                 </h4>
                 <div className="space-y-2">
@@ -185,7 +184,7 @@ export function LiturgicalScheduleCard({
           ) : (
             <>
               <div>
-                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
+                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
                   전례 봉사
                 </h4>
                 <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-2">
@@ -208,11 +207,11 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div>
-                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
+                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
                   복음 환호송
                 </h4>
                 {schedule.role_gospel_acclamation.trim() ? (
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  <p className="text-sm font-medium text-[var(--lit-ink)]">
                     {schedule.role_gospel_acclamation}
                   </p>
                 ) : null}
@@ -247,10 +246,10 @@ export function LiturgicalScheduleCard({
           )}
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-amber-50/40 to-slate-50/30 p-4 dark:border-slate-700 dark:from-slate-900/40 dark:to-slate-950/50 sm:p-5">
+        <div className="rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)]/80 p-4 sm:p-5">
           {enrich ? (
             <div className="space-y-2">
-              <h4 className="mb-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-indigo-950 dark:text-amber-200/95">
+              <h4 className="mb-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-gold)]">
                 지휘 · 반주
               </h4>
               <RoleLine label="지휘" value={FIXED_CONDUCTOR_NAME} />
@@ -274,7 +273,7 @@ export function LiturgicalScheduleCard({
       )}
 
       {showEditLink && schedule.updated_at ? (
-        <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-500">
+        <p className="mt-4 text-center text-xs text-[var(--lit-ink-subtle)]">
           마지막 저장:{" "}
           {new Date(schedule.updated_at).toLocaleString("ko-KR")}
         </p>

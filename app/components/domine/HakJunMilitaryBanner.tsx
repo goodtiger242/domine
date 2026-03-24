@@ -28,11 +28,13 @@ export function HakJunMilitaryBanner() {
   }
 
   return (
-    <div className="border-b border-slate-200/80 bg-gradient-to-b from-slate-100/95 to-indigo-50/50 dark:border-slate-800 dark:from-slate-900 dark:to-indigo-950/30">
-      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-10 sm:py-5">
-        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-[0_4px_24px_rgb(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-700/90 dark:bg-slate-900/70 dark:shadow-none sm:flex-row sm:items-center sm:gap-6 sm:p-5">
+    <div className="border-b border-[var(--lit-border)] bg-[var(--lit-bg)]">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-10 sm:py-6">
+        <div
+          className="flex flex-col gap-4 rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-4 shadow-[var(--lit-paper-shadow)] sm:flex-row sm:items-center sm:gap-6 sm:p-5"
+        >
           <div className="flex shrink-0 justify-center sm:justify-start">
-            <div className="relative aspect-[4/5] w-[6.5rem] overflow-hidden rounded-2xl bg-slate-200 shadow-inner ring-2 ring-white/90 dark:bg-slate-800 dark:ring-slate-700/80 sm:w-[7.25rem]">
+            <div className="relative aspect-[4/5] w-[6.5rem] overflow-hidden rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] shadow-inner sm:w-[7.25rem]">
               <Image
                 src={PHOTO}
                 alt={`${HAK_JUN_NAME} 사진`}
@@ -46,22 +48,22 @@ export function HakJunMilitaryBanner() {
 
           <div className="min-w-0 flex-1 space-y-3">
             <div className="text-center sm:text-left">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-[var(--lit-gold-muted)]">
                 {HAK_JUN_NAME} 님 복무 카운트
               </p>
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-slate-700 dark:text-slate-300 sm:justify-start">
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-[var(--lit-ink-muted)] sm:justify-start">
                 <span>
-                  <span className="text-slate-500 dark:text-slate-500">입대</span>{" "}
-                  <span className="font-semibold text-indigo-950 dark:text-amber-100">
+                  <span className="text-[var(--lit-ink-subtle)]">입대</span>{" "}
+                  <span className="font-semibold text-[var(--lit-ink)]">
                     {formatKoreanDate(HAK_JUN_ENLIST)}
                   </span>
                 </span>
-                <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                <span className="text-[var(--lit-border-strong)]" aria-hidden>
                   ·
                 </span>
                 <span>
-                  <span className="text-slate-500 dark:text-slate-500">전역</span>{" "}
-                  <span className="font-semibold text-indigo-950 dark:text-amber-100">
+                  <span className="text-[var(--lit-ink-subtle)]">전역</span>{" "}
+                  <span className="font-semibold text-[var(--lit-ink)]">
                     {formatKoreanDate(HAK_JUN_DISCHARGE)}
                   </span>
                 </span>
@@ -70,19 +72,19 @@ export function HakJunMilitaryBanner() {
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
               <div className="flex items-baseline justify-center gap-6 sm:justify-start">
-                <span className="text-2xl font-bold tabular-nums tracking-tight text-indigo-950 dark:text-amber-200">
+                <span className="text-2xl font-bold tabular-nums tracking-tight text-[var(--lit-ink)]">
                   {ddayLabel}
                 </span>
-                <span className="text-sm text-slate-500 dark:text-slate-400">
+                <span className="text-sm text-[var(--lit-ink-muted)]">
                   진행{" "}
-                  <span className="text-lg font-bold tabular-nums text-indigo-950 dark:text-amber-100">
+                  <span className="text-lg font-bold tabular-nums text-[var(--lit-gold)]">
                     {pctLabel}%
                   </span>
                 </span>
               </div>
-              <div className="h-2.5 w-full min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700">
+              <div className="h-2.5 w-full min-w-0 flex-1 overflow-hidden rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg)]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 dark:from-amber-400 dark:to-amber-300"
+                  className="h-full rounded-full bg-gradient-to-r from-[var(--lit-accent)] to-[var(--lit-gold)]"
                   style={{
                     width:
                       displayPct <= 0

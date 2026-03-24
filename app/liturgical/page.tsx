@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { listLiturgicalInMonth } from "@/app/actions/liturgical";
+import { SiteHeader } from "@/app/components/layout/SiteHeader";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { parseYearMonthParams } from "@/lib/date/month";
-import { outfitDisplay } from "@/lib/fonts/display";
+import { litDisplay } from "@/lib/fonts/display";
+import { SITE_NAV_LITURGICAL } from "@/lib/nav/site-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -21,38 +23,22 @@ export default async function LiturgicalGuidePage({
   const schedules = await listLiturgicalInMonth(year, month);
 
   return (
-    <div className="flex min-h-full flex-col bg-[#f4f6fb] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="border-b border-slate-200/80 bg-[#f4f6fb]/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-        <div className="mx-auto flex h-[3.75rem] max-w-6xl items-center justify-between px-5 sm:px-10">
-          <Link
-            href="/"
-            className={`${outfitDisplay.className} text-lg text-indigo-950 dark:text-amber-100`}
-          >
-            ← 도미네
-          </Link>
-          <nav className="flex flex-wrap items-center gap-2 text-[15px] font-medium sm:gap-4">
-            <Link
-              href="/liturgical/edit"
-              className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800"
-            >
-              전례 편집
-            </Link>
-            <Link
-              href="/calendar"
-              className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800"
-            >
-              캘린더
-            </Link>
-            <Link
-              href="/youth"
-              className="rounded-full px-3 py-2 text-slate-600 transition hover:bg-white/80 hover:text-indigo-950 dark:text-slate-400 dark:hover:bg-slate-800"
-            >
-              청년회 멤버
-            </Link>
-          </nav>
-        </div>
-      </header>
+    <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)]">
+      <SiteHeader navLinks={SITE_NAV_LITURGICAL} />
       <main className="flex-1">
+        <div className="border-b border-[var(--lit-border)] bg-[var(--lit-bg-hero)]/50 px-5 py-10 sm:px-10">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[var(--lit-gold-muted)]">
+            도미네
+          </p>
+          <h1
+            className={`${litDisplay.className} mt-2 text-3xl tracking-tight text-[var(--lit-ink)] sm:text-4xl`}
+          >
+            전례 안내
+          </h1>
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
+            월별 전례 봉사 배정을 확인합니다. 편집은 상단 메뉴에서 이동할 수 있습니다.
+          </p>
+        </div>
         <LiturgicalMonthSection
           year={year}
           month={month}
@@ -60,6 +46,14 @@ export default async function LiturgicalGuidePage({
           variant="page"
         />
       </main>
+      <footer className="border-t border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-5 py-8 text-center text-sm text-[var(--lit-ink-muted)]">
+        <Link
+          href="/"
+          className="font-medium text-[var(--lit-gold)] underline decoration-[var(--lit-gold)]/35 underline-offset-4 transition hover:text-[var(--lit-ink)]"
+        >
+          메인으로
+        </Link>
+      </footer>
     </div>
   );
 }

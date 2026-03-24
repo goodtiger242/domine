@@ -35,7 +35,7 @@ export function MonthNav({ year, month, basePath }: Props) {
   const now = new Date();
 
   const navBtnClass =
-    "inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800";
+    "inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] text-sm font-semibold text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2";
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -51,7 +51,7 @@ export function MonthNav({ year, month, basePath }: Props) {
         >
           ‹
         </button>
-        <span className="min-w-[10rem] text-center text-base font-semibold text-indigo-950 dark:text-amber-100">
+        <span className="min-w-[10rem] text-center text-base font-semibold text-[var(--lit-ink)]">
           {label}
         </span>
         <button
@@ -70,7 +70,7 @@ export function MonthNav({ year, month, basePath }: Props) {
         type="button"
         disabled={pending}
         onClick={() => go(now.getFullYear(), now.getMonth() + 1)}
-        className="flex h-11 items-center justify-center rounded-full border border-indigo-950/25 bg-indigo-950/[0.06] px-5 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-950/10 disabled:opacity-50 dark:border-amber-200/30 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50"
+        className="flex h-11 items-center justify-center rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-5 text-sm font-semibold text-[var(--lit-ink-muted)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
       >
         이번 달
       </button>

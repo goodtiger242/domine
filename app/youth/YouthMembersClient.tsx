@@ -6,6 +6,7 @@ import {
   feastDayDateOnly,
   type YouthProfile,
 } from "@/lib/constants/youth-profiles";
+import { litDisplay } from "@/lib/fonts/display";
 
 const STORAGE_KEY = "domine-youth-profiles-v1";
 
@@ -114,12 +115,20 @@ export function YouthMembersClient({ initialProfiles }: Props) {
   const rows = isEditing ? draft : profiles;
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-10">
+      <div className="flex flex-col gap-6 border-b border-[var(--lit-border)] pb-10 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-indigo-950 dark:text-amber-50">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[var(--lit-gold-muted)]">
+            공동체
+          </p>
+          <h1
+            className={`${litDisplay.className} mt-2 text-3xl tracking-tight text-[var(--lit-ink)] sm:text-4xl`}
+          >
             청년회 멤버
           </h1>
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
+            생일·축일·세례명을 확인합니다. 편집 시 이 브라우저에만 저장됩니다.
+          </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {isEditing ? (
@@ -127,14 +136,14 @@ export function YouthMembersClient({ initialProfiles }: Props) {
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="h-10 rounded-full border border-slate-300 px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="h-10 rounded-lg border border-[var(--lit-border)] px-5 text-sm font-medium text-[var(--lit-ink-muted)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
               >
                 취소
               </button>
               <button
                 type="button"
                 onClick={saveEdit}
-                className="h-10 rounded-full bg-indigo-950 px-6 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-900 dark:bg-amber-100 dark:text-slate-900 dark:hover:bg-white"
+                className="h-10 rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-ink)] px-6 text-sm font-semibold text-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow)] transition hover:bg-[var(--lit-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
               >
                 저장
               </button>
@@ -143,7 +152,7 @@ export function YouthMembersClient({ initialProfiles }: Props) {
             <button
               type="button"
               onClick={startEdit}
-              className="h-10 rounded-full border border-indigo-900/25 bg-white px-6 text-sm font-semibold text-indigo-950 shadow-sm transition hover:bg-indigo-50 dark:border-amber-200/30 dark:bg-slate-900 dark:text-amber-100 dark:hover:bg-slate-800"
+              className="h-10 rounded-lg border border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-6 text-sm font-semibold text-[var(--lit-ink)] shadow-[var(--lit-paper-shadow)] transition hover:border-[var(--lit-gold)] hover:text-[var(--lit-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
             >
               편집
             </button>
@@ -155,11 +164,11 @@ export function YouthMembersClient({ initialProfiles }: Props) {
         {rows.map((p, index) => (
           <li
             key={p.legalName}
-            className="rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-700 dark:bg-slate-950/70 dark:shadow-none"
+            className="rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 shadow-[var(--lit-paper-shadow)]"
           >
             <div className="mx-auto mb-4 w-full max-w-[220px]">
               {p.imageSrc?.trim() ? (
-                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-slate-200 ring-2 ring-white/80 dark:bg-slate-800 dark:ring-slate-700/80">
+                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
                   <Image
                     src={p.imageSrc}
                     alt={`${p.legalName} 사진`}
@@ -169,8 +178,8 @@ export function YouthMembersClient({ initialProfiles }: Props) {
                   />
                 </div>
               ) : (
-                <div className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100/90 to-amber-50/80 ring-2 ring-white/80 dark:from-indigo-950/80 dark:to-slate-900 dark:ring-slate-700/80">
-                  <span className="text-4xl font-bold text-indigo-950/40 dark:text-amber-200/50">
+                <div className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
+                  <span className={`${litDisplay.className} text-4xl font-semibold text-[var(--lit-gold-muted)]/50`}>
                     {p.legalName.slice(0, 1)}
                   </span>
                 </div>
@@ -180,10 +189,10 @@ export function YouthMembersClient({ initialProfiles }: Props) {
             {isEditing ? (
               <div className="space-y-3 text-sm">
                 <div>
-                  <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500">
+                  <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
                     성명
                   </label>
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  <p className="font-semibold text-[var(--lit-ink)]">
                     {p.legalName}
                   </p>
                 </div>
@@ -227,43 +236,43 @@ export function YouthMembersClient({ initialProfiles }: Props) {
             ) : (
               <div className="space-y-3 text-sm">
                 <div>
-                  <h2 className="text-lg font-bold text-indigo-950 dark:text-amber-100">
+                  <h2 className={`${litDisplay.className} text-lg font-semibold text-[var(--lit-ink)]`}>
                     {p.legalName}
                   </h2>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                  <p className="text-sm font-medium text-[var(--lit-ink-muted)]">
                     세례명 {p.baptismalNameKo}
                   </p>
                 </div>
-                <dl className="space-y-2 border-t border-slate-200/80 pt-3 dark:border-slate-700">
+                <dl className="space-y-2 border-t border-[var(--lit-border)] pt-3">
                   <div>
-                    <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500">
+                    <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
                       생일
                     </dt>
-                    <dd className="text-slate-800 dark:text-slate-200">
+                    <dd className="text-[var(--lit-ink-muted)]">
                       {p.birthday || "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500">
+                    <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
                       축일
                     </dt>
-                    <dd className="text-slate-800 dark:text-slate-200">
+                    <dd className="text-[var(--lit-ink-muted)]">
                       {p.feastDay || "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500">
+                    <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
                       특기
                     </dt>
-                    <dd className="whitespace-pre-wrap text-slate-800 dark:text-slate-200">
+                    <dd className="whitespace-pre-wrap text-[var(--lit-ink-muted)]">
                       {p.notes || "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500">
+                    <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
                       장기
                     </dt>
-                    <dd className="whitespace-pre-wrap text-slate-800 dark:text-slate-200">
+                    <dd className="whitespace-pre-wrap text-[var(--lit-ink-muted)]">
                       {p.talents || "—"}
                     </dd>
                   </div>
@@ -291,10 +300,10 @@ function Field({
   multiline?: boolean;
 }) {
   const base =
-    "mt-0.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100";
+    "mt-0.5 w-full rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2 text-sm text-[var(--lit-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]";
   return (
     <div>
-      <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500">
+      <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--lit-gold-muted)]">
         {label}
       </label>
       {multiline ? (

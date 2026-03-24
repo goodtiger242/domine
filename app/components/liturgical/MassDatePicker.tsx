@@ -11,7 +11,6 @@ import "react-day-picker/style.css";
 type Props = {
   value: string;
   onChange: (iso: string) => void;
-  /** ISO 날짜 → 저장된 미사·전례 건수. 1이면 점 1개, 2 이상이면 점 2개 */
   savedDateCounts?: Record<string, number>;
 };
 
@@ -48,7 +47,6 @@ export function MassDatePicker({
     }
   }, [value]);
 
-  /** 표시 중인 달 — ‹ › 로 넘길 때 필수(비제어 시 월이 안 바뀌는 경우 방지) */
   const [month, setMonth] = useState(() => monthFromValue(value));
 
   useEffect(() => {
@@ -81,14 +79,14 @@ export function MassDatePicker({
   })();
 
   const dotOne =
-    "relative font-semibold text-indigo-950 dark:text-amber-200 after:pointer-events-none after:absolute after:bottom-0.5 after:left-1/2 after:z-[1] after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-amber-500 after:shadow-[0_0_0_1px_rgba(255,255,255,0.35)] dark:after:bg-amber-400 dark:after:shadow-[0_0_0_1px_rgba(0,0,0,0.2)]";
+    "relative font-semibold text-[var(--lit-ink)] after:pointer-events-none after:absolute after:bottom-0.5 after:left-1/2 after:z-[1] after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-[var(--lit-gold)] after:shadow-[0_0_0_1px_rgba(255,252,246,0.5)]";
 
   const dotTwo =
-    "relative font-semibold text-indigo-950 dark:text-amber-200 after:pointer-events-none after:absolute after:bottom-0.5 after:left-1/2 after:z-[1] after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-amber-500 after:shadow-[7px_0_0_0_rgb(245,158,11),0_0_0_1px_rgba(255,255,255,0.35)] dark:after:bg-amber-400 dark:after:shadow-[7px_0_0_0_rgb(251,191,36),0_0_0_1px_rgba(0,0,0,0.2)]";
+    "relative font-semibold text-[var(--lit-ink)] after:pointer-events-none after:absolute after:bottom-0.5 after:left-1/2 after:z-[1] after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-[var(--lit-gold)] after:shadow-[7px_0_0_0_var(--lit-gold-muted),0_0_0_1px_rgba(255,252,246,0.4)]";
 
   return (
-    <div className="w-full rounded-3xl border border-slate-200/90 bg-white p-6 shadow-[0_12px_40px_rgb(15,23,42,0.08)] sm:p-8 dark:border-slate-700 dark:bg-slate-950/70 dark:shadow-none">
-      <p className="mb-5 text-lg font-semibold text-indigo-950 dark:text-amber-100">
+    <div className="w-full rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-6 shadow-[var(--lit-paper-shadow)] sm:p-8">
+      <p className="mb-5 text-lg font-semibold text-[var(--lit-ink)]">
         미사 날짜
       </p>
       <div className="flex w-full min-w-0 flex-col items-stretch overflow-x-auto">
@@ -110,21 +108,20 @@ export function MassDatePicker({
           }}
           className="rdp-mass-calendar w-full min-w-0 max-w-none justify-center"
           classNames={{
-            today: "font-bold text-indigo-950 dark:text-amber-200",
+            today: "font-bold text-[var(--lit-ink)]",
             selected:
-              "bg-indigo-950 text-white rounded-xl dark:bg-amber-100 dark:text-slate-900",
+              "bg-[var(--lit-ink)] text-[var(--lit-bg-elevated)] rounded-xl",
             root: "w-full max-w-none",
             month_caption:
               "flex justify-center pt-1 relative items-center mb-3 text-xl font-semibold sm:text-2xl",
-            chevron:
-              "size-7 fill-indigo-950 sm:size-8 dark:fill-amber-200",
+            chevron: "size-7 fill-[var(--lit-accent)] sm:size-8",
             weekdays: "text-sm font-semibold sm:text-base",
             day: "text-[1.05rem] sm:text-[1.125rem]",
           }}
         />
       </div>
       {label ? (
-        <p className="mt-4 text-center text-sm text-slate-600 dark:text-slate-400 sm:text-left">
+        <p className="mt-4 text-center text-sm text-[var(--lit-ink-muted)] sm:text-left">
           선택: {label}
         </p>
       ) : null}
