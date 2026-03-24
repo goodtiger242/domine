@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { formatMonthLabelKo } from "@/lib/date/month";
 import { LiturgicalScheduleCard } from "@/app/components/domine/LiturgicalScheduleCard";
+import { HomeLiturgicalSpotlight } from "@/app/components/domine/HomeLiturgicalSpotlight";
 import { MonthNav } from "@/app/components/ui/MonthNav";
 
 type Props = {
@@ -9,7 +10,12 @@ type Props = {
   month: number;
   schedules: LiturgicalSchedule[];
   variant: "home" | "page";
-  highlightLiturgyDate?: string | null;
+  /** 메인: 한 박스 + 좌우 네비 (전체 월 리스트 대신) */
+  homeSpotlight?: {
+    eventKeys: string[];
+    schedulesByDate: Record<string, LiturgicalSchedule>;
+    initialIndex: number;
+  } | null;
 };
 
 export function LiturgicalMonthSection({
@@ -17,7 +23,7 @@ export function LiturgicalMonthSection({
   month,
   schedules,
   variant,
-  highlightLiturgyDate = null,
+  homeSpotlight = null,
 }: Props) {
   const label = formatMonthLabelKo(year, month);
 
@@ -34,13 +40,19 @@ export function LiturgicalMonthSection({
                 Liturgy
               </p>
               <h2 className="mt-4 font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.65rem,6.5vw,2.1rem)] max-lg:leading-snug md:text-5xl">
-                <span className="break-keep">{label}</span>
-                <span className="mt-1.5 block max-lg:mt-2 lg:mt-0 lg:inline">
-                  <span className="font-normal text-[var(--lit-ink-muted)]">
-                    <span className="max-lg:hidden"> · </span>
-                    전례 봉사
-                  </span>
-                </span>
+                {variant === "home" && homeSpotlight ? (
+                  <span className="break-keep">전례 봉사</span>
+                ) : (
+                  <>
+                    <span className="break-keep">{label}</span>
+                    <span className="mt-1.5 block max-lg:mt-2 lg:mt-0 lg:inline">
+                      <span className="font-normal text-[var(--lit-ink-muted)]">
+                        <span className="max-lg:hidden"> · </span>
+                        전례 봉사
+                      </span>
+                    </span>
+                  </>
+                )}
               </h2>
             </div>
             {variant === "page" ? (
@@ -50,6 +62,13 @@ export function LiturgicalMonthSection({
               >
                 편집
               </Link>
+            ) : variant === "home" && homeSpotlight ? (
+              <Link
+                href="/liturgical"
+                className="inline-flex h-12 shrink-0 items-center justify-center border border-[var(--lit-border)] bg-transparent px-6 text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink)] transition hover:border-[var(--lit-ink)] hover:bg-[var(--lit-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+              >
+                월별
+              </Link>
             ) : null}
           </div>
 
@@ -58,7 +77,13 @@ export function LiturgicalMonthSection({
           ) : null}
         </div>
 
-        {schedules.length === 0 ? (
+        {variant === "home" && homeSpotlight ? (
+          <HomeLiturgicalSpotlight
+            eventKeys={homeSpotlight.eventKeys}
+            schedulesByDate={homeSpotlight.schedulesByDate}
+            initialIndex={homeSpotlight.initialIndex}
+          />
+        ) : schedules.length === 0 ? (
           <div className="border border-dashed border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-8 py-16 text-center">
             <p className="text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
               {label}에 등록된 전례 봉사 정보가 없습니다.
@@ -77,11 +102,6 @@ export function LiturgicalMonthSection({
                 <LiturgicalScheduleCard
                   schedule={s}
                   showEditLink={variant !== "home"}
-                  emphasize={
-                    variant === "home" &&
-                    highlightLiturgyDate !== null &&
-                    s.liturgy_date === highlightLiturgyDate
-                  }
                 />
               </li>
             ))}

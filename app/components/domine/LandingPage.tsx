@@ -12,15 +12,17 @@ import { SITE_NAV_HOME } from "@/lib/nav/site-nav";
 type Props = {
   liturgicalYear: number;
   liturgicalMonth: number;
-  liturgicalSchedules: LiturgicalSchedule[];
-  highlightLiturgyDate?: string | null;
+  homeSpotlight: {
+    eventKeys: string[];
+    schedulesByDate: Record<string, LiturgicalSchedule>;
+    initialIndex: number;
+  };
 };
 
 export function LandingPage({
   liturgicalYear,
   liturgicalMonth,
-  liturgicalSchedules,
-  highlightLiturgyDate = null,
+  homeSpotlight,
 }: Props) {
   return (
     <div className="flex min-h-full flex-col bg-[var(--lit-bg)] text-[var(--lit-ink)]">
@@ -59,9 +61,9 @@ export function LandingPage({
         <LiturgicalMonthSection
           year={liturgicalYear}
           month={liturgicalMonth}
-          schedules={liturgicalSchedules}
+          schedules={[]}
           variant="home"
-          highlightLiturgyDate={highlightLiturgyDate}
+          homeSpotlight={homeSpotlight}
         />
 
         <LiturgicalMinisterPrayersSection />

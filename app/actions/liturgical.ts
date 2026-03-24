@@ -19,6 +19,30 @@ export type LiturgicalSchedule = {
   updated_at: string;
 };
 
+/** 해당 일 이후(포함) DB에 있고 내용이 있는 미사만 (날짜 오름차순, 상한 있음) */
+export async function listLiturgicalFromDate(
+  startISO: string,
+  options?: { limit?: number }
+): Promise<LiturgicalSchedule[]> {
+  const limit = options?.limit ?? 400;
+  try {
+    const supabase = createAnonServerClient();
+    const { data, error } = await supabase
+      .from("liturgical_weekly_schedule")
+      .select("*")
+      .gte("liturgy_date", startISO)
+      .order("liturgy_date", { ascending: true })
+      .limit(limit);
+
+    if (error || !data) {
+      return [];
+    }
+    return (data as LiturgicalSchedule[]).filter(hasLiturgicalContent);
+  } catch {
+    return [];
+  }
+}
+
 /** 해당 월에 DB에 있고, 내용이 하나라도 있는 미사만 (날짜 오름차순) */
 export async function listLiturgicalInMonth(
   year: number,

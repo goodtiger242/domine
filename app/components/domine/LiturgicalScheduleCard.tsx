@@ -17,23 +17,26 @@ function RoleCell({
   label,
   value,
   enrichDisplay,
+  showEmptyWhenBlank,
 }: {
   label: string;
   value: string;
   enrichDisplay?: boolean;
+  showEmptyWhenBlank?: boolean;
 }) {
-  if (!value.trim()) {
+  const trimmed = value.trim();
+  if (!trimmed && !showEmptyWhenBlank) {
     return null;
   }
   const shown =
-    enrichDisplay ? formatYouthMemberDisplay(value) : value;
+    trimmed && enrichDisplay ? formatYouthMemberDisplay(value) : trimmed;
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-[var(--lit-ink-subtle)]">
         {label}
       </span>
       <span className="break-words text-sm font-medium leading-snug text-[var(--lit-ink)]">
-        {shown}
+        {shown || "\u00a0"}
       </span>
     </div>
   );
@@ -42,20 +45,23 @@ function RoleCell({
 function RoleLine({
   label,
   value,
+  showEmptyWhenBlank,
 }: {
   label: string;
   value: string;
+  showEmptyWhenBlank?: boolean;
 }) {
-  if (!value.trim()) {
+  const trimmed = value.trim();
+  if (!trimmed && !showEmptyWhenBlank) {
     return null;
   }
-  const shown = formatYouthMemberDisplay(value);
+  const shown = trimmed ? formatYouthMemberDisplay(value) : "";
   return (
     <p className="break-words text-sm leading-relaxed text-[var(--lit-ink-muted)]">
       <span className="text-[var(--lit-ink-subtle)]">{label}</span>
       <span className="text-[var(--lit-border-strong)]"> : </span>
       <span className="font-medium text-[var(--lit-ink)]">
-        {shown}
+        {shown || "\u00a0"}
       </span>
     </p>
   );
@@ -65,6 +71,10 @@ type Props = {
   schedule: LiturgicalSchedule;
   showEditLink?: boolean;
   emphasize?: boolean;
+  /** 메인 등: 담당 미입력 시에도 라벨만 두고 빈칸 표시 */
+  showEmptyRolePlaceholders?: boolean;
+  /** DB에 해당 날짜 행이 없을 때(일요일 슬롯만 있는 경우) — 지휘 고정명도 비움 */
+  syntheticEmpty?: boolean;
 };
 
 const cardBase =
@@ -74,8 +84,11 @@ export function LiturgicalScheduleCard({
   schedule,
   showEditLink = true,
   emphasize = false,
+  showEmptyRolePlaceholders = false,
+  syntheticEmpty = false,
 }: Props) {
   const enrich = !showEditLink;
+  const showEmpty = showEmptyRolePlaceholders && enrich;
 
   const hasLiturgicalRoles = [
     schedule.role_commentator,
@@ -86,6 +99,9 @@ export function LiturgicalScheduleCard({
     schedule.thurifer_sub,
     schedule.organist,
   ].some((s) => s.trim());
+
+  const showRolesBlock = hasLiturgicalRoles || showEmptyRolePlaceholders;
+  const conductorValue = syntheticEmpty ? "" : FIXED_CONDUCTOR_NAME;
 
   return (
     <article
@@ -124,7 +140,7 @@ export function LiturgicalScheduleCard({
         </div>
       ) : null}
 
-      {hasLiturgicalRoles ? (
+      {showRolesBlock ? (
         <div className="space-y-4 border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4 sm:p-5">
           {enrich ? (
             <>
@@ -136,14 +152,17 @@ export function LiturgicalScheduleCard({
                   <RoleLine
                     label="해설"
                     value={schedule.role_commentator}
+                    showEmptyWhenBlank={showEmpty}
                   />
                   <RoleLine
                     label="1독서"
                     value={schedule.role_reader_1}
+                    showEmptyWhenBlank={showEmpty}
                   />
                   <RoleLine
                     label="2독서"
                     value={schedule.role_reader_2}
+                    showEmptyWhenBlank={showEmpty}
                   />
                 </div>
               </div>
@@ -152,6 +171,7 @@ export function LiturgicalScheduleCard({
                 <RoleLine
                   label="복음 환호송"
                   value={schedule.role_gospel_acclamation}
+                  showEmptyWhenBlank={showEmpty}
                 />
               </div>
 
@@ -160,8 +180,16 @@ export function LiturgicalScheduleCard({
                   복사단
                 </h4>
                 <div className="space-y-2">
-                  <RoleLine label="대복" value={schedule.thurifer_main} />
-                  <RoleLine label="소복" value={schedule.thurifer_sub} />
+                  <RoleLine
+                    label="대복"
+                    value={schedule.thurifer_main}
+                    showEmptyWhenBlank={showEmpty}
+                  />
+                  <RoleLine
+                    label="소복"
+                    value={schedule.thurifer_sub}
+                    showEmptyWhenBlank={showEmpty}
+                  />
                 </div>
               </div>
 
@@ -170,8 +198,16 @@ export function LiturgicalScheduleCard({
                   지휘 · 반주
                 </h4>
                 <div className="space-y-2">
-                  <RoleLine label="지휘" value={FIXED_CONDUCTOR_NAME} />
-                  <RoleLine label="반주" value={schedule.organist} />
+                  <RoleLine
+                    label="지휘"
+                    value={conductorValue}
+                    showEmptyWhenBlank={showEmpty}
+                  />
+                  <RoleLine
+                    label="반주"
+                    value={schedule.organist}
+                    showEmptyWhenBlank={showEmpty}
+                  />
                 </div>
               </div>
             </>
@@ -186,16 +222,19 @@ export function LiturgicalScheduleCard({
                     label="해설"
                     value={schedule.role_commentator}
                     enrichDisplay={enrich}
+                    showEmptyWhenBlank={showEmpty}
                   />
                   <RoleCell
                     label="1독서"
                     value={schedule.role_reader_1}
                     enrichDisplay={enrich}
+                    showEmptyWhenBlank={showEmpty}
                   />
                   <RoleCell
                     label="2독서"
                     value={schedule.role_reader_2}
                     enrichDisplay={enrich}
+                    showEmptyWhenBlank={showEmpty}
                   />
                 </div>
               </div>
@@ -204,9 +243,13 @@ export function LiturgicalScheduleCard({
                 <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
                   복음 환호송
                 </h4>
-                {schedule.role_gospel_acclamation.trim() ? (
+                {schedule.role_gospel_acclamation.trim() || showEmpty ? (
                   <p className="text-sm font-medium text-[var(--lit-ink)]">
-                    {schedule.role_gospel_acclamation}
+                    {schedule.role_gospel_acclamation.trim()
+                      ? schedule.role_gospel_acclamation
+                      : showEmpty
+                        ? "\u00a0"
+                        : null}
                   </p>
                 ) : null}
               </div>
@@ -216,24 +259,28 @@ export function LiturgicalScheduleCard({
                   label="대복"
                   value={schedule.thurifer_main}
                   enrichDisplay={enrich}
+                  showEmptyWhenBlank={showEmpty}
                 />
                 <RoleCell
                   label="소복"
                   value={schedule.thurifer_sub}
                   enrichDisplay={enrich}
+                  showEmptyWhenBlank={showEmpty}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                 <RoleCell
                   label="지휘"
-                  value={FIXED_CONDUCTOR_NAME}
+                  value={conductorValue}
                   enrichDisplay={enrich}
+                  showEmptyWhenBlank={showEmpty}
                 />
                 <RoleCell
                   label="반주"
                   value={schedule.organist}
                   enrichDisplay={enrich}
+                  showEmptyWhenBlank={showEmpty}
                 />
               </div>
             </>
@@ -246,14 +293,14 @@ export function LiturgicalScheduleCard({
               <h4 className="mb-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
                 지휘 · 반주
               </h4>
-              <RoleLine label="지휘" value={FIXED_CONDUCTOR_NAME} />
+              <RoleLine label="지휘" value={conductorValue} />
               <RoleLine label="반주" value={schedule.organist} />
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-x-3 gap-y-2">
               <RoleCell
                 label="지휘"
-                value={FIXED_CONDUCTOR_NAME}
+                value={conductorValue}
                 enrichDisplay={enrich}
               />
               <RoleCell
