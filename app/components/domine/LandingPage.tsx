@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteBrandLink } from "@/app/components/layout/SiteBrandLink";
@@ -46,7 +47,17 @@ export function LandingPage({
             aria-hidden
           />
           <div className="relative mx-auto w-full max-w-[90rem] px-4 py-8 md:px-10 md:py-20 lg:px-12 lg:py-28">
-            <div className="cos-stagger-2 mx-auto w-full max-w-[min(100%,42rem)]">
+            <div className="cos-stagger-2 mx-auto flex w-full max-w-[min(100%,42rem)] flex-col items-center">
+              <div className="mb-8 flex w-full justify-center md:mb-10">
+                <Image
+                  src="/image/domine_logo.jpg"
+                  alt="Domine"
+                  width={480}
+                  height={180}
+                  priority
+                  className="h-auto max-h-[4.75rem] w-auto max-w-[min(100%,18rem)] object-contain object-center md:max-h-[5.5rem] lg:max-h-[6rem]"
+                />
+              </div>
               <FamilyPhotoCarousel
                 images={familyGalleryImages}
                 imageClassName="object-contain object-center lg:object-cover lg:object-[center_28%]"
