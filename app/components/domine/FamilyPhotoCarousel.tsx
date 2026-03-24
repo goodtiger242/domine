@@ -93,8 +93,6 @@ export function FamilyPhotoCarousel({
   }
 
   const slidePct = len > 0 ? (index * 100) / len : 0;
-  const current = images[index];
-  const caption = current?.caption;
 
   const frameClass =
     layout === "compact"
@@ -143,18 +141,6 @@ export function FamilyPhotoCarousel({
           ))}
         </div>
       </div>
-
-      {caption ? (
-        <p className="mt-3 text-center text-[14px] font-medium leading-snug text-[var(--lit-ink)]">
-          {caption}
-        </p>
-      ) : null}
-
-      {layout === "compact" && len > 1 ? (
-        <p className="mt-1 text-center text-[12px] text-[var(--lit-ink-muted)]">
-          좌우로 밀어 더 보기
-        </p>
-      ) : null}
 
       {len > 1 ? (
         <div className="mt-5 flex items-center justify-center gap-4">

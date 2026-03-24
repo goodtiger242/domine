@@ -49,8 +49,15 @@ export function LandingPage({
                 aria-hidden
               />
               <div className="relative mx-auto w-full max-w-[90rem] px-4 py-12 md:px-10 md:py-24 lg:px-12 lg:py-28">
-                <div className="cos-stagger-2 mx-auto flex w-full max-w-[min(100%,42rem)] flex-col items-center gap-2">
-                  <div className="mb-2 flex w-full justify-center px-2 md:mb-4">
+                <div className="cos-stagger-2 mx-auto flex w-full max-w-[min(100%,42rem)] flex-col items-center gap-6">
+                  <FamilyPhotoCarousel
+                    images={familyGalleryImages}
+                    imageClassName="object-contain object-center lg:object-cover lg:object-[center_28%]"
+                    sizes="(max-width: 1024px) 100vw, 42rem"
+                    layout="hero"
+                    autoPlayMs={0}
+                  />
+                  <div className="flex w-full justify-center px-2">
                     <Image
                       src="/image/domine_logo.jpg"
                       alt="Domine"
@@ -60,20 +67,20 @@ export function LandingPage({
                       className="h-auto max-h-[4.75rem] w-auto max-w-[min(100%,18rem)] object-contain object-center drop-shadow-[0_2px_20px_rgba(0,0,0,0.06)] md:max-h-[5.5rem] lg:max-h-[6rem] dark:drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
                     />
                   </div>
-                  <FamilyPhotoCarousel
-                    images={familyGalleryImages}
-                    imageClassName="object-contain object-center lg:object-cover lg:object-[center_28%]"
-                    sizes="(max-width: 1024px) 100vw, 42rem"
-                    layout="hero"
-                    autoPlayMs={0}
-                  />
                 </div>
               </div>
             </div>
 
             <div className="relative bg-[var(--lit-bg-hero)] px-4 pb-12 pt-10 lg:hidden">
-              <div className="mx-auto w-full max-w-[min(100%,26rem)]">
-                <div className="mb-6 flex justify-center">
+              <div className="mx-auto flex w-full max-w-[min(100%,26rem)] flex-col items-center gap-6">
+                <FamilyPhotoCarousel
+                  images={familyGalleryImages}
+                  imageClassName="object-cover object-center"
+                  sizes="(max-width: 1024px) 100vw, 26rem"
+                  layout="compact"
+                  autoPlayMs={0}
+                />
+                <div className="flex justify-center">
                   <Image
                     src="/image/domine_logo.jpg"
                     alt="Domine"
@@ -82,13 +89,6 @@ export function LandingPage({
                     className="h-auto max-h-9 w-auto object-contain opacity-90"
                   />
                 </div>
-                <FamilyPhotoCarousel
-                  images={familyGalleryImages}
-                  imageClassName="object-cover object-center"
-                  sizes="(max-width: 1024px) 100vw, 26rem"
-                  layout="compact"
-                  autoPlayMs={0}
-                />
               </div>
             </div>
           </section>
