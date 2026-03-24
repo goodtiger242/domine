@@ -94,6 +94,17 @@ html {
   animation: cos-reveal 1s var(--cos-ease) 0.44s both;
 }
 
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 /* 잔잔한 에디토리얼 그리드 (히어로 배경) */
 .cos-grid-bg {
   background-color: var(--lit-bg-hero);
