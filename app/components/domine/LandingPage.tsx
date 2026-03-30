@@ -2,12 +2,10 @@ import Image from "next/image";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteBrandLink } from "@/app/components/layout/SiteBrandLink";
-import { FamilyPhotoCarousel } from "@/app/components/domine/FamilyPhotoCarousel";
 import { HakJunMilitaryBanner } from "@/app/components/domine/HakJunMilitaryBanner";
 import { ScrollToTop } from "@/app/components/domine/home/ScrollToTop";
 import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
-import { familyGalleryImages } from "@/lib/domine/family-gallery";
 import { SiteHeaderNav } from "@/app/components/layout/SiteHeaderNav";
 import { SITE_NAV_HOME } from "@/lib/nav/site-nav";
 
@@ -40,55 +38,23 @@ export function LandingPage({
 
         <div className="flex flex-col">
           <section
-            id="home-gallery"
-            className="relative cos-grid-bg order-1 border-b border-[var(--lit-border)]/70 lg:order-1 lg:min-h-0 lg:border-b"
+            id="home-hero"
+            className="relative cos-grid-bg order-1 border-b border-[var(--lit-border)]/70"
           >
-            <div className="relative hidden overflow-hidden lg:block">
-              <div
-                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--lit-bg-hero)] via-[var(--lit-bg-hero)]/40 to-[var(--lit-bg)] opacity-[0.92]"
-                aria-hidden
-              />
-              <div className="relative mx-auto w-full max-w-[90rem] px-4 py-12 md:px-10 md:py-24 lg:px-12 lg:py-28">
-                <div className="cos-stagger-2 mx-auto flex w-full max-w-[min(100%,42rem)] flex-col items-center gap-6">
-                  <FamilyPhotoCarousel
-                    images={familyGalleryImages}
-                    imageClassName="object-contain object-center"
-                    sizes="(max-width: 1024px) 100vw, 42rem"
-                    layout="hero"
-                    autoPlayMs={0}
-                  />
-                  <div className="flex w-full justify-center px-2">
-                    <Image
-                      src="/image/domine_logo.jpg"
-                      alt="Domine"
-                      width={480}
-                      height={180}
-                      priority
-                      className="h-auto max-h-[4.75rem] w-auto max-w-[min(100%,18rem)] object-contain object-center drop-shadow-[0_2px_20px_rgba(0,0,0,0.06)] md:max-h-[5.5rem] lg:max-h-[6rem] dark:drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative bg-[var(--lit-bg-hero)] px-4 pb-12 pt-10 lg:hidden">
-              <div className="mx-auto flex w-full max-w-[min(100%,26rem)] flex-col items-center gap-6">
-                <FamilyPhotoCarousel
-                  images={familyGalleryImages}
-                  imageClassName="object-contain object-center"
-                  sizes="(max-width: 1024px) 100vw, 26rem"
-                  layout="compact"
-                  autoPlayMs={0}
+            <div
+              className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--lit-bg-hero)] via-[var(--lit-bg-hero)]/50 to-[var(--lit-bg)] opacity-[0.92]"
+              aria-hidden
+            />
+            <div className="relative mx-auto flex w-full max-w-[90rem] justify-center px-4 py-12 md:px-10 md:py-16 lg:px-12 lg:py-20">
+              <div className="cos-stagger-2 flex justify-center px-2">
+                <Image
+                  src="/image/domine_logo.jpg"
+                  alt="Domine"
+                  width={480}
+                  height={180}
+                  priority
+                  className="h-auto max-h-[3.5rem] w-auto max-w-[min(100%,16rem)] object-contain object-center opacity-95 drop-shadow-[0_2px_20px_rgba(0,0,0,0.06)] sm:max-h-[4.25rem] sm:max-w-[min(100%,18rem)] md:max-h-[4.75rem] dark:drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
                 />
-                <div className="flex justify-center">
-                  <Image
-                    src="/image/domine_logo.jpg"
-                    alt="Domine"
-                    width={320}
-                    height={120}
-                    className="h-auto max-h-9 w-auto object-contain opacity-90"
-                  />
-                </div>
               </div>
             </div>
           </section>
