@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useId, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import type { SiteNavLink } from "@/lib/nav/site-nav";
 
@@ -17,21 +23,21 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href;
 }
 
+function subscribeNothing() {
+  return () => {};
+}
+
 export function SiteHeaderNav({ navLinks }: Props) {
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
   const titleId = useId();
   const dialogId = "site-header-nav-dialog";
 
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    close();
+    queueMicrotask(close);
   }, [pathname, close]);
 
   useEffect(() => {

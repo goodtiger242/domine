@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { listLiturgicalInMonth } from "@/app/actions/liturgical";
 import { LiturgicalScheduleCard } from "@/app/components/domine/LiturgicalScheduleCard";
 import Link from "next/link";
 
 type Props = {
-  initialYear: number;
   initialMonth: number;
   initialSchedules: LiturgicalSchedule[];
   nextUpcomingLiturgyDate: string | null;
@@ -21,7 +20,6 @@ function currentCalendarMonth(): { y: number; m: number } {
 const MONTHS_1_12 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 export function HomeLiturgicalMonthList({
-  initialYear,
   initialMonth,
   initialSchedules,
   nextUpcomingLiturgyDate,
@@ -41,13 +39,6 @@ export function HomeLiturgicalMonthList({
     },
     [calendarYear]
   );
-
-  useEffect(() => {
-    if (initialYear !== calendarYear) {
-      const { m } = currentCalendarMonth();
-      loadMonth(m);
-    }
-  }, [initialYear, calendarYear, loadMonth]);
 
   const goThisMonth = useCallback(() => {
     const { m } = currentCalendarMonth();

@@ -39,7 +39,6 @@ export function LiturgicalMonthSection({
       <div className="mx-auto max-w-3xl">
         {variant === "home" && homeLiturgical ? (
           <HomeLiturgicalMonthList
-            initialYear={year}
             initialMonth={month}
             initialSchedules={homeLiturgical.initialSchedules}
             nextUpcomingLiturgyDate={homeLiturgical.nextUpcomingLiturgyDate}

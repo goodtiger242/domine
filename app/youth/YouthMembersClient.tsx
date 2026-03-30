@@ -23,10 +23,12 @@ export function YouthMembersClient({ initialProfiles }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setProfiles(initialProfiles);
-    if (!isEditing) {
-      setDraft(initialProfiles);
-    }
+    queueMicrotask(() => {
+      setProfiles(initialProfiles);
+      if (!isEditing) {
+        setDraft(initialProfiles);
+      }
+    });
   }, [initialProfiles, isEditing]);
 
   const startEdit = useCallback(() => {

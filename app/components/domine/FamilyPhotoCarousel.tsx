@@ -26,11 +26,9 @@ export function FamilyPhotoCarousel({
 }: Props) {
   const [index, setIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
-
-  useEffect(() => {
-    setImgLoaded(false);
-  }, [index]);
+  /** 현재 슬라이드 인덱스에 맞는 이미지가 로드됐을 때만 true (effect 없이 동기화) */
+  const [loadedSlideIndex, setLoadedSlideIndex] = useState<number | null>(null);
+  const imgLoaded = loadedSlideIndex === index;
   const touchStartX = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
 
@@ -134,7 +132,7 @@ export function FamilyPhotoCarousel({
                 sizes={sizes}
                 priority={i <= 1}
                 onLoad={() => {
-                  if (i === index) setImgLoaded(true);
+                  if (i === index) setLoadedSlideIndex(i);
                 }}
               />
             </div>
