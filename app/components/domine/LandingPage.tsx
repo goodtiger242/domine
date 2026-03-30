@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteBrandLink } from "@/app/components/layout/SiteBrandLink";
@@ -38,30 +37,8 @@ export function LandingPage({
 
         <div className="flex flex-col">
           <section
-            id="home-hero"
-            className="relative cos-grid-bg order-1 border-b border-[var(--lit-border)]/70"
-          >
-            <div
-              className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--lit-bg-hero)] via-[var(--lit-bg-hero)]/50 to-[var(--lit-bg)] opacity-[0.92]"
-              aria-hidden
-            />
-            <div className="relative mx-auto flex w-full max-w-[90rem] justify-center px-4 py-12 md:px-10 md:py-16 lg:px-12 lg:py-20">
-              <div className="cos-stagger-2 flex justify-center px-2">
-                <Image
-                  src="/image/domine_logo.jpg"
-                  alt="Domine"
-                  width={480}
-                  height={180}
-                  priority
-                  className="h-auto max-h-[3.5rem] w-auto max-w-[min(100%,16rem)] object-contain object-center opacity-95 drop-shadow-[0_2px_20px_rgba(0,0,0,0.06)] sm:max-h-[4.25rem] sm:max-w-[min(100%,18rem)] md:max-h-[4.75rem] dark:drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
-                />
-              </div>
-            </div>
-          </section>
-
-          <section
             id="home-military"
-            className="order-2 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-2"
+            className="order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-1"
           >
             <div className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-14 lg:px-2">
               <div className="overflow-hidden rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]">
@@ -78,10 +55,10 @@ export function LandingPage({
             schedules={[]}
             variant="home"
             homeSpotlight={homeSpotlight}
-            sectionClassName="order-3 lg:order-3"
+            sectionClassName="order-2 lg:order-2"
           />
 
-          <div className="order-4 lg:order-4">
+          <div className="order-3 lg:order-3">
             <LiturgicalMinisterPrayersSection />
           </div>
         </div>
