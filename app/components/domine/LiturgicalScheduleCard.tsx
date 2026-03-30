@@ -71,6 +71,8 @@ type Props = {
   schedule: LiturgicalSchedule;
   showEditLink?: boolean;
   emphasize?: boolean;
+  /** emphasize 시 상단 뱃지 (메인: 다가오는 미사) */
+  emphasizeLabel?: string;
   /** 메인 등: 담당 미입력 시에도 라벨만 두고 빈칸 표시 */
   showEmptyRolePlaceholders?: boolean;
   /** DB에 해당 날짜 행이 없을 때(일요일 슬롯만 있는 경우) — 지휘 고정명도 비움 */
@@ -86,6 +88,7 @@ export function LiturgicalScheduleCard({
   schedule,
   showEditLink = true,
   emphasize = false,
+  emphasizeLabel,
   showEmptyRolePlaceholders = false,
   syntheticEmpty = false,
   articleClassName = "",
@@ -108,12 +111,18 @@ export function LiturgicalScheduleCard({
 
   return (
     <article
+      aria-label={emphasize ? emphasizeLabel ?? "다가오는 미사 일정" : undefined}
       className={`${
         emphasize
-          ? `${cardBase} border-2 border-[var(--lit-ink)]`
+          ? `${cardBase} border-2 border-[var(--lit-ink)] shadow-[0_0_0_1px_rgba(0,0,0,0.04)] ring-2 ring-[var(--lit-ink)]/12 dark:ring-[var(--lit-ink)]/25`
           : `${cardBase} border-[var(--lit-border)]`
       }${articleClassName ? ` ${articleClassName}` : ""}`}
     >
+      {emphasize ? (
+        <p className="mb-3 inline-flex max-w-full rounded-full border border-[var(--lit-ink)] bg-[var(--lit-bg)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--lit-ink)]">
+          {emphasizeLabel ?? "다가오는 미사"}
+        </p>
+      ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]">
