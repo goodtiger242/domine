@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { listLiturgicalInMonth } from "@/app/actions/liturgical";
 import { LiturgicalScheduleCard } from "@/app/components/domine/LiturgicalScheduleCard";
 import Link from "next/link";
 
 type Props = {
+  initialYear: number;
   initialMonth: number;
   initialSchedules: LiturgicalSchedule[];
   nextUpcomingLiturgyDate: string | null;
@@ -20,11 +21,12 @@ function currentCalendarMonth(): { y: number; m: number } {
 const MONTHS_1_12 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 export function HomeLiturgicalMonthList({
+  initialYear,
   initialMonth,
   initialSchedules,
   nextUpcomingLiturgyDate,
 }: Props) {
-  const calendarYear = useMemo(() => new Date().getFullYear(), []);
+  const [viewYear, setViewYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
   const [schedules, setSchedules] = useState(initialSchedules);
   const [pending, startTransition] = useTransition();
@@ -33,20 +35,25 @@ export function HomeLiturgicalMonthList({
     (m: number) => {
       setMonth(m);
       startTransition(async () => {
-        const rows = await listLiturgicalInMonth(calendarYear, m);
+        const rows = await listLiturgicalInMonth(viewYear, m);
         setSchedules(rows);
       });
     },
-    [calendarYear]
+    [viewYear]
   );
 
   const goThisMonth = useCallback(() => {
-    const { m } = currentCalendarMonth();
-    loadMonth(m);
-  }, [loadMonth]);
+    const { y, m } = currentCalendarMonth();
+    setViewYear(y);
+    setMonth(m);
+    startTransition(async () => {
+      const rows = await listLiturgicalInMonth(y, m);
+      setSchedules(rows);
+    });
+  }, []);
 
-  const { m: cm } = currentCalendarMonth();
-  const isViewingThisCalendarMonth = month === cm;
+  const { y: cy, m: cm } = currentCalendarMonth();
+  const isViewingThisCalendarMonth = month === cm && viewYear === cy;
 
   const monthBtnBase =
     "flex min-h-11 min-w-0 items-center justify-center rounded-lg border px-1.5 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2 disabled:opacity-50 motion-reduce:transition-none";
@@ -56,7 +63,7 @@ export function HomeLiturgicalMonthList({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <h2 className="font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.65rem,6.5vw,2.1rem)] max-lg:leading-snug md:text-5xl">
           <span className="break-keep">
-            {calendarYear}년 {month}월 전례 봉사
+            {viewYear}년 {month}월 전례 봉사
           </span>
         </h2>
 
@@ -75,7 +82,7 @@ export function HomeLiturgicalMonthList({
       <div
         className="mt-5 rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)]/80 p-3 sm:mt-6 sm:p-4"
         role="group"
-        aria-label={`${calendarYear}년 월 선택`}
+        aria-label={`${viewYear}년 월 선택`}
       >
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-2.5 lg:grid-cols-6">
           {MONTHS_1_12.map((m) => {
@@ -87,7 +94,7 @@ export function HomeLiturgicalMonthList({
                 disabled={pending}
                 onClick={() => loadMonth(m)}
                 aria-pressed={selected}
-                aria-label={`${calendarYear}년 ${m}월`}
+                aria-label={`${viewYear}년 ${m}월`}
                 className={`${monthBtnBase} ${
                   selected
                     ? "border-[var(--lit-ink)] bg-[var(--lit-ink)] text-[var(--lit-bg-elevated)] shadow-sm"
@@ -105,7 +112,7 @@ export function HomeLiturgicalMonthList({
         {schedules.length === 0 ? (
           <div className="border border-dashed border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-8 py-16 text-center">
             <p className="text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
-              {calendarYear}년 {month}월에 등록된 전례 봉사 정보가 없습니다.
+              {viewYear}년 {month}월에 등록된 전례 봉사 정보가 없습니다.
             </p>
             <Link
               href="/liturgical/edit"
