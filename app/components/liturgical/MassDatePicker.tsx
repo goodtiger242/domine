@@ -93,6 +93,7 @@ export function MassDatePicker({
         <DayPicker
           mode="single"
           locale={ko}
+          navLayout="around"
           month={month}
           onMonthChange={setMonth}
           selected={selected}
@@ -108,15 +109,17 @@ export function MassDatePicker({
           }}
           className="rdp-mass-calendar w-full min-w-0 max-w-none justify-center"
           classNames={{
-            today: "font-bold text-[var(--lit-ink)]",
+            /* 오늘+선택 겹침 시 today 글자색이 selected를 덮어쓰지 않게 함 */
+            today:
+              "rdp-today font-bold text-[var(--lit-ink)] [&[data-selected]]:text-[var(--lit-bg-elevated)]",
             selected:
-              "bg-[var(--lit-ink)] text-[var(--lit-bg-elevated)] rounded-sm",
+              "rdp-selected bg-[var(--lit-ink)] text-[var(--lit-bg-elevated)] rounded-sm",
             root: "w-full max-w-none",
             month_caption:
               "flex justify-center pt-1 relative items-center mb-3 text-xl font-semibold sm:text-2xl",
             chevron: "size-7 fill-[var(--lit-accent)] sm:size-8",
             weekdays: "text-sm font-semibold sm:text-base",
-            day: "text-[1.05rem] sm:text-[1.125rem]",
+            day: "rdp-day text-[1.05rem] sm:text-[1.125rem]",
           }}
         />
       </div>

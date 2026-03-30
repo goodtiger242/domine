@@ -235,3 +235,8 @@ body {
     font-size: 1.25rem;
   }
 }
+
+/* 선택일: td에 배경이 있을 때 버튼 글자색이 today 등과 충돌하지 않도록 */
+.rdp-mass-calendar .rdp-selected .rdp-day_button {
+  color: var(--lit-bg-elevated);
+}
