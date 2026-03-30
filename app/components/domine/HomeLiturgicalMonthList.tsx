@@ -134,7 +134,6 @@ export function HomeLiturgicalMonthList({
                     nextUpcomingLiturgyDate !== null &&
                     s.liturgy_date === nextUpcomingLiturgyDate
                   }
-                  emphasizeLabel="다가오는 미사"
                 />
               </li>
             ))}
