@@ -40,9 +40,9 @@ export function LandingPage({
             id="home-military"
             className="order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-1"
           >
-            <div className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-14 lg:px-2">
+            <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-11 lg:px-2">
               <div className="overflow-hidden rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]">
-                <div className="p-5 md:p-8">
+                <div className="p-4 md:p-6">
                   <HakJunMilitaryBanner embedded />
                 </div>
               </div>
