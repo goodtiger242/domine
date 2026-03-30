@@ -114,9 +114,10 @@ export function MassDatePicker({
               "rdp-today font-bold text-[var(--lit-ink)] [&[data-selected]]:text-[var(--lit-bg-elevated)]",
             selected:
               "rdp-selected bg-[var(--lit-ink)] text-[var(--lit-bg-elevated)] rounded-sm",
-            root: "w-full max-w-none",
+            /* 기본 rdp-* 유지: navLayout="around"일 때 이전/다음이 월 제목과 한 줄로 배치됨 */
+            root: "rdp-root w-full max-w-none",
             month_caption:
-              "flex justify-center pt-1 relative items-center mb-3 text-xl font-semibold sm:text-2xl",
+              "rdp-month_caption relative mb-3 flex items-center justify-center pt-1 text-xl font-semibold sm:text-2xl",
             chevron: "size-7 fill-[var(--lit-accent)] sm:size-8",
             weekdays: "text-sm font-semibold sm:text-base",
             day: "rdp-day text-[1.05rem] sm:text-[1.125rem]",
