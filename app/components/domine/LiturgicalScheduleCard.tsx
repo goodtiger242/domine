@@ -32,17 +32,18 @@ function RoleCell({
     trimmed && enrichDisplay ? formatYouthMemberDisplay(value) : trimmed;
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-[var(--lit-ink-subtle)]">
+      <span className="text-[11px] font-semibold tracking-wide text-[var(--lit-ink-muted)]">
         {label}
       </span>
-      <span className="break-words text-sm font-medium leading-snug text-[var(--lit-ink)]">
+      <span className="break-keep text-[15px] font-medium leading-snug text-[var(--lit-ink)]">
         {shown || "\u00a0"}
       </span>
     </div>
   );
 }
 
-function RoleLine({
+/** 메인 등 읽기 전용: 라벨·이름 대비를 높이고 줄 수를 줄임 */
+function DenseRoleSlot({
   label,
   value,
   showEmptyWhenBlank,
@@ -57,13 +58,14 @@ function RoleLine({
   }
   const shown = trimmed ? formatYouthMemberDisplay(value) : "";
   return (
-    <p className="break-words text-sm leading-relaxed text-[var(--lit-ink-muted)]">
-      <span className="text-[var(--lit-ink-subtle)]">{label}</span>
-      <span className="text-[var(--lit-border-strong)]"> : </span>
-      <span className="font-medium text-[var(--lit-ink)]">
+    <div className="min-w-0">
+      <p className="text-[11px] font-semibold leading-tight text-[var(--lit-ink-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 break-keep text-[15px] font-medium leading-snug text-[var(--lit-ink)]">
         {shown || "\u00a0"}
-      </span>
-    </p>
+      </p>
+    </div>
   );
 }
 
@@ -82,7 +84,13 @@ type Props = {
 };
 
 const cardBase =
-  "rounded-sm border bg-[var(--lit-bg-elevated)] p-6 sm:p-8";
+  "rounded-xl border bg-[var(--lit-bg-elevated)] p-5 sm:p-6";
+
+const rolesPanelClass =
+  "rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4 sm:p-5";
+
+const sectionTitleClass =
+  "text-[13px] font-semibold tracking-[-0.02em] text-[var(--lit-ink)]";
 
 export function LiturgicalScheduleCard({
   schedule,
@@ -125,11 +133,23 @@ export function LiturgicalScheduleCard({
       ) : null}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]">
+          <p
+            className={
+              enrich
+                ? "text-[15px] font-semibold leading-snug tracking-[-0.02em] text-[var(--lit-ink)]"
+                : "text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]"
+            }
+          >
             {formatDateLabel(schedule.liturgy_date)}
           </p>
           {schedule.title.trim() ? (
-            <h3 className="mt-2 text-xl font-light tracking-tight text-[var(--lit-ink)]">
+            <h3
+              className={`mt-2 tracking-tight text-[var(--lit-ink)] ${
+                enrich
+                  ? "text-lg font-medium leading-snug sm:text-xl"
+                  : "text-xl font-light"
+              }`}
+            >
               {schedule.title}
             </h3>
           ) : null}
@@ -145,59 +165,71 @@ export function LiturgicalScheduleCard({
       </div>
 
       {schedule.announcement_detail.trim() ? (
-        <div className="mb-6">
-          <p className="whitespace-pre-wrap text-[15px] leading-[1.75] text-[var(--lit-ink)]">
+        <div className={enrich ? "mb-5" : "mb-6"}>
+          <p
+            className={`whitespace-pre-wrap text-[var(--lit-ink)] ${
+              enrich
+                ? "text-[15px] leading-relaxed"
+                : "text-[15px] leading-[1.75]"
+            }`}
+          >
             {schedule.announcement_detail}
           </p>
         </div>
       ) : null}
 
       {showRolesBlock ? (
-        <div className="space-y-4 border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4 sm:p-5">
+        <div
+          className={
+            enrich
+              ? rolesPanelClass
+              : "space-y-4 rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4 sm:p-5"
+          }
+        >
           {enrich ? (
-            <>
+            <div className="space-y-4 sm:space-y-3">
               <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
+                <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>
                   전례 봉사
                 </h4>
-                <div className="space-y-2">
-                  <RoleLine
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-3 sm:gap-x-4">
+                  <DenseRoleSlot
                     label="해설"
                     value={schedule.role_commentator}
                     showEmptyWhenBlank={showEmpty}
                   />
-                  <RoleLine
+                  <DenseRoleSlot
                     label="1독서"
                     value={schedule.role_reader_1}
                     showEmptyWhenBlank={showEmpty}
                   />
-                  <RoleLine
-                    label="2독서"
-                    value={schedule.role_reader_2}
-                    showEmptyWhenBlank={showEmpty}
-                  />
+                  <div className="col-span-2 sm:col-span-1">
+                    <DenseRoleSlot
+                      label="2독서"
+                      value={schedule.role_reader_2}
+                      showEmptyWhenBlank={showEmpty}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <RoleLine
+              <div className="border-t border-[var(--lit-border)] pt-3 sm:pt-2.5">
+                <DenseRoleSlot
                   label="복음 환호송"
                   value={schedule.role_gospel_acclamation}
                   showEmptyWhenBlank={showEmpty}
                 />
               </div>
 
-              <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
-                  복사단
-                </h4>
-                <div className="space-y-2">
-                  <RoleLine
+              <div className="border-t border-[var(--lit-border)] pt-3 sm:pt-2.5">
+                <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>복사단</h4>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-4">
+                  <DenseRoleSlot
                     label="대복"
                     value={schedule.thurifer_main}
                     showEmptyWhenBlank={showEmpty}
                   />
-                  <RoleLine
+                  <DenseRoleSlot
                     label="소복"
                     value={schedule.thurifer_sub}
                     showEmptyWhenBlank={showEmpty}
@@ -205,30 +237,28 @@ export function LiturgicalScheduleCard({
                 </div>
               </div>
 
-              <div>
-                <h4 className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
+              <div className="border-t border-[var(--lit-border)] pt-3 sm:pt-2.5">
+                <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>
                   지휘 · 반주
                 </h4>
-                <div className="space-y-2">
-                  <RoleLine
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-4">
+                  <DenseRoleSlot
                     label="지휘"
                     value={conductorValue}
                     showEmptyWhenBlank={showEmpty}
                   />
-                  <RoleLine
+                  <DenseRoleSlot
                     label="반주"
                     value={schedule.organist}
                     showEmptyWhenBlank={showEmpty}
                   />
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <>
               <div>
-                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
-                  전례 봉사
-                </h4>
+                <h4 className={`mb-2 ${sectionTitleClass}`}>전례 봉사</h4>
                 <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-2">
                   <RoleCell
                     label="해설"
@@ -252,11 +282,9 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div>
-                <h4 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
-                  복음 환호송
-                </h4>
+                <h4 className={`mb-2 ${sectionTitleClass}`}>복음 환호송</h4>
                 {schedule.role_gospel_acclamation.trim() || showEmpty ? (
-                  <p className="text-sm font-medium text-[var(--lit-ink)]">
+                  <p className="text-[15px] font-medium leading-snug text-[var(--lit-ink)]">
                     {schedule.role_gospel_acclamation.trim()
                       ? schedule.role_gospel_acclamation
                       : showEmpty
@@ -299,14 +327,16 @@ export function LiturgicalScheduleCard({
           )}
         </div>
       ) : (
-        <div className="border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4 sm:p-5">
+        <div className={`${rolesPanelClass}`}>
           {enrich ? (
-            <div className="space-y-2">
-              <h4 className="mb-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)]">
+            <div>
+              <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>
                 지휘 · 반주
               </h4>
-              <RoleLine label="지휘" value={conductorValue} />
-              <RoleLine label="반주" value={schedule.organist} />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-4">
+                <DenseRoleSlot label="지휘" value={conductorValue} />
+                <DenseRoleSlot label="반주" value={schedule.organist} />
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-x-3 gap-y-2">
