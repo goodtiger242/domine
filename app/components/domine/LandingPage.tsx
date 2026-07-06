@@ -72,24 +72,8 @@ export function LandingPage({
       <ScrollToTop />
 
       <footer className="border-t border-[var(--lit-border)]/80 bg-[var(--lit-bg-elevated)]">
-        <div className="mx-auto max-w-[90rem] px-5 py-5 md:px-10 md:py-6 lg:px-12">
-          <div className="flex flex-col items-center justify-between gap-2 text-center md:flex-row md:text-left">
-            <div className="max-lg:text-balance">
-              <p className="text-[9px] font-medium uppercase tracking-[0.28em] text-[var(--lit-ink-subtle)]">
-                Domine
-              </p>
-              <p className="mt-1 text-sm font-medium tracking-[-0.02em] text-[var(--lit-ink)]">
-                도미네
-              </p>
-              <p className="mt-0.5 break-keep text-xs text-[var(--lit-ink-muted)]">
-                용호성당 청년회
-              </p>
-            </div>
-            <p className="text-[11px] tracking-wide text-[var(--lit-ink-subtle)] max-lg:text-balance">
-              © {new Date().getFullYear()}
-            </p>
-          </div>
-          <DeployStamp />
+        <div className="mx-auto max-w-[90rem] px-5 py-2 md:px-10 lg:px-12">
+          <DeployStamp className="!mt-0 !text-[9px] !opacity-45" />
         </div>
       </footer>
     </div>
