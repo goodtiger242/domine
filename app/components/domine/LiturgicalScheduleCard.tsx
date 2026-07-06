@@ -180,9 +180,6 @@ export function LiturgicalScheduleCard({
           {enrich ? (
             <div className="space-y-3">
               <div>
-                <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>
-                  전례 봉사
-                </h4>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:grid-cols-3 sm:gap-x-4">
                   <DenseRoleSlot
                     label="해설"
@@ -213,7 +210,6 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div className="border-t border-[var(--lit-border)] pt-2.5">
-                <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>복사단</h4>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-x-4">
                   <DenseRoleSlot
                     label="대복"
@@ -229,9 +225,6 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div className="border-t border-[var(--lit-border)] pt-2.5">
-                <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>
-                  지휘 · 반주
-                </h4>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-x-4">
                   <DenseRoleSlot
                     label="지휘"
