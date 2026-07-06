@@ -58,13 +58,13 @@ function DenseRoleSlot({
   }
   const shown = trimmed ? formatYouthMemberDisplay(value) : "";
   return (
-    <div className="min-w-0">
-      <p className="text-[11px] font-semibold leading-tight text-[var(--lit-ink-muted)]">
+    <div className="flex min-w-0 items-baseline justify-between gap-3">
+      <span className="shrink-0 text-[11px] font-semibold leading-tight text-[var(--lit-ink-muted)]">
         {label}
-      </p>
-      <p className="mt-1 break-keep text-[15px] font-medium leading-snug text-[var(--lit-ink)]">
+      </span>
+      <span className="min-w-0 break-keep text-right text-[15px] font-medium leading-snug text-[var(--lit-ink)]">
         {shown || "\u00a0"}
-      </p>
+      </span>
     </div>
   );
 }
@@ -178,9 +178,9 @@ export function LiturgicalScheduleCard({
           }
         >
           {enrich ? (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:grid-cols-3 sm:gap-x-4">
+                <div className="grid gap-y-2.5">
                   <DenseRoleSlot
                     label="해설"
                     value={schedule.role_commentator}
@@ -191,13 +191,11 @@ export function LiturgicalScheduleCard({
                     value={schedule.role_reader_1}
                     showEmptyWhenBlank={showEmpty}
                   />
-                  <div className="col-span-2 sm:col-span-1">
-                    <DenseRoleSlot
-                      label="2독서"
-                      value={schedule.role_reader_2}
-                      showEmptyWhenBlank={showEmpty}
-                    />
-                  </div>
+                  <DenseRoleSlot
+                    label="2독서"
+                    value={schedule.role_reader_2}
+                    showEmptyWhenBlank={showEmpty}
+                  />
                 </div>
               </div>
 
@@ -210,7 +208,7 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div className="border-t border-[var(--lit-border)] pt-2.5">
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-x-4">
+                <div className="grid gap-y-2.5">
                   <DenseRoleSlot
                     label="대복"
                     value={schedule.thurifer_main}
@@ -225,7 +223,7 @@ export function LiturgicalScheduleCard({
               </div>
 
               <div className="border-t border-[var(--lit-border)] pt-2.5">
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-x-4">
+                <div className="grid gap-y-2.5">
                   <DenseRoleSlot
                     label="지휘"
                     value={conductorValue}
