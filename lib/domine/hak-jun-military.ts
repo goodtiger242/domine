@@ -10,6 +10,35 @@ export const HAK_JUN_ENLIST = new Date("2026-03-09T12:00:00+09:00");
 /** 전역일 */
 export const HAK_JUN_DISCHARGE = new Date("2027-09-08T12:00:00+09:00");
 
+export type MilitaryServiceMember = {
+  name: string;
+  label: string;
+  photoSrc: string | null;
+  enlistDate: Date;
+  dischargeDate: Date;
+};
+
+export const HAK_JUN_MILITARY_MEMBER: MilitaryServiceMember = {
+  name: HAK_JUN_NAME,
+  label: HAK_JUN_NAME,
+  photoSrc: "/image/이학준.jpg",
+  enlistDate: HAK_JUN_ENLIST,
+  dischargeDate: HAK_JUN_DISCHARGE,
+};
+
+export const TAE_WON_MILITARY_MEMBER: MilitaryServiceMember = {
+  name: "유태원",
+  label: "유태원 아이다노",
+  photoSrc: null,
+  enlistDate: new Date("2026-06-15T12:00:00+09:00"),
+  dischargeDate: new Date("2027-12-14T12:00:00+09:00"),
+};
+
+export const MILITARY_SERVICE_MEMBERS: readonly MilitaryServiceMember[] = [
+  HAK_JUN_MILITARY_MEMBER,
+  TAE_WON_MILITARY_MEMBER,
+];
+
 const MS_DAY = 86_400_000;
 
 export type HakJunMilitaryStats = {
@@ -23,9 +52,12 @@ export type HakJunMilitaryStats = {
   isPreEnlist: boolean;
 };
 
-export function getHakJunMilitaryStats(now: Date = new Date()): HakJunMilitaryStats {
-  const t0 = HAK_JUN_ENLIST.getTime();
-  const t1 = HAK_JUN_DISCHARGE.getTime();
+export function getMilitaryServiceStats(
+  member: MilitaryServiceMember,
+  now: Date = new Date()
+): HakJunMilitaryStats {
+  const t0 = member.enlistDate.getTime();
+  const t1 = member.dischargeDate.getTime();
   const total = t1 - t0;
 
   if (total <= 0) {
@@ -64,6 +96,12 @@ export function getHakJunMilitaryStats(now: Date = new Date()): HakJunMilitarySt
     isDischarged,
     isPreEnlist,
   };
+}
+
+export function getHakJunMilitaryStats(
+  now: Date = new Date()
+): HakJunMilitaryStats {
+  return getMilitaryServiceStats(HAK_JUN_MILITARY_MEMBER, now);
 }
 
 export function formatKoreanDate(d: Date) {

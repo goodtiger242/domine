@@ -2,22 +2,23 @@ import Image from "next/image";
 import {
   formatKoreanDate,
   formatProgressPercentDisplay,
-  getHakJunMilitaryStats,
-  HAK_JUN_DISCHARGE,
-  HAK_JUN_ENLIST,
-  HAK_JUN_NAME,
+  getMilitaryServiceStats,
+  HAK_JUN_MILITARY_MEMBER,
+  type MilitaryServiceMember,
 } from "@/lib/domine/hak-jun-military";
-
-const PHOTO = "/image/이학준.jpg";
 
 type Props = {
   /** 메인 등: 바깥 카드가 있을 때 테두리·배경 생략 */
   embedded?: boolean;
+  member?: MilitaryServiceMember;
 };
 
-export function HakJunMilitaryBanner({ embedded = false }: Props) {
+export function MilitaryServiceBanner({
+  embedded = false,
+  member = HAK_JUN_MILITARY_MEMBER,
+}: Props) {
   const compact = embedded;
-  const stats = getHakJunMilitaryStats();
+  const stats = getMilitaryServiceStats(member);
   const displayPct = stats.isDischarged ? 100 : stats.progressPercent;
   const pctLabel = formatProgressPercentDisplay(displayPct);
 
@@ -59,18 +60,24 @@ export function HakJunMilitaryBanner({ embedded = false }: Props) {
                 : "relative aspect-[3/4] w-full max-w-[7rem] shrink-0 overflow-hidden bg-[var(--lit-bg)] md:max-w-none"
             }
           >
-            <Image
-              src={PHOTO}
-              alt={`${HAK_JUN_NAME} 사진`}
-              fill
-              sizes={
-                compact
-                  ? "(max-width: 768px) 88px, 260px"
-                  : "(max-width: 768px) 112px, 320px"
-              }
-              className="object-cover object-top"
-              priority
-            />
+            {member.photoSrc ? (
+              <Image
+                src={member.photoSrc}
+                alt={`${member.label} 사진`}
+                fill
+                sizes={
+                  compact
+                    ? "(max-width: 768px) 88px, 260px"
+                    : "(max-width: 768px) 112px, 320px"
+                }
+                className="object-cover object-top"
+                priority
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-[var(--lit-border)] text-xl font-semibold tracking-[-0.03em] text-[var(--lit-ink-muted)] md:text-5xl">
+                {member.name.slice(0, 1)}
+              </div>
+            )}
           </div>
 
           <div
@@ -82,7 +89,7 @@ export function HakJunMilitaryBanner({ embedded = false }: Props) {
           >
             <div>
               <p className="break-keep text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--lit-ink-subtle)] md:text-[11px] md:tracking-[0.22em]">
-                {HAK_JUN_NAME} · 복무 카운트
+                {member.label} · 복무 카운트
               </p>
               <div
                 className={
@@ -94,7 +101,7 @@ export function HakJunMilitaryBanner({ embedded = false }: Props) {
                 <span className="break-keep">
                   <span className="text-[var(--lit-ink-subtle)]">입대</span>{" "}
                   <span className="font-medium text-[var(--lit-ink)]">
-                    {formatKoreanDate(HAK_JUN_ENLIST)}
+                    {formatKoreanDate(member.enlistDate)}
                   </span>
                 </span>
                 <span className="text-[var(--lit-border-strong)]" aria-hidden>
@@ -103,7 +110,7 @@ export function HakJunMilitaryBanner({ embedded = false }: Props) {
                 <span className="break-keep">
                   <span className="text-[var(--lit-ink-subtle)]">전역</span>{" "}
                   <span className="font-medium text-[var(--lit-ink)]">
-                    {formatKoreanDate(HAK_JUN_DISCHARGE)}
+                    {formatKoreanDate(member.dischargeDate)}
                   </span>
                 </span>
               </div>
@@ -175,5 +182,14 @@ export function HakJunMilitaryBanner({ embedded = false }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+export function HakJunMilitaryBanner({ embedded = false }: Props) {
+  return (
+    <MilitaryServiceBanner
+      embedded={embedded}
+      member={HAK_JUN_MILITARY_MEMBER}
+    />
   );
 }

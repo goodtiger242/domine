@@ -1,11 +1,12 @@
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteBrandLink } from "@/app/components/layout/SiteBrandLink";
-import { HakJunMilitaryBanner } from "@/app/components/domine/HakJunMilitaryBanner";
+import { MilitaryServiceBanner } from "@/app/components/domine/HakJunMilitaryBanner";
 import { ScrollToTop } from "@/app/components/domine/home/ScrollToTop";
 import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
 import { SiteHeaderNav } from "@/app/components/layout/SiteHeaderNav";
+import { MILITARY_SERVICE_MEMBERS } from "@/lib/domine/hak-jun-military";
 import { SITE_NAV_HOME } from "@/lib/nav/site-nav";
 
 type Props = {
@@ -39,12 +40,17 @@ export function LandingPage({
             id="home-military"
             className="order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-1"
           >
-            <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-11 lg:px-2">
-              <div className="overflow-hidden rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]">
-                <div className="p-4 md:p-6">
-                  <HakJunMilitaryBanner embedded />
+            <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-8 md:gap-5 md:px-6 md:py-11 lg:px-2">
+              {MILITARY_SERVICE_MEMBERS.map((member) => (
+                <div
+                  key={member.name}
+                  className="overflow-hidden rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]"
+                >
+                  <div className="p-4 md:p-6">
+                    <MilitaryServiceBanner embedded member={member} />
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
           </section>
 
