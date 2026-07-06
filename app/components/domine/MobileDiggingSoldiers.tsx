@@ -146,10 +146,10 @@ function MarchingDog({ x }: { x: number }) {
 
 export function MobileDiggingSoldiers() {
   return (
-    <div className="border-t border-[var(--lit-border)] px-3 py-1.5 text-[var(--lit-ink-subtle)] md:hidden">
+    <div className="border-t border-[var(--lit-border)] px-3 py-1.5 text-[var(--lit-ink-subtle)] md:py-2">
       <svg
         viewBox="0 0 128 30"
-        className="mx-auto h-7 w-full max-w-[13rem]"
+        className="mx-auto h-7 w-full max-w-[13rem] md:h-8 md:max-w-[16rem]"
         role="img"
         aria-label="군복무 응원 행군 애니메이션"
       >
