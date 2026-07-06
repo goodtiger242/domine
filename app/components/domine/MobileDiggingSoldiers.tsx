@@ -163,7 +163,7 @@ export function MobileDiggingSoldiers() {
         <g className="military-march">
           <MarchingDog x={-38} />
           <MarchingSoldier x={0} />
-          <MarchingSoldier x={38} />
+          <MarchingSoldier x={50} />
         </g>
       </svg>
     </div>
