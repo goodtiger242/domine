@@ -1,6 +1,27 @@
 function MarchingSoldier({ x }: { x: number }) {
   return (
     <g transform={`translate(${x} 0)`}>
+      <path
+        d="M13 7.5 28 22.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity="0.58"
+      />
+      <path
+        d="M11.5 6 15 9.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        opacity="0.58"
+      />
+      <path
+        d="M26.5 21 31 21"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        opacity="0.58"
+      />
       <rect
         x="7"
         y="10"
@@ -56,6 +77,46 @@ function MarchingSoldier({ x }: { x: number }) {
   );
 }
 
+function MarchingDog({ x }: { x: number }) {
+  return (
+    <g className="military-dog" transform={`translate(${x} 0)`}>
+      <ellipse
+        cx="12"
+        cy="22"
+        rx="6"
+        ry="3.2"
+        fill="currentColor"
+        opacity="0.58"
+      />
+      <circle cx="19" cy="20" r="2.6" fill="currentColor" opacity="0.58" />
+      <path
+        className="military-dog-tail"
+        d="M6.5 21.5 2 18.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity="0.58"
+      />
+      <path
+        className="military-leg-a"
+        d="M9 24.5 7.5 27"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        opacity="0.58"
+      />
+      <path
+        className="military-leg-b"
+        d="M15 24.5 16.5 27"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        opacity="0.58"
+      />
+    </g>
+  );
+}
+
 export function MobileDiggingSoldiers() {
   return (
     <div className="border-t border-[var(--lit-border)] px-3 py-1.5 text-[var(--lit-ink-subtle)] md:hidden">
@@ -73,6 +134,7 @@ export function MobileDiggingSoldiers() {
           opacity="0.18"
         />
         <g className="military-march">
+          <MarchingDog x={-24} />
           <MarchingSoldier x={0} />
           <MarchingSoldier x={30} />
         </g>

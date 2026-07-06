@@ -78,7 +78,9 @@ html {
   .military-arm-a,
   .military-arm-b,
   .military-leg-a,
-  .military-leg-b {
+  .military-leg-b,
+  .military-dog,
+  .military-dog-tail {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
@@ -132,6 +134,18 @@ html {
   animation: military-limb-b 0.58s ease-in-out infinite;
   transform-box: fill-box;
   transform-origin: 50% 10%;
+}
+
+.military-dog {
+  animation: military-limb-b 0.58s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 80%;
+}
+
+.military-dog-tail {
+  animation: military-limb-a 0.58s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 90% 50%;
 }
 
 @keyframes cos-reveal {
