@@ -73,11 +73,51 @@ html {
   .cos-stagger-1,
   .cos-stagger-2,
   .cos-stagger-3,
-  .cos-stagger-4 {
+  .cos-stagger-4,
+  .military-dig,
+  .military-dig-reverse,
+  .military-shovel {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
+}
+
+@keyframes military-dig-sway {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(1px) rotate(4deg);
+  }
+}
+
+@keyframes military-shovel-swing {
+  0%,
+  100% {
+    transform: rotate(-12deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+
+.military-dig,
+.military-dig-reverse {
+  animation: military-dig-sway 1.15s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 75%;
+}
+
+.military-dig-reverse {
+  animation-delay: -0.55s;
+}
+
+.military-shovel {
+  animation: military-shovel-swing 1.15s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 15%;
 }
 
 @keyframes cos-reveal {

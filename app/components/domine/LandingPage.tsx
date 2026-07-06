@@ -2,6 +2,7 @@ import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteBrandLink } from "@/app/components/layout/SiteBrandLink";
 import { MilitaryServiceCompactCard } from "@/app/components/domine/HakJunMilitaryBanner";
+import { MobileDiggingSoldiers } from "@/app/components/domine/MobileDiggingSoldiers";
 import { ScrollToTop } from "@/app/components/domine/home/ScrollToTop";
 import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
 import { LiturgicalMonthSection } from "@/app/components/domine/LiturgicalMonthSection";
@@ -50,6 +51,7 @@ export function LandingPage({
                     />
                   ))}
                 </div>
+                <MobileDiggingSoldiers />
               </div>
             </div>
           </section>
