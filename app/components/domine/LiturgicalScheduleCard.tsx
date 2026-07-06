@@ -59,10 +59,10 @@ function DenseRoleSlot({
   const shown = trimmed ? formatYouthMemberDisplay(value) : "";
   return (
     <div className="flex min-w-0 items-baseline justify-between gap-3">
-      <span className="shrink-0 text-[11px] font-semibold leading-tight text-[var(--lit-ink-muted)]">
+      <span className="shrink-0 text-[11px] font-semibold leading-tight tracking-[-0.01em] text-[var(--lit-ink-muted)]">
         {label}
       </span>
-      <span className="min-w-0 break-keep text-right text-[15px] font-medium leading-snug text-[var(--lit-ink)]">
+      <span className="min-w-0 break-keep text-right text-sm font-semibold leading-snug text-[var(--lit-ink)] sm:text-[15px]">
         {shown || "\u00a0"}
       </span>
     </div>
@@ -82,10 +82,10 @@ type Props = {
 };
 
 const cardBase =
-  "rounded-xl border bg-[var(--lit-bg-elevated)] p-4 sm:p-5";
+  "rounded-xl border bg-[var(--lit-bg-elevated)] p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)] sm:p-5";
 
 const rolesPanelClass =
-  "rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] p-3.5 sm:p-4";
+  "rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] p-3.5 ring-1 ring-black/[0.015] sm:p-4 dark:ring-white/[0.025]";
 
 const sectionTitleClass =
   "text-[13px] font-semibold tracking-[-0.02em] text-[var(--lit-ink)]";
@@ -127,7 +127,7 @@ export function LiturgicalScheduleCard({
           <p
             className={
               enrich
-                ? "text-sm font-semibold leading-snug tracking-[-0.02em] text-[var(--lit-ink)]"
+                ? "text-sm font-semibold leading-snug tracking-[-0.01em] text-[var(--lit-ink)]"
                 : "text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]"
             }
           >
@@ -137,7 +137,7 @@ export function LiturgicalScheduleCard({
             <h3
               className={`mt-2 tracking-tight text-[var(--lit-ink)] ${
                 enrich
-                  ? "text-base font-medium leading-snug sm:text-lg"
+                  ? "text-base font-semibold leading-snug sm:text-lg"
                   : "text-xl font-light"
               }`}
             >

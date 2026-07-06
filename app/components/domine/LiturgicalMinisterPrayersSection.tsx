@@ -67,7 +67,7 @@ export function LiturgicalMinisterPrayersSection({
           id="liturgical-prayers-heading"
           className={`text-center font-light tracking-[-0.03em] text-[var(--lit-ink)] text-pretty max-lg:leading-snug ${
             compact
-              ? "text-[clamp(1.35rem,4vw,1.85rem)] max-lg:text-[clamp(1.25rem,4.3vw,1.6rem)]"
+              ? "text-[clamp(1.35rem,4vw,1.85rem)] font-medium max-lg:text-[clamp(1.25rem,4.3vw,1.6rem)]"
               : "mt-4 text-[clamp(1.75rem,4.5vw,2.5rem)] max-lg:text-[clamp(1.5rem,5.2vw,1.95rem)] md:mt-6"
           }`}
         >
@@ -76,7 +76,7 @@ export function LiturgicalMinisterPrayersSection({
         {compact ? (
           <div className="mt-5">
             <div
-              className="grid grid-cols-2 overflow-hidden rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)]"
+              className="grid grid-cols-2 overflow-hidden rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] shadow-[0_1px_0_rgba(0,0,0,0.03)]"
               role="tablist"
               aria-label="기도문 선택"
             >
@@ -103,7 +103,7 @@ export function LiturgicalMinisterPrayersSection({
                 );
               })}
             </div>
-            <div className="mt-3 rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] p-4 shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.02] dark:ring-white/[0.04]">
+            <div className="mt-3 rounded-xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] p-4 shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.02] dark:ring-white/[0.04]">
               <div className="space-y-1.5 text-[15px] leading-[1.65] text-[var(--lit-ink-muted)]">
                 {activePrayerLines.map((line, i) => (
                   <p key={i}>{line}</p>

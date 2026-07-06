@@ -41,7 +41,7 @@ export function LandingPage({
             className="order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-1"
           >
             <div className="mx-auto max-w-3xl px-4 pb-2 pt-5 md:px-6 md:pb-3 md:pt-7 lg:px-2">
-              <div className="overflow-hidden rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]">
+              <div className="overflow-hidden rounded-xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]">
                 <div className="grid grid-cols-2 gap-3 p-3 md:gap-6 md:p-5">
                   {MILITARY_SERVICE_MEMBERS.map((member) => (
                     <MilitaryServiceCompactCard

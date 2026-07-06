@@ -67,12 +67,12 @@ export function HomeLiturgicalMonthList({
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="min-w-0 font-light text-2xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:leading-snug sm:text-3xl md:text-4xl">
+        <h2 className="min-w-0 text-2xl font-medium tracking-[-0.03em] text-[var(--lit-ink)] max-lg:leading-snug sm:text-3xl md:text-4xl">
           <span className="break-keep">전례 안내</span>
         </h2>
 
         <div
-          className="flex min-h-9 shrink-0 items-center overflow-hidden rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] sm:min-h-11"
+          className="flex min-h-9 shrink-0 items-center overflow-hidden rounded-full border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] shadow-[0_1px_0_rgba(0,0,0,0.03)] sm:min-h-11"
           role="group"
           aria-label="월 이동"
         >
@@ -89,7 +89,7 @@ export function HomeLiturgicalMonthList({
             type="button"
             onClick={goThisMonth}
             disabled={pending || isViewingThisCalendarMonth}
-            className="h-9 min-w-[6.4rem] border-x border-[var(--lit-border)] px-2 text-xs font-medium tabular-nums text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] disabled:cursor-default disabled:hover:bg-transparent sm:h-11 sm:min-w-[8.5rem] sm:px-3 sm:text-sm md:min-w-[9.5rem]"
+            className="h-9 min-w-[6.4rem] border-x border-[var(--lit-border)] px-2 text-xs font-semibold tabular-nums text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] disabled:cursor-default disabled:hover:bg-transparent sm:h-11 sm:min-w-[8.5rem] sm:px-3 sm:text-sm md:min-w-[9.5rem]"
           >
             {viewYear}년 {month}월
           </button>

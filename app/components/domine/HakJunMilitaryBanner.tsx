@@ -41,7 +41,7 @@ export function MilitaryServiceCompactCard({ member }: CardProps) {
   return (
     <div className="min-w-0 text-center">
       <div className="mx-auto w-full max-w-[7.75rem] md:max-w-[9.75rem]">
-        <div className="relative aspect-[10/9] w-full overflow-hidden bg-[var(--lit-bg)]">
+        <div className="relative aspect-[10/9] w-full overflow-hidden rounded-lg bg-[var(--lit-bg)] ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
           {member.photoSrc ? (
             <Image
               src={member.photoSrc}
@@ -60,14 +60,14 @@ export function MilitaryServiceCompactCard({ member }: CardProps) {
       </div>
 
       <div className="mx-auto mt-2 max-w-[12rem] md:mt-3">
-        <p className="truncate text-sm font-semibold tracking-[-0.02em] text-[var(--lit-ink)] md:text-base">
+        <p className="truncate text-[13px] font-semibold tracking-[-0.01em] text-[var(--lit-ink)] md:text-[15px]">
           {member.label}
         </p>
         <div className="mt-1.5 flex items-baseline justify-center gap-2.5 md:mt-2 md:gap-3">
-          <span className="text-xl font-light tabular-nums tracking-tight text-[var(--lit-ink)] md:text-3xl">
+          <span className="text-xl font-medium tabular-nums tracking-tight text-[var(--lit-ink)] md:text-3xl">
             {ddayLabel}
           </span>
-          <span className="text-sm font-light tabular-nums text-[var(--lit-ink-muted)] md:text-lg">
+          <span className="text-sm font-medium tabular-nums text-[var(--lit-ink-muted)] md:text-lg">
             {pctLabel}%
           </span>
         </div>
