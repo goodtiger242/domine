@@ -81,37 +81,64 @@ function MarchingDog({ x }: { x: number }) {
   return (
     <g className="military-dog" transform={`translate(${x} 0)`}>
       <ellipse
-        cx="12"
-        cy="22"
-        rx="6"
-        ry="3.2"
+        cx="10"
+        cy="22.2"
+        rx="5.4"
+        ry="3"
+        fill="currentColor"
+        opacity="0.52"
+      />
+      <circle
+        cx="16.8"
+        cy="20.2"
+        r="2.7"
         fill="currentColor"
         opacity="0.58"
       />
-      <circle cx="19" cy="20" r="2.6" fill="currentColor" opacity="0.58" />
+      <path
+        d="M15.2 18.2 13.8 15.8"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        opacity="0.52"
+      />
+      <path
+        d="M18.4 18.3 20.2 16.2"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        opacity="0.52"
+      />
+      <circle
+        cx="18.6"
+        cy="20.1"
+        r="0.45"
+        fill="var(--lit-bg-elevated)"
+        opacity="0.9"
+      />
       <path
         className="military-dog-tail"
-        d="M6.5 21.5 2 18.5"
+        d="M5 21.5 1 18.5"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.4"
         strokeLinecap="round"
-        opacity="0.58"
+        opacity="0.56"
       />
       <path
         className="military-leg-a"
-        d="M9 24.5 7.5 27"
+        d="M7.5 24.4 6.2 26.8"
         stroke="currentColor"
-        strokeWidth="1.4"
+        strokeWidth="1.25"
         strokeLinecap="round"
-        opacity="0.58"
+        opacity="0.56"
       />
       <path
         className="military-leg-b"
-        d="M15 24.5 16.5 27"
+        d="M13.5 24.5 14.8 26.8"
         stroke="currentColor"
-        strokeWidth="1.4"
+        strokeWidth="1.25"
         strokeLinecap="round"
-        opacity="0.58"
+        opacity="0.56"
       />
     </g>
   );
@@ -134,9 +161,9 @@ export function MobileDiggingSoldiers() {
           opacity="0.18"
         />
         <g className="military-march">
-          <MarchingDog x={-24} />
+          <MarchingDog x={-38} />
           <MarchingSoldier x={0} />
-          <MarchingSoldier x={30} />
+          <MarchingSoldier x={38} />
         </g>
       </svg>
     </div>

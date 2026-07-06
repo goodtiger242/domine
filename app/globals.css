@@ -89,10 +89,10 @@ html {
 
 @keyframes military-march-across {
   from {
-    transform: translateX(-48px);
+    transform: translateX(-58px);
   }
   to {
-    transform: translateX(132px);
+    transform: translateX(136px);
   }
 }
 
