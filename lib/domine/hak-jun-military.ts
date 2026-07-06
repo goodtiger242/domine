@@ -29,7 +29,7 @@ export const HAK_JUN_MILITARY_MEMBER: MilitaryServiceMember = {
 export const TAE_WON_MILITARY_MEMBER: MilitaryServiceMember = {
   name: "유태원",
   label: "유태원 아이다노",
-  photoSrc: null,
+  photoSrc: "/image/유태원.png",
   enlistDate: new Date("2026-06-15T12:00:00+09:00"),
   dischargeDate: new Date("2027-12-14T12:00:00+09:00"),
 };
