@@ -30,7 +30,7 @@ export function LiturgicalMonthSection({
   const label = formatMonthLabelKo(year, month);
   const sectionPadding =
     variant === "home"
-      ? "px-5 pb-12 pt-3 md:px-10 md:pb-16 md:pt-4 lg:px-12"
+      ? "px-5 pb-2 pt-3 md:px-10 md:pb-10 md:pt-4 lg:px-12"
       : "px-5 py-24 md:px-10 md:py-32 lg:px-12";
 
   return (
