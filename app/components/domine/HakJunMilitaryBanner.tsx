@@ -17,6 +17,13 @@ type CardProps = {
   member: MilitaryServiceMember;
 };
 
+function formatShortDate(d: Date) {
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yy}.${mm}.${dd}`;
+}
+
 export function MilitaryServiceCompactCard({ member }: CardProps) {
   const stats = getMilitaryServiceStats(member);
   const displayPct = stats.isDischarged ? 100 : stats.progressPercent;
@@ -65,8 +72,8 @@ export function MilitaryServiceCompactCard({ member }: CardProps) {
           </span>
         </div>
         <p className="mt-1.5 break-keep text-[10px] leading-relaxed text-[var(--lit-ink-muted)] md:mt-2 md:text-[11px]">
-          {formatKoreanDate(member.enlistDate)} -{" "}
-          {formatKoreanDate(member.dischargeDate)}
+          {formatShortDate(member.enlistDate)} -{" "}
+          {formatShortDate(member.dischargeDate)}
         </p>
       </div>
     </div>
