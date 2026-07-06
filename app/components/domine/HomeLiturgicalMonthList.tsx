@@ -61,10 +61,8 @@ export function HomeLiturgicalMonthList({
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-        <h2 className="font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.65rem,6.5vw,2.1rem)] max-lg:leading-snug md:text-5xl">
-          <span className="break-keep">
-            {viewYear}년 {month}월 전례 봉사
-          </span>
+        <h2 className="font-light text-3xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.45rem,5.5vw,1.85rem)] max-lg:leading-snug md:text-4xl">
+          <span className="break-keep">전례 안내</span>
         </h2>
 
         {!isViewingThisCalendarMonth ? (

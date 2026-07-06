@@ -55,17 +55,11 @@ export function LiturgicalMonthSection({
                     </p>
                   ) : null}
                   <h2
-                    className={`font-light text-4xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.65rem,6.5vw,2.1rem)] max-lg:leading-snug md:text-5xl ${
+                    className={`font-light text-3xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.45rem,5.5vw,1.85rem)] max-lg:leading-snug md:text-4xl ${
                       variant === "page" ? "mt-4" : "mt-0"
                     }`}
                   >
-                    <span className="break-keep">{label}</span>
-                    <span className="mt-1.5 block max-lg:mt-2 lg:mt-0 lg:inline">
-                      <span className="font-normal text-[var(--lit-ink-muted)]">
-                        <span className="max-lg:hidden"> · </span>
-                        전례 봉사
-                      </span>
-                    </span>
+                    <span className="break-keep">전례 안내</span>
                   </h2>
                 </div>
                 {variant === "page" ? (
