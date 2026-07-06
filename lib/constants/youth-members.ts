@@ -25,6 +25,7 @@ export const YOUTH_MEMBERS: readonly YouthMember[] = [
   { legalName: "이학준", baptismalNameKo: "라파엘" },
   { legalName: "이현아", baptismalNameKo: "마리아 도미니카" },
   { legalName: "임효진", baptismalNameKo: "수산나" },
+  { legalName: "조수지", baptismalNameKo: "예비자" },
   { legalName: "최비호", baptismalNameKo: "비오" },
   { legalName: "최선호", baptismalNameKo: "프란치스코" },
   { legalName: "최지수", baptismalNameKo: "스텔라" },
