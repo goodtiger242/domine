@@ -72,20 +72,20 @@ export function LandingPage({
       <ScrollToTop />
 
       <footer className="border-t border-[var(--lit-border)]/80 bg-[var(--lit-bg-elevated)]">
-        <div className="mx-auto max-w-[90rem] px-5 py-10 md:px-10 md:py-14 lg:px-12">
-          <div className="flex flex-col items-center justify-between gap-5 text-center md:flex-row md:text-left">
+        <div className="mx-auto max-w-[90rem] px-5 py-5 md:px-10 md:py-6 lg:px-12">
+          <div className="flex flex-col items-center justify-between gap-2 text-center md:flex-row md:text-left">
             <div className="max-lg:text-balance">
-              <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.28em]">
+              <p className="text-[9px] font-medium uppercase tracking-[0.28em] text-[var(--lit-ink-subtle)]">
                 Domine
               </p>
-              <p className="mt-2 text-base font-medium tracking-[-0.02em] text-[var(--lit-ink)]">
+              <p className="mt-1 text-sm font-medium tracking-[-0.02em] text-[var(--lit-ink)]">
                 도미네
               </p>
-              <p className="mt-1 break-keep text-sm text-[var(--lit-ink-muted)]">
+              <p className="mt-0.5 break-keep text-xs text-[var(--lit-ink-muted)]">
                 용호성당 청년회
               </p>
             </div>
-            <p className="text-xs tracking-wide text-[var(--lit-ink-subtle)] max-lg:text-balance">
+            <p className="text-[11px] tracking-wide text-[var(--lit-ink-subtle)] max-lg:text-balance">
               © {new Date().getFullYear()}
             </p>
           </div>
