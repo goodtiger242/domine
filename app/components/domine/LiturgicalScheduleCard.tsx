@@ -82,10 +82,10 @@ type Props = {
 };
 
 const cardBase =
-  "rounded-xl border bg-[var(--lit-bg-elevated)] p-5 sm:p-6";
+  "rounded-xl border bg-[var(--lit-bg-elevated)] p-4 sm:p-5";
 
 const rolesPanelClass =
-  "rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] p-4 sm:p-5";
+  "rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg)] p-3.5 sm:p-4";
 
 const sectionTitleClass =
   "text-[13px] font-semibold tracking-[-0.02em] text-[var(--lit-ink)]";
@@ -122,12 +122,12 @@ export function LiturgicalScheduleCard({
           : `${cardBase} border-[var(--lit-border)]`
       }${articleClassName ? ` ${articleClassName}` : ""}`}
     >
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p
             className={
               enrich
-                ? "text-[15px] font-semibold leading-snug tracking-[-0.02em] text-[var(--lit-ink)]"
+                ? "text-sm font-semibold leading-snug tracking-[-0.02em] text-[var(--lit-ink)]"
                 : "text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]"
             }
           >
@@ -137,7 +137,7 @@ export function LiturgicalScheduleCard({
             <h3
               className={`mt-2 tracking-tight text-[var(--lit-ink)] ${
                 enrich
-                  ? "text-lg font-medium leading-snug sm:text-xl"
+                  ? "text-base font-medium leading-snug sm:text-lg"
                   : "text-xl font-light"
               }`}
             >
@@ -156,11 +156,11 @@ export function LiturgicalScheduleCard({
       </div>
 
       {schedule.announcement_detail.trim() ? (
-        <div className={enrich ? "mb-5" : "mb-6"}>
+        <div className={enrich ? "mb-4" : "mb-6"}>
           <p
             className={`whitespace-pre-wrap text-[var(--lit-ink)] ${
               enrich
-                ? "text-[15px] leading-relaxed"
+                ? "text-sm leading-relaxed"
                 : "text-[15px] leading-[1.75]"
             }`}
           >
@@ -178,12 +178,12 @@ export function LiturgicalScheduleCard({
           }
         >
           {enrich ? (
-            <div className="space-y-4 sm:space-y-3">
+            <div className="space-y-3">
               <div>
                 <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>
                   전례 봉사
                 </h4>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-3 sm:gap-x-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:grid-cols-3 sm:gap-x-4">
                   <DenseRoleSlot
                     label="해설"
                     value={schedule.role_commentator}
@@ -204,7 +204,7 @@ export function LiturgicalScheduleCard({
                 </div>
               </div>
 
-              <div className="border-t border-[var(--lit-border)] pt-3 sm:pt-2.5">
+              <div className="border-t border-[var(--lit-border)] pt-2.5">
                 <DenseRoleSlot
                   label="복음 환호송"
                   value={schedule.role_gospel_acclamation}
@@ -212,9 +212,9 @@ export function LiturgicalScheduleCard({
                 />
               </div>
 
-              <div className="border-t border-[var(--lit-border)] pt-3 sm:pt-2.5">
+              <div className="border-t border-[var(--lit-border)] pt-2.5">
                 <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>복사단</h4>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-x-4">
                   <DenseRoleSlot
                     label="대복"
                     value={schedule.thurifer_main}
@@ -228,11 +228,11 @@ export function LiturgicalScheduleCard({
                 </div>
               </div>
 
-              <div className="border-t border-[var(--lit-border)] pt-3 sm:pt-2.5">
+              <div className="border-t border-[var(--lit-border)] pt-2.5">
                 <h4 className={`mb-2.5 sm:mb-2 ${sectionTitleClass}`}>
                   지휘 · 반주
                 </h4>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-x-4">
                   <DenseRoleSlot
                     label="지휘"
                     value={conductorValue}

@@ -40,9 +40,9 @@ export function LandingPage({
             id="home-military"
             className="order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-1"
           >
-            <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-11 lg:px-2">
+            <div className="mx-auto max-w-3xl px-4 py-5 md:px-6 md:py-7 lg:px-2">
               <div className="overflow-hidden rounded-2xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]">
-                <div className="grid grid-cols-2 gap-4 p-4 md:gap-8 md:p-6">
+                <div className="grid grid-cols-2 gap-3 p-3 md:gap-6 md:p-5">
                   {MILITARY_SERVICE_MEMBERS.map((member) => (
                     <MilitaryServiceCompactCard
                       key={member.name}
@@ -64,7 +64,7 @@ export function LandingPage({
           />
 
           <div className="order-3 lg:order-3">
-            <LiturgicalMinisterPrayersSection />
+            <LiturgicalMinisterPrayersSection compact />
           </div>
         </div>
       </main>
@@ -72,16 +72,16 @@ export function LandingPage({
       <ScrollToTop />
 
       <footer className="border-t border-[var(--lit-border)]/80 bg-[var(--lit-bg-elevated)]">
-        <div className="mx-auto max-w-[90rem] px-5 py-16 md:px-10 md:py-24 lg:px-12">
-          <div className="flex flex-col items-center justify-between gap-10 text-center md:flex-row md:text-left">
+        <div className="mx-auto max-w-[90rem] px-5 py-10 md:px-10 md:py-14 lg:px-12">
+          <div className="flex flex-col items-center justify-between gap-5 text-center md:flex-row md:text-left">
             <div className="max-lg:text-balance">
               <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[var(--lit-ink-subtle)] max-lg:tracking-[0.28em]">
                 Domine
               </p>
-              <p className="mt-3 text-lg font-medium tracking-[-0.02em] text-[var(--lit-ink)]">
+              <p className="mt-2 text-base font-medium tracking-[-0.02em] text-[var(--lit-ink)]">
                 도미네
               </p>
-              <p className="mt-2 break-keep text-sm text-[var(--lit-ink-muted)]">
+              <p className="mt-1 break-keep text-sm text-[var(--lit-ink-muted)]">
                 용호성당 청년회
               </p>
             </div>

@@ -105,7 +105,7 @@ export function HomeLiturgicalMonthList({
         </div>
       </div>
 
-      <div className="mt-8 md:mt-10">
+      <div className="mt-5 md:mt-7">
         {schedules.length === 0 ? (
           <div className="border border-dashed border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] px-8 py-16 text-center">
             <p className="text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
@@ -119,7 +119,7 @@ export function HomeLiturgicalMonthList({
             </Link>
           </div>
         ) : (
-          <ul className="flex flex-col gap-10 md:gap-14">
+          <ul className="flex flex-col gap-6 md:gap-8">
             {schedules.map((s, i) => (
               <li key={`${s.liturgy_date}-${s.updated_at ?? i}`}>
                 <LiturgicalScheduleCard

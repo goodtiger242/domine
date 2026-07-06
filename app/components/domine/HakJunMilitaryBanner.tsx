@@ -33,7 +33,7 @@ export function MilitaryServiceCompactCard({ member }: CardProps) {
 
   return (
     <div className="min-w-0 text-center">
-      <div className="mx-auto w-full max-w-[11rem] md:max-w-[13rem]">
+      <div className="mx-auto w-full max-w-[8.25rem] md:max-w-[10.5rem]">
         <div className="relative aspect-[3/4] w-full overflow-hidden bg-[var(--lit-bg)]">
           {member.photoSrc ? (
             <Image
@@ -52,19 +52,19 @@ export function MilitaryServiceCompactCard({ member }: CardProps) {
         </div>
       </div>
 
-      <div className="mx-auto mt-3 max-w-[13rem] md:mt-4">
+      <div className="mx-auto mt-2 max-w-[12rem] md:mt-3">
         <p className="truncate text-sm font-semibold tracking-[-0.02em] text-[var(--lit-ink)] md:text-base">
           {member.label}
         </p>
-        <div className="mt-2 flex items-baseline justify-center gap-3 md:mt-3 md:gap-4">
-          <span className="text-2xl font-light tabular-nums tracking-tight text-[var(--lit-ink)] md:text-4xl">
+        <div className="mt-1.5 flex items-baseline justify-center gap-2.5 md:mt-2 md:gap-3">
+          <span className="text-xl font-light tabular-nums tracking-tight text-[var(--lit-ink)] md:text-3xl">
             {ddayLabel}
           </span>
-          <span className="text-base font-light tabular-nums text-[var(--lit-ink-muted)] md:text-xl">
+          <span className="text-sm font-light tabular-nums text-[var(--lit-ink-muted)] md:text-lg">
             {pctLabel}%
           </span>
         </div>
-        <p className="mt-2 break-keep text-[11px] leading-relaxed text-[var(--lit-ink-muted)] md:mt-3 md:text-xs">
+        <p className="mt-1.5 break-keep text-[10px] leading-relaxed text-[var(--lit-ink-muted)] md:mt-2 md:text-[11px]">
           {formatKoreanDate(member.enlistDate)} -{" "}
           {formatKoreanDate(member.dischargeDate)}
         </p>

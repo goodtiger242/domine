@@ -28,11 +28,15 @@ export function LiturgicalMonthSection({
   sectionClassName = "",
 }: Props) {
   const label = formatMonthLabelKo(year, month);
+  const sectionPadding =
+    variant === "home"
+      ? "px-5 py-12 md:px-10 md:py-16 lg:px-12"
+      : "px-5 py-24 md:px-10 md:py-32 lg:px-12";
 
   return (
     <section
       id={variant === "home" ? "liturgical" : undefined}
-      className={`scroll-mt-28 border-b border-[var(--lit-border)]/80 bg-[var(--lit-bg)] px-5 py-24 md:px-10 md:py-32 lg:scroll-mt-24 lg:px-12${
+      className={`scroll-mt-28 border-b border-[var(--lit-border)]/80 bg-[var(--lit-bg)] ${sectionPadding} lg:scroll-mt-24${
         sectionClassName ? ` ${sectionClassName}` : ""
       }`}
     >
