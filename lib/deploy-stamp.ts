@@ -7,7 +7,7 @@
  * 재배포해도 숫자가 갱신되지 않는 문제가 있어, 이제는 이 상수만 사용합니다.
  * (호스팅에 남아 있는 NEXT_PUBLIC_DEPLOY_INDEX 는 무시됩니다. 삭제해도 됩니다.)
  */
-export const DEPLOYMENT_INDEX = 48;
+export const DEPLOYMENT_INDEX = 49;
 
 export function getDeploymentIndex(): number {
   return DEPLOYMENT_INDEX;

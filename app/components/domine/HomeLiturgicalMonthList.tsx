@@ -66,13 +66,13 @@ export function HomeLiturgicalMonthList({
 
   return (
     <div>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-        <h2 className="font-light text-3xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:text-[clamp(1.45rem,5.5vw,1.85rem)] max-lg:leading-snug md:text-4xl">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="min-w-0 font-light text-2xl tracking-[-0.03em] text-[var(--lit-ink)] max-lg:leading-snug sm:text-3xl md:text-4xl">
           <span className="break-keep">전례 안내</span>
         </h2>
 
         <div
-          className="flex min-h-11 items-center self-start overflow-hidden rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] sm:self-auto"
+          className="flex min-h-9 shrink-0 items-center overflow-hidden rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] sm:min-h-11"
           role="group"
           aria-label="월 이동"
         >
@@ -81,7 +81,7 @@ export function HomeLiturgicalMonthList({
             onClick={() => moveMonth(-1)}
             disabled={pending}
             aria-label="이전 달"
-            className="flex h-11 w-11 items-center justify-center text-xl leading-none text-[var(--lit-ink-muted)] transition hover:bg-[var(--lit-bg)] hover:text-[var(--lit-ink)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lit-ring)]"
+            className="flex h-9 w-9 items-center justify-center text-lg leading-none text-[var(--lit-ink-muted)] transition hover:bg-[var(--lit-bg)] hover:text-[var(--lit-ink)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lit-ring)] sm:h-11 sm:w-11 sm:text-xl"
           >
             ‹
           </button>
@@ -89,7 +89,7 @@ export function HomeLiturgicalMonthList({
             type="button"
             onClick={goThisMonth}
             disabled={pending || isViewingThisCalendarMonth}
-            className="h-11 min-w-[8.5rem] border-x border-[var(--lit-border)] px-3 text-sm font-medium tabular-nums text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] disabled:cursor-default disabled:hover:bg-transparent md:min-w-[9.5rem]"
+            className="h-9 min-w-[6.4rem] border-x border-[var(--lit-border)] px-2 text-xs font-medium tabular-nums text-[var(--lit-ink)] transition hover:bg-[var(--lit-bg)] disabled:cursor-default disabled:hover:bg-transparent sm:h-11 sm:min-w-[8.5rem] sm:px-3 sm:text-sm md:min-w-[9.5rem]"
           >
             {viewYear}년 {month}월
           </button>
@@ -98,7 +98,7 @@ export function HomeLiturgicalMonthList({
             onClick={() => moveMonth(1)}
             disabled={pending}
             aria-label="다음 달"
-            className="flex h-11 w-11 items-center justify-center text-xl leading-none text-[var(--lit-ink-muted)] transition hover:bg-[var(--lit-bg)] hover:text-[var(--lit-ink)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lit-ring)]"
+            className="flex h-9 w-9 items-center justify-center text-lg leading-none text-[var(--lit-ink-muted)] transition hover:bg-[var(--lit-bg)] hover:text-[var(--lit-ink)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lit-ring)] sm:h-11 sm:w-11 sm:text-xl"
           >
             ›
           </button>
