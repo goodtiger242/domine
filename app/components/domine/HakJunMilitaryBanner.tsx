@@ -13,6 +13,66 @@ type Props = {
   member?: MilitaryServiceMember;
 };
 
+type CardProps = {
+  member: MilitaryServiceMember;
+};
+
+export function MilitaryServiceCompactCard({ member }: CardProps) {
+  const stats = getMilitaryServiceStats(member);
+  const displayPct = stats.isDischarged ? 100 : stats.progressPercent;
+  const pctLabel = formatProgressPercentDisplay(displayPct);
+
+  let ddayLabel: string;
+  if (stats.isDischarged) {
+    ddayLabel = "전역";
+  } else if (stats.daysToDischarge <= 0) {
+    ddayLabel = "D-day";
+  } else {
+    ddayLabel = `D-${stats.daysToDischarge}`;
+  }
+
+  return (
+    <div className="min-w-0 text-center">
+      <div className="mx-auto w-full max-w-[11rem] md:max-w-[13rem]">
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-[var(--lit-bg)]">
+          {member.photoSrc ? (
+            <Image
+              src={member.photoSrc}
+              alt={`${member.label} 사진`}
+              fill
+              sizes="(max-width: 768px) 44vw, 208px"
+              className="object-cover object-top"
+              priority
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-[var(--lit-border)] text-4xl font-semibold tracking-[-0.03em] text-[var(--lit-ink-muted)] md:text-5xl">
+              {member.name.slice(0, 1)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto mt-3 max-w-[13rem] md:mt-4">
+        <p className="truncate text-sm font-semibold tracking-[-0.02em] text-[var(--lit-ink)] md:text-base">
+          {member.label}
+        </p>
+        <div className="mt-2 flex items-baseline justify-center gap-3 md:mt-3 md:gap-4">
+          <span className="text-2xl font-light tabular-nums tracking-tight text-[var(--lit-ink)] md:text-4xl">
+            {ddayLabel}
+          </span>
+          <span className="text-base font-light tabular-nums text-[var(--lit-ink-muted)] md:text-xl">
+            {pctLabel}%
+          </span>
+        </div>
+        <p className="mt-2 break-keep text-[11px] leading-relaxed text-[var(--lit-ink-muted)] md:mt-3 md:text-xs">
+          {formatKoreanDate(member.enlistDate)} -{" "}
+          {formatKoreanDate(member.dischargeDate)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function MilitaryServiceBanner({
   embedded = false,
   member = HAK_JUN_MILITARY_MEMBER,
