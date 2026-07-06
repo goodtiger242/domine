@@ -59,10 +59,10 @@ function DenseRoleSlot({
   const shown = trimmed ? formatYouthMemberDisplay(value) : "";
   return (
     <div className="flex min-w-0 items-baseline justify-between gap-3">
-      <span className="shrink-0 text-[11px] font-semibold leading-tight tracking-[-0.01em] text-[var(--lit-ink-muted)]">
+      <span className="shrink-0 text-xs font-semibold leading-tight tracking-[-0.01em] text-[var(--lit-ink-muted)]">
         {label}
       </span>
-      <span className="min-w-0 break-keep text-right text-sm font-semibold leading-snug text-[var(--lit-ink)] sm:text-[15px]">
+      <span className="min-w-0 break-keep text-right text-sm font-medium leading-snug text-[var(--lit-ink)] sm:text-[15px]">
         {shown || "\u00a0"}
       </span>
     </div>
