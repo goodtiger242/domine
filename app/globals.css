@@ -74,50 +74,64 @@ html {
   .cos-stagger-2,
   .cos-stagger-3,
   .cos-stagger-4,
-  .military-dig,
-  .military-dig-reverse,
-  .military-shovel {
+  .military-march,
+  .military-arm-a,
+  .military-arm-b,
+  .military-leg-a,
+  .military-leg-b {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
 }
 
-@keyframes military-dig-sway {
+@keyframes military-march-across {
+  from {
+    transform: translateX(-48px);
+  }
+  to {
+    transform: translateX(132px);
+  }
+}
+
+@keyframes military-limb-a {
   0%,
   100% {
-    transform: translateY(0) rotate(-4deg);
+    transform: rotate(15deg);
   }
   50% {
-    transform: translateY(1px) rotate(4deg);
+    transform: rotate(-15deg);
   }
 }
 
-@keyframes military-shovel-swing {
+@keyframes military-limb-b {
   0%,
   100% {
-    transform: rotate(-12deg);
+    transform: rotate(-15deg);
   }
   50% {
-    transform: rotate(12deg);
+    transform: rotate(15deg);
   }
 }
 
-.military-dig,
-.military-dig-reverse {
-  animation: military-dig-sway 1.15s ease-in-out infinite;
+.military-march {
+  animation: military-march-across 5.4s linear infinite;
   transform-box: fill-box;
-  transform-origin: 50% 75%;
+  transform-origin: center;
 }
 
-.military-dig-reverse {
-  animation-delay: -0.55s;
+.military-arm-a,
+.military-leg-a {
+  animation: military-limb-a 0.58s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 10%;
 }
 
-.military-shovel {
-  animation: military-shovel-swing 1.15s ease-in-out infinite;
+.military-arm-b,
+.military-leg-b {
+  animation: military-limb-b 0.58s ease-in-out infinite;
   transform-box: fill-box;
-  transform-origin: 50% 15%;
+  transform-origin: 50% 10%;
 }
 
 @keyframes cos-reveal {
