@@ -40,8 +40,8 @@ export function MilitaryServiceCompactCard({ member }: CardProps) {
 
   return (
     <div className="min-w-0 text-center">
-      <div className="mx-auto w-full max-w-[8.25rem] md:max-w-[10.5rem]">
-        <div className="relative aspect-[3/4] w-full overflow-hidden bg-[var(--lit-bg)]">
+      <div className="mx-auto w-full max-w-[7.75rem] md:max-w-[9.75rem]">
+        <div className="relative aspect-[10/9] w-full overflow-hidden bg-[var(--lit-bg)]">
           {member.photoSrc ? (
             <Image
               src={member.photoSrc}
