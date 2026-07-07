@@ -79,67 +79,69 @@ function MarchingSoldier({ x }: { x: number }) {
 
 function MarchingDog({ x }: { x: number }) {
   return (
-    <g className="military-dog" transform={`translate(${x} 0)`}>
-      <ellipse
-        cx="10"
-        cy="22.2"
-        rx="5.4"
-        ry="3"
-        fill="currentColor"
-        opacity="0.52"
-      />
-      <circle
-        cx="16.8"
-        cy="20.2"
-        r="2.7"
-        fill="currentColor"
-        opacity="0.58"
-      />
-      <path
-        d="M15.2 18.2 13.8 15.8"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        opacity="0.52"
-      />
-      <path
-        d="M18.4 18.3 20.2 16.2"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        opacity="0.52"
-      />
-      <circle
-        cx="18.6"
-        cy="20.1"
-        r="0.45"
-        fill="var(--lit-bg-elevated)"
-        opacity="0.9"
-      />
-      <path
-        className="military-dog-tail"
-        d="M5 21.5 1 18.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        opacity="0.56"
-      />
-      <path
-        className="military-leg-a"
-        d="M7.5 24.4 6.2 26.8"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinecap="round"
-        opacity="0.56"
-      />
-      <path
-        className="military-leg-b"
-        d="M13.5 24.5 14.8 26.8"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinecap="round"
-        opacity="0.56"
-      />
+    <g transform={`translate(${x} 0)`}>
+      <g className="military-dog">
+        <ellipse
+          cx="10"
+          cy="22.2"
+          rx="5.4"
+          ry="3"
+          fill="currentColor"
+          opacity="0.52"
+        />
+        <circle
+          cx="16.8"
+          cy="20.2"
+          r="2.7"
+          fill="currentColor"
+          opacity="0.58"
+        />
+        <path
+          d="M15.2 18.2 13.8 15.8"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          opacity="0.52"
+        />
+        <path
+          d="M18.4 18.3 20.2 16.2"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          opacity="0.52"
+        />
+        <circle
+          cx="18.6"
+          cy="20.1"
+          r="0.45"
+          fill="var(--lit-bg-elevated)"
+          opacity="0.9"
+        />
+        <path
+          className="military-dog-tail"
+          d="M5 21.5 1 18.5"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          opacity="0.56"
+        />
+        <path
+          className="military-leg-a"
+          d="M7.5 24.4 6.2 26.8"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          opacity="0.56"
+        />
+        <path
+          className="military-leg-b"
+          d="M13.5 24.5 14.8 26.8"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          opacity="0.56"
+        />
+      </g>
     </g>
   );
 }
