@@ -161,9 +161,9 @@ export function MobileDiggingSoldiers() {
           opacity="0.18"
         />
         <g className="military-march">
-          <MarchingDog x={-88} />
+          <MarchingDog x={-140} />
           <MarchingSoldier x={0} />
-          <MarchingSoldier x={80} />
+          <MarchingSoldier x={38} />
         </g>
       </svg>
     </div>
