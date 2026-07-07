@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? `https://${process.env.NEXT_PUBLIC_SITE_URL.replace(/^https?:\/\//, "")}`
-  : process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
+  : "https://domine-eight.vercel.app";
+
+const socialImage = "/image/domine_logo.jpg";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -31,7 +31,10 @@ export const metadata: Metadata = {
       "용호성당 청년회 도미네(Domine) — 천주교 신앙 안에서 함께 걷는 청년 공동체입니다.",
     images: [
       {
-        url: "/image/domine_logo.jpg",
+        url: socialImage,
+        width: 960,
+        height: 716,
+        type: "image/jpeg",
         alt: "도미네 로고",
       },
     ],
@@ -41,7 +44,7 @@ export const metadata: Metadata = {
     title: "도미네 | 용호성당 청년회",
     description:
       "용호성당 청년회 도미네(Domine) — 천주교 신앙 안에서 함께 걷는 청년 공동체입니다.",
-    images: ["/image/domine_logo.jpg"],
+    images: [socialImage],
   },
 };
 
