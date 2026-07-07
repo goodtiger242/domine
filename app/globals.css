@@ -89,10 +89,10 @@ html {
 
 @keyframes military-march-across {
   from {
-    transform: translateX(-172px);
+    transform: translateX(-104px);
   }
   to {
-    transform: translateX(176px);
+    transform: translateX(136px);
   }
 }
 
@@ -117,7 +117,7 @@ html {
 }
 
 .military-march {
-  animation: military-march-across 9.2s linear infinite;
+  animation: military-march-across 7.2s linear infinite;
   transform-box: fill-box;
   transform-origin: center;
 }
