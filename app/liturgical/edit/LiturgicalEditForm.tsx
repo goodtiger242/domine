@@ -17,6 +17,8 @@ import {
 import {
   isYouthMemberName,
   isValidCustomLiturgicalName,
+  resolveYouthMemberLegalName,
+  sortedYouthMemberLegalNames,
 } from "@/lib/constants/youth-members";
 
 const fieldClass =
@@ -51,6 +53,32 @@ function emptyFormState() {
   };
 }
 
+type UniqueRoleKey =
+  | "role_commentator"
+  | "role_reader_1"
+  | "role_reader_2"
+  | "thurifer_main"
+  | "thurifer_sub"
+  | "organist";
+
+const UNIQUE_ROLE_KEYS: readonly UniqueRoleKey[] = [
+  "role_commentator",
+  "role_reader_1",
+  "role_reader_2",
+  "thurifer_main",
+  "thurifer_sub",
+  "organist",
+];
+
+const UNIQUE_ROLE_LABELS: Record<UniqueRoleKey, string> = {
+  role_commentator: "해설",
+  role_reader_1: "1독서",
+  role_reader_2: "2독서",
+  thurifer_main: "대복",
+  thurifer_sub: "소복",
+  organist: "반주",
+};
+
 export function LiturgicalEditForm({
   liturgyDate,
   initial,
@@ -78,6 +106,29 @@ export function LiturgicalEditForm({
 
   const hasSavedSchedule = initial !== null;
 
+  const selectedUniqueRoleLegalNames = new Map<UniqueRoleKey, string>();
+  for (const key of UNIQUE_ROLE_KEYS) {
+    const legal = resolveYouthMemberLegalName(form[key]);
+    if (legal) {
+      selectedUniqueRoleLegalNames.set(key, legal);
+    }
+  }
+
+  function selectableMembersFor(
+    key: UniqueRoleKey,
+    baseNames: readonly string[] = sortedYouthMemberLegalNames()
+  ): string[] {
+    const current = selectedUniqueRoleLegalNames.get(key);
+    const unavailable = new Set(
+      [...selectedUniqueRoleLegalNames.entries()]
+        .filter(([selectedKey]) => selectedKey !== key)
+        .map(([, legal]) => legal)
+    );
+    return baseNames.filter(
+      (name) => name === current || !unavailable.has(name)
+    );
+  }
+
   function onDateChange(nextIso: string) {
     router.push(`/liturgical/edit?date=${encodeURIComponent(nextIso)}`);
   }
@@ -94,6 +145,22 @@ export function LiturgicalEditForm({
       ["소복", form.thurifer_sub],
       ["반주", form.organist],
     ];
+    const assignedPeople = new Map<string, string>();
+    for (const key of UNIQUE_ROLE_KEYS) {
+      const value = form[key].trim();
+      if (!value) {
+        continue;
+      }
+      const identity = resolveYouthMemberLegalName(value) ?? value;
+      const previousLabel = assignedPeople.get(identity);
+      if (previousLabel) {
+        setMsg(
+          `${previousLabel}와 ${UNIQUE_ROLE_LABELS[key]}: 같은 사람은 중복 배정할 수 없습니다.`
+        );
+        return;
+      }
+      assignedPeople.set(identity, UNIQUE_ROLE_LABELS[key]);
+    }
     for (const [label, val] of roleChecks) {
       if (label === "반주") {
         if (val.trim() && !isLiturgicalOrganistName(val)) {
@@ -216,16 +283,19 @@ export function LiturgicalEditForm({
             onChange={(v) =>
               setForm((f) => ({ ...f, role_commentator: v }))
             }
+            selectableMemberNames={selectableMembersFor("role_commentator")}
           />
           <MemberOrCustomInput
             label="1독서"
             value={form.role_reader_1}
             onChange={(v) => setForm((f) => ({ ...f, role_reader_1: v }))}
+            selectableMemberNames={selectableMembersFor("role_reader_1")}
           />
           <MemberOrCustomInput
             label="2독서"
             value={form.role_reader_2}
             onChange={(v) => setForm((f) => ({ ...f, role_reader_2: v }))}
+            selectableMemberNames={selectableMembersFor("role_reader_2")}
           />
           <MemberOrCustomInput
             label="복음 환호송"
@@ -246,11 +316,13 @@ export function LiturgicalEditForm({
             label="대복"
             value={form.thurifer_main}
             onChange={(v) => setForm((f) => ({ ...f, thurifer_main: v }))}
+            selectableMemberNames={selectableMembersFor("thurifer_main")}
           />
           <MemberOrCustomInput
             label="소복"
             value={form.thurifer_sub}
             onChange={(v) => setForm((f) => ({ ...f, thurifer_sub: v }))}
+            selectableMemberNames={selectableMembersFor("thurifer_sub")}
           />
         </div>
       </div>
@@ -272,7 +344,10 @@ export function LiturgicalEditForm({
             label="반주"
             value={form.organist}
             onChange={(v) => setForm((f) => ({ ...f, organist: v }))}
-            selectableMemberNames={LITURGICAL_ORGANIST_LEGAL_NAMES}
+            selectableMemberNames={selectableMembersFor(
+              "organist",
+              LITURGICAL_ORGANIST_LEGAL_NAMES
+            )}
             allowCustom={false}
           />
         </div>
