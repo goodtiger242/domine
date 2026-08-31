@@ -3,7 +3,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   formatYouthMemberDisplay,
-  isYouthMemberName,
   isValidCustomLiturgicalName,
   resolveYouthMemberLegalName,
   sortedYouthMemberLegalNames,
@@ -13,6 +12,8 @@ type Props = {
   label: string;
   value: string;
   onChange: (next: string) => void;
+  selectableMemberNames?: readonly string[];
+  allowCustom?: boolean;
 };
 
 /** 직접 입력: 공백 제거 후 한글만, 최대 4자 — 세례명·띄어쓰기 입력 방지 */
@@ -21,22 +22,41 @@ function sanitizeCustomInput(raw: string): string {
   return noSpace.replace(/[^가-힣]/g, "").slice(0, 4);
 }
 
-export function MemberOrCustomInput({ label, value, onChange }: Props) {
+export function MemberOrCustomInput({
+  label,
+  value,
+  onChange,
+  selectableMemberNames,
+  allowCustom = true,
+}: Props) {
   const baseId = useId();
-  const members = sortedYouthMemberLegalNames();
+  const members = useMemo(
+    () =>
+      selectableMemberNames
+        ? [...selectableMemberNames].sort((a, b) => a.localeCompare(b, "ko"))
+        : sortedYouthMemberLegalNames(),
+    [selectableMemberNames]
+  );
+  const selectableMemberSet = useMemo(() => new Set(members), [members]);
+  const resolvedMemberName = resolveYouthMemberLegalName(value);
+  const isSelectableMember =
+    resolvedMemberName !== null && selectableMemberSet.has(resolvedMemberName);
   const memberSelectValue =
-    isYouthMemberName(value) ? (resolveYouthMemberLegalName(value) ?? "") : "";
+    isSelectableMember ? (resolvedMemberName ?? "") : "";
 
   /** 값이 비어 있을 때만 탭 상태 사용(직접 입력 + 빈 칸). 값이 있으면 value에 따라 member/custom 고정 */
   const [emptyTab, setEmptyTab] = useState<"member" | "custom">("member");
 
   const mode = useMemo((): "member" | "custom" => {
+    if (!allowCustom) {
+      return "member";
+    }
     const v = value.trim();
     if (v) {
-      return isYouthMemberName(value) ? "member" : "custom";
+      return isSelectableMember ? "member" : "custom";
     }
     return emptyTab;
-  }, [value, emptyTab]);
+  }, [allowCustom, value, isSelectableMember, emptyTab]);
 
   const [customHint, setCustomHint] = useState<string | null>(null);
 
@@ -65,7 +85,7 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
             onClick={() => {
               setEmptyTab("member");
               setCustomHint(null);
-              if (!isYouthMemberName(value)) {
+              if (!isSelectableMember) {
                 onChange("");
               }
             }}
@@ -77,17 +97,19 @@ export function MemberOrCustomInput({ label, value, onChange }: Props) {
           >
             멤버 선택
           </button>
-          <button
-            type="button"
-            onClick={() => setEmptyTab("custom")}
-            className={`rounded-sm px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] ${
-              mode === "custom"
-                ? "bg-[var(--lit-bg-elevated)] text-[var(--lit-ink)] ring-1 ring-[var(--lit-border)]"
-                : "text-[var(--lit-ink-subtle)]"
-            }`}
-          >
-            직접 입력
-          </button>
+          {allowCustom ? (
+            <button
+              type="button"
+              onClick={() => setEmptyTab("custom")}
+              className={`rounded-sm px-2.5 py-1 text-[11px] font-medium transition sm:px-3 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] ${
+                mode === "custom"
+                  ? "bg-[var(--lit-bg-elevated)] text-[var(--lit-ink)] ring-1 ring-[var(--lit-border)]"
+                  : "text-[var(--lit-ink-subtle)]"
+              }`}
+            >
+              직접 입력
+            </button>
+          ) : null}
         </div>
       </div>
 

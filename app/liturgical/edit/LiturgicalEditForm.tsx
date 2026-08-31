@@ -11,6 +11,10 @@ import { MassDatePicker } from "@/app/components/liturgical/MassDatePicker";
 import { MemberOrCustomInput } from "@/app/components/liturgical/MemberOrCustomInput";
 import { FIXED_CONDUCTOR_NAME } from "@/lib/constants/liturgical";
 import {
+  isLiturgicalOrganistName,
+  LITURGICAL_ORGANIST_LEGAL_NAMES,
+} from "@/lib/constants/liturgical-organists";
+import {
   isYouthMemberName,
   isValidCustomLiturgicalName,
 } from "@/lib/constants/youth-members";
@@ -91,6 +95,13 @@ export function LiturgicalEditForm({
       ["반주", form.organist],
     ];
     for (const [label, val] of roleChecks) {
+      if (label === "반주") {
+        if (val.trim() && !isLiturgicalOrganistName(val)) {
+          setMsg("반주: 반주 가능 멤버 목록에서 선택해 주세요.");
+          return;
+        }
+        continue;
+      }
       if (!isValidRoleField(val)) {
         setMsg(
           `${label}: 멤버는 목록에서 선택하면 세례명까지 함께 저장됩니다. 직접 입력은 한글 성명만 2~4자로 적어 주세요.`
@@ -261,6 +272,8 @@ export function LiturgicalEditForm({
             label="반주"
             value={form.organist}
             onChange={(v) => setForm((f) => ({ ...f, organist: v }))}
+            selectableMemberNames={LITURGICAL_ORGANIST_LEGAL_NAMES}
+            allowCustom={false}
           />
         </div>
       </div>
