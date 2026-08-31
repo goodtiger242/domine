@@ -31,6 +31,9 @@ export const YOUTH_MEMBERS: readonly YouthMember[] = [
   { legalName: "최지수", baptismalNameKo: "스텔라" },
 ] as const;
 
+/** 휴지기 등으로 신규 선택 목록에서만 임시 숨길 멤버 */
+const HIDDEN_FROM_SELECTION_LEGAL_NAMES = new Set<string>(["도화정"]);
+
 const byLegal = new Map<string, YouthMember>(
   YOUTH_MEMBERS.map((m) => [m.legalName, m])
 );
@@ -43,6 +46,7 @@ const LEGACY_TO_LEGAL: Readonly<Record<string, string>> = {
 
 export function sortedYouthMemberLegalNames(): string[] {
   return [...YOUTH_MEMBERS]
+    .filter((m) => !HIDDEN_FROM_SELECTION_LEGAL_NAMES.has(m.legalName))
     .map((m) => m.legalName)
     .sort((a, b) => a.localeCompare(b, "ko"));
 }
