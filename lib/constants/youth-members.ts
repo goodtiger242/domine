@@ -32,7 +32,13 @@ export const YOUTH_MEMBERS: readonly YouthMember[] = [
 ] as const;
 
 /** 휴지기 등으로 신규 선택 목록에서만 임시 숨길 멤버 */
-const HIDDEN_FROM_SELECTION_LEGAL_NAMES = new Set<string>(["도화정", "안제오"]);
+const HIDDEN_FROM_SELECTION_LEGAL_NAMES = new Set<string>([
+  "김윤서",
+  "도화정",
+  "안제오",
+  "유태원",
+  "이학준",
+]);
 
 const byLegal = new Map<string, YouthMember>(
   YOUTH_MEMBERS.map((m) => [m.legalName, m])
