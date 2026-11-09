@@ -62,8 +62,7 @@ export function LandingPage({
             className="cos-stagger-2 order-2 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] px-5 py-5 md:px-10 md:py-8 lg:px-12"
           >
             <div className="mx-auto max-w-3xl">
-              <h2 className="t-heading text-[var(--lit-ink)]">우리 강아지 도미</h2>
-              <div className="mt-3 max-w-xl">
+              <div className="max-w-xl">
                 <PetGame />
               </div>
             </div>

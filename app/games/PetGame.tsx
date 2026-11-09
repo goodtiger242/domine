@@ -163,9 +163,17 @@ export function PetGame() {
     }
     const r = data as { ok: boolean; message?: string; wait?: number };
     if (!r.ok) {
-      setMessage(r.message ?? "지금은 할 수 없어요.");
-      say(r.message ?? "지금은 할 수 없어요.");
-      if (r.wait) setWait((w) => ({ ...w, [action]: r.wait! }));
+      const why = r.message ?? "지금은 할 수 없어요.";
+      setMessage(why);
+      if (r.wait) {
+        // 쉬는 중: 연출 없이 안내만
+        setWait((w) => ({ ...w, [action]: r.wait! }));
+        say(why);
+      } else {
+        // 이미 배부르거나 기분이 최고인 경우: 수치는 그대로지만 연출은 보여 주고, 이유는 연출 끝 무렵에 말한다
+        setCue({ action, id: Date.now() });
+        window.setTimeout(() => say(why), 1800);
+      }
       return;
     }
     setMessage(`${nick}님이 도미에게 ${ACTION_DONE[action]}.`);
@@ -178,23 +186,54 @@ export function PetGame() {
 
   const collar = collarToday();
 
+  const head = (
+    <div className="mb-2 flex items-center justify-between gap-3">
+      <h2 className="t-heading text-[var(--lit-ink)]">우리 강아지 도미</h2>
+      {nick ? (
+        <button
+          type="button"
+          className="t-caption shrink-0 text-[var(--lit-ink-subtle)] underline underline-offset-2"
+          onClick={() => {
+            try {
+              localStorage.removeItem(NICK_KEY);
+            } catch {
+              /* 무시 */
+            }
+            setNick("");
+            setNickInput("");
+          }}
+        >
+          별명 바꾸기
+        </button>
+      ) : null}
+    </div>
+  );
+
   if (status === "missing") {
     return (
-      <p className="t-body rounded-xl border border-dashed border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] p-4 text-[var(--lit-ink-muted)]">
-        도미를 데려오는 중이에요. 아직 준비가 끝나지 않았어요.
-      </p>
+      <div>
+        {head}
+        <p className="t-body rounded-xl border border-dashed border-[var(--lit-border-strong)] bg-[var(--lit-bg-elevated)] p-4 text-[var(--lit-ink-muted)]">
+          도미를 데려오는 중이에요. 아직 준비가 끝나지 않았어요.
+        </p>
+      </div>
     );
   }
   if (status === "error") {
     return (
-      <p className="t-body rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-4 text-[var(--lit-ink-muted)]">
-        도미를 불러오지 못했어요. 잠시 후 다시 열어 주세요.
-      </p>
+      <div>
+        {head}
+        <p className="t-body rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-4 text-[var(--lit-ink-muted)]">
+          도미를 불러오지 못했어요. 잠시 후 다시 열어 주세요.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-2.5">
+    <div>
+      {head}
+      <div className="space-y-2.5">
       <div className="relative overflow-hidden rounded-2xl border border-[var(--lit-border)] shadow-[var(--lit-paper-shadow-soft)]">
         <PetScene
           stage={stage}
@@ -256,46 +295,6 @@ export function PetGame() {
               );
             })}
           </div>
-          {message ? (
-            <p className="t-caption text-center text-[var(--lit-ink-muted)]" aria-live="polite">
-              {message}
-            </p>
-          ) : null}
-          <p className="t-caption text-center text-[var(--lit-ink-subtle)]">
-            {nick}님{streak > 1 ? ` · ${streak}일째` : ""} ·{" "}
-            <button
-              type="button"
-              className="underline underline-offset-2"
-              onClick={() => {
-                const next = !sound;
-                setSound(next);
-                try {
-                  localStorage.setItem(SOUND_KEY, next ? "1" : "0");
-                } catch {
-                  /* 무시 */
-                }
-                if (next) blip("pet");
-              }}
-            >
-              소리 {sound ? "끄기" : "켜기"}
-            </button>{" "}
-            ·{" "}
-            <button
-              type="button"
-              className="underline underline-offset-2"
-              onClick={() => {
-                try {
-                  localStorage.removeItem(NICK_KEY);
-                } catch {
-                  /* 무시 */
-                }
-                setNick("");
-                setNickInput("");
-              }}
-            >
-              별명 바꾸기
-            </button>
-          </p>
         </>
       ) : (
         <form
@@ -365,6 +364,7 @@ export function PetGame() {
           </div>
         </details>
       ) : null}
+      </div>
     </div>
   );
 }
