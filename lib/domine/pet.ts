@@ -98,6 +98,7 @@ export function sanitizeNickname(raw: string): string {
 }
 
 import { getSundayLiturgy } from "@/lib/liturgical/sunday-names";
+import { line } from "@/lib/domine/pet-lines";
 
 const LITURGY_COLOR: Record<string, { hex: string; name: string }> = {
   녹: { hex: "#2f8f57", name: "초록" },
@@ -119,25 +120,8 @@ export function collarToday(now = new Date()) {
   return { hex: c.hex, colorName: c.name, liturgy: l?.name ?? "" };
 }
 
-const SAYS: Record<string, string[]> = {
-  happy: [
-    "오늘도 와 줘서 고마워요!",
-    "같이 있으니 좋아요.",
-    "꼬리가 절로 흔들려요.",
-    "산책 가고 싶은 날씨예요.",
-    "오늘은 뭐 하고 놀까요?",
-    "킁킁, 좋은 냄새가 나요.",
-    "멍! 반가워요!",
-    "배를 쓰다듬어도 돼요.",
-  ],
-  hungry: ["배에서 소리가 나요…", "맛있는 거 주세요.", "밥그릇이 텅 비었어요.", "꼬르륵…"],
-  sad: ["조금 심심해요.", "쓰다듬어 주면 좋겠어요.", "같이 놀아 줄래요?", "낑…"],
-  dirty: ["몸이 간질간질해요.", "목욕하고 싶어요.", "털이 꼬질꼬질해요.", "씻겨 주세요!"],
-  sleepy: ["쿨쿨… 조금만 더 잘게요.", "꿈에서 산책 중이에요.", "음냐음냐…", "하품이 나와요."],
-};
-export function saysText(face: string, seed = Math.floor(Math.random() * 1000)): string {
-  const list = SAYS[face] ?? SAYS.happy;
-  return list[seed % list.length];
+export function saysText(face: string): string {
+  return line(`idle_${face}`) || line("idle_happy");
 }
 
 /** 이 기기에서 연속으로 돌본 날 수 (localStorage) */

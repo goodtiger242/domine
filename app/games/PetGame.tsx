@@ -20,6 +20,7 @@ import {
   type PetAction,
   type PetState,
 } from "@/lib/domine/pet";
+import { rejectLine } from "@/lib/domine/pet-lines";
 import { currentHour } from "@/lib/domine/sky";
 import { PetScene } from "./PetScene";
 
@@ -71,6 +72,22 @@ export function PetGame() {
   const [streak, setStreak] = useState(0);
   const [bubble, setBubble] = useState("");
   const [dogX, setDogX] = useState(78);
+  const [sceneBusy, setSceneBusy] = useState(false);
+  const sceneBusyRef = useRef(false);
+  const startScene = useCallback((action: PetAction) => {
+    sceneBusyRef.current = true;
+    setSceneBusy(true);
+    setCue({ action, id: Date.now() });
+    // 혹시 끝 신호를 놓쳐도 영원히 잠기지 않게 안전장치
+    window.setTimeout(() => {
+      sceneBusyRef.current = false;
+      setSceneBusy(false);
+    }, 14000);
+  }, []);
+  const endScene = useCallback(() => {
+    sceneBusyRef.current = false;
+    setSceneBusy(false);
+  }, []);
   const sayUntil = useRef(0);
 
   const say = useCallback((text: string) => {
@@ -152,7 +169,7 @@ export function PetGame() {
   }
 
   async function care(action: PetAction) {
-    if (busy || !nick) return;
+    if (busy || !nick || sceneBusyRef.current) return;
     setBusy(true);
     setMessage("");
     const { data, error } = await supabase.current.rpc("domine_pet_care", { p_nickname: nick, p_action: action });
@@ -168,11 +185,11 @@ export function PetGame() {
       if (r.wait) {
         // 쉬는 중: 연출 없이 안내만
         setWait((w) => ({ ...w, [action]: r.wait! }));
-        say(why);
+        say(rejectLine(why));
       } else {
         // 이미 배부르거나 기분이 최고인 경우: 수치는 그대로지만 연출은 보여 주고, 이유는 연출 끝 무렵에 말한다
-        setCue({ action, id: Date.now() });
-        window.setTimeout(() => say(why), 1800);
+        startScene(action);
+        window.setTimeout(() => say(rejectLine(why)), 1800);
       }
       return;
     }
@@ -180,7 +197,7 @@ export function PetGame() {
     setStreak(bumpStreak());
     navigator.vibrate?.(25);
     if (sound) blip(action);
-    setCue({ action, id: Date.now() });
+    startScene(action);
     load(nick);
   }
 
@@ -244,6 +261,7 @@ export function PetGame() {
           cue={cue}
           onSay={say}
           onMove={setDogX}
+          onDone={endScene}
         />
         <div className="pointer-events-none absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-white backdrop-blur-sm">
           <span className="text-[13px] font-semibold leading-none">도미</span>
@@ -279,7 +297,7 @@ export function PetGame() {
                   key={a}
                   type="button"
                   onClick={() => care(a)}
-                  disabled={busy || w > 0 || status !== "ready"}
+                  disabled={busy || sceneBusy || w > 0 || status !== "ready"}
                   className="flex min-h-[3.4rem] flex-col items-center justify-center rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-1 py-1 text-[var(--lit-ink)] transition duration-150 active:scale-[0.96] enabled:hover:border-[var(--lit-border-strong)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
                 >
                   <span className="flex items-center gap-1 leading-none">

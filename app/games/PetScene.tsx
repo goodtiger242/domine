@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PetAction, PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
+import { line } from "@/lib/domine/pet-lines";
 import { DOG_W, PetBowl, PetDog, RATIO } from "./PetDog";
 
 /**
@@ -43,22 +44,15 @@ const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const depth = (y: number) => 0.84 + ((y - 76) / 13) * 0.2;
 
-const CARRY_LINES: Record<Carry, string[]> = {
-  mouth: ["물었다!", "잡았다!"],
-  back: ["등에 얹었어요!", "균형 잡는 중…"],
-  tail: ["꼬리에 걸었어요!", "살랑살랑~"],
-  head: ["머리에 올렸어요!", "안 떨어뜨릴 거예요."],
-};
-
 function makePlan(action: PetAction | "tap", w: number): Plan {
   const h = w * RATIO;
 
   if (action === "tap") {
     return {
       steps: pick<[number, Patch][]>([
-        [[0, { motion: "pet-flip", say: pick(["으랏차!", "공중제비!", "와!", "짜잔!"]) }]],
-        [[0, { motion: "pet-hop", say: pick(["깡충!", "신난다!", "멍!"]) }]],
-        [[0, { say: "빙글빙글!", dir: -1, dur: 260 }], [280, { dir: 1, dur: 260 }], [560, { dir: -1, dur: 260 }], [840, { dir: 1, dur: 260 }]],
+        [[0, { motion: "pet-flip", say: line("tap_flip") }]],
+        [[0, { motion: "pet-hop", say: line("tap_hop") }]],
+        [[0, { say: line("tap_spin"), dir: -1, dur: 260 }], [280, { dir: 1, dur: 260 }], [560, { dir: -1, dur: 260 }], [840, { dir: 1, dur: 260 }]],
       ]),
       end: 1100,
     };
@@ -90,7 +84,7 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
     const roll = d * rnd(4, 12);
     const bounce = Math.random() < 0.5;
     const steps: [number, Patch][] = [
-      [0, { dir: d, dur: 250, motion: "pet-hop", ball: { x: L.x + d * 8, y: L.y - h * 0.7, dur: 0 }, say: pick(["던진다!", "간다~", "받아라!", "멀리 던질게!"]) }],
+      [0, { dir: d, dur: 250, motion: "pet-hop", ball: { x: L.x + d * 8, y: L.y - h * 0.7, dur: 0 }, say: line("throw") }],
       [140, { ball: { x: (L.x + tx) / 2, y: apex, dur: fly / 2 } }],
       [140 + fly / 2, { ball: { x: tx, y: ty - 2, dur: fly / 2 } }],
     ];
@@ -105,7 +99,7 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
     const bring = (from: number, mode: Carry, atX: number, atY: number): [number, Patch][] => {
       const out: [number, Patch][] = [];
       let u = from;
-      out.push([u, { ball: null, carry: mode, motion: "pet-hop", say: pick(CARRY_LINES[mode]) }]);
+      out.push([u, { ball: null, carry: mode, motion: "pet-hop", say: line(`carry_${mode}`) }]);
       u += 500;
       const rx = clamp(L.x + rnd(-16, 16), 14, 146);
       const ry = rnd(77, 88);
@@ -114,22 +108,22 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
       out.push([u, { x: rx, y: ry, dir: bd, dur: m, motion: "pet-trot" }]);
       u += m + 60;
       if (mode === "mouth") {
-        out.push([u, { carry: null, ball: { x: rx + bd * w * 0.5, y: ry - 2, dur: 0 }, motion: "pet-hop", say: pick(["가져왔어요!", "또 던져 줘요!", "칭찬해 주세요!"]) }]);
+        out.push([u, { carry: null, ball: { x: rx + bd * w * 0.5, y: ry - 2, dur: 0 }, motion: "pet-hop", say: line("drop_mouth") }]);
         u += 900;
       } else if (mode === "back") {
-        out.push([u, { motion: "pet-shake", say: "부르르~" }]);
+        out.push([u, { motion: "pet-shake", say: line("shake") }]);
         out.push([u + 450, { carry: null, ball: { x: rx - bd * 5, y: ry - h * 0.9, dur: 0 } }]);
-        out.push([u + 500, { ball: { x: rx - bd * 12, y: ry - 2, dur: 380 }, motion: "pet-hop", say: "짜잔!" }]);
+        out.push([u + 500, { ball: { x: rx - bd * 12, y: ry - 2, dur: 380 }, motion: "pet-hop", say: line("drop_back") }]);
         u += 1300;
       } else if (mode === "tail") {
-        out.push([u, { motion: "pet-wiggle", say: "꼬리로 던질게요!" }]);
+        out.push([u, { motion: "pet-wiggle", say: line("drop_tail") }]);
         out.push([u + 550, { carry: null, ball: { x: rx - bd * w * 0.47, y: ry - h * 0.33, dur: 0 } }]);
-        out.push([u + 570, { ball: { x: rx - bd * (w * 0.47 + rnd(14, 28)), y: ry - 2, dur: 520 }, motion: "pet-hop", say: "슝~!" }]);
+        out.push([u + 570, { ball: { x: rx - bd * (w * 0.47 + rnd(14, 28)), y: ry - 2, dur: 520 }, motion: "pet-hop", say: line("drop_tail_end") }]);
         u += 1500;
       } else {
-        out.push([u, { motion: "pet-nuzzle", say: "착지 준비!" }]);
+        out.push([u, { motion: "pet-nuzzle", say: line("drop_head") }]);
         out.push([u + 650, { carry: null, ball: { x: rx + bd * w * 0.3, y: ry - h * 0.98, dur: 0 } }]);
-        out.push([u + 700, { ball: { x: rx + bd * w * 0.62, y: ry - 2, dur: 400 }, motion: "pet-hop", say: "가져왔어요!" }]);
+        out.push([u + 700, { ball: { x: rx + bd * w * 0.62, y: ry - 2, dur: 400 }, motion: "pet-hop", say: line("drop_mouth") }]);
         u += 1500;
       }
       out.push([u, { motion: null }]);
@@ -138,14 +132,14 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
     const mode = pick<Carry>(["mouth", "mouth", "mouth", "back", "tail", "head"]);
     const r = Math.random();
     if (r < 0.7) {
-      steps.push([t, { x: gx, y: ty, dir: d, dur: runMs(gx - L.x), motion: "pet-trot", say: "공이다!" }]);
+      steps.push([t, { x: gx, y: ty, dir: d, dur: runMs(gx - L.x), motion: "pet-trot", say: line("run") }]);
       const arrive = t + runMs(gx - L.x) + 60;
       const got = bring(arrive, mode, gx, ty);
       steps.push(...got);
       return mk(steps, got[got.length - 1][0] + 400);
     }
     if (r < 0.8) {
-      steps.push([t, { dir: (-d) as Dir, dur: 400, say: pick(["흥, 안 가져올래.", "공은 관심 없어요.", "귀찮아요~"]) }]);
+      steps.push([t, { dir: (-d) as Dir, dur: 400, say: line("ignore") }]);
       steps.push([t + 700, { motion: "pet-lie" }]);
       steps.push([t + 2000, { ball: null, motion: null }]);
       return mk(steps, t + 2500);
@@ -154,15 +148,15 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
       const edge = d > 0 ? 154 : 6;
       steps.push([t, { x: gx, y: ty, dir: d, dur: runMs(gx - L.x), motion: "pet-trot" }]);
       const a = t + runMs(gx - L.x) + 60;
-      steps.push([a, { ball: null, say: pick(["내 거야!", "안 돌려줄 거예요!"]) }]);
+      steps.push([a, { ball: null, say: line("steal") }]);
       steps.push([a + 50, { x: edge, dur: 800 }]);
-      steps.push([a + 950, { dir: (-d) as Dir, x: clamp(L.x + rnd(-20, 20), 14, 146), y: rnd(77, 88), dur: 1100, say: "메롱~" }]);
+      steps.push([a + 950, { dir: (-d) as Dir, x: clamp(L.x + rnd(-20, 20), 14, 146), y: rnd(77, 88), dur: 1100, say: line("steal_end") }]);
       return mk(steps, a + 2400);
     }
     const t2 = clamp(bx + d * rnd(18, 32), 16, 144);
-    steps.push([t, { x: gx, y: ty, dir: d, dur: runMs(gx - L.x), motion: "pet-trot", say: "공이다!" }]);
+    steps.push([t, { x: gx, y: ty, dir: d, dur: runMs(gx - L.x), motion: "pet-trot", say: line("run") }]);
     const a2 = t + runMs(gx - L.x);
-    steps.push([a2 - 200, { ball: { x: t2, y: ty - 2, dur: 450 }, say: "어어?" }]);
+    steps.push([a2 - 200, { ball: { x: t2, y: ty - 2, dur: 450 }, say: line("fumble") }]);
     const g2 = clamp(t2 - d * w * 0.4, 12, 148);
     steps.push([a2 + 50, { x: g2, dur: 600 }]);
     const got = bring(a2 + 700, mode, g2, ty);
@@ -172,11 +166,11 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
 
   if (action === "pet") {
     const spots = {
-      head: { lx: 0.36, ly: -0.95, m: "pet-nuzzle", say: ["머리 쓰다듬는 거 좋아요!", "헤헤, 좋아요~"] },
-      back: { lx: 0, ly: -0.66, m: "pet-wiggle", say: ["등 쓰다듬어 주니 시원해요.", "그 자리예요!"] },
-      rump: { lx: -0.38, ly: -0.6, m: "pet-wiggle", say: ["엉덩이 토닥토닥~", "꼬리가 신나요!"] },
-      chin: { lx: 0.44, ly: -0.45, m: "pet-nuzzle", say: ["턱 밑이 제일 좋아요.", "으으~ 시원해요."] },
-      belly: { lx: 0, ly: -0.18, m: "pet-roll", say: ["배도 쓰다듬어 주세요!", "배 보여 줄게요!"] },
+      head: { lx: 0.36, ly: -0.95, m: "pet-nuzzle", say: "pet_head" },
+      back: { lx: 0, ly: -0.66, m: "pet-wiggle", say: "pet_back" },
+      rump: { lx: -0.38, ly: -0.6, m: "pet-wiggle", say: "pet_rump" },
+      chin: { lx: 0.44, ly: -0.45, m: "pet-nuzzle", say: "pet_chin" },
+      belly: { lx: 0, ly: -0.18, m: "pet-roll", say: "pet_belly" },
     };
     const order = (["head", "back", "rump", "chin", "belly"] as const).slice().sort(() => Math.random() - 0.5);
     const count = Math.random() < 0.45 ? 2 : 1;
@@ -191,7 +185,7 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
       if (key === "belly") steps.push([t, { motion: sp.m }]);
       steps.push([t + lead2 - 100, { hand: hand(p.x + 8, p.y - 26, 0, false) }]);
       steps.push([t + lead2, { hand: hand(p.x, p.y - 4, 380, false) }]);
-      steps.push([t + lead2 + 400, { hand: hand(p.x, p.y - 4, 0, true), motion: sp.m, fx: ["hearts"], say: pick(sp.say) }]);
+      steps.push([t + lead2 + 400, { hand: hand(p.x, p.y - 4, 0, true), motion: sp.m, fx: ["hearts"], say: line(sp.say) }]);
       steps.push([t + lead2 + 1500, { hand: hand(p.x + 8, p.y - 26, 400, false), fx: [] }]);
       t += lead2 + 1800;
     }
@@ -208,24 +202,24 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
     const fall: [number, Patch][] =
       variant === "spill"
         ? [
-            [0, { item: { e: food, x: bx, y: L.y - 40, dur: 0, size: 10 }, say: "와르르~" }],
+            [0, { item: { e: food, x: bx, y: L.y - 40, dur: 0, size: 10 }, say: line("feed_spill") }],
             [120, { item: { e: food, x: bx, y: L.y - 2, dur: 420, size: 10 } }],
           ]
         : [
-            [0, { bowl: bx, item: { e: food, x: bx, y: L.y - 34, dur: 0, size: 10 }, say: "밥이다!" }],
+            [0, { bowl: bx, item: { e: food, x: bx, y: L.y - 34, dur: 0, size: 10 }, say: line("feed_start") }],
             [150, { item: { e: food, x: bx, y: L.y - 9, dur: 380, size: 10 } }],
           ];
     const go: [number, Patch][] = run ? [[650, { x: gx, dir: L.d, dur: run, motion: "pet-trot" }]] : [];
     const e0 = 650 + run + (run ? 60 : 0);
     if (variant === "picky") {
       return mk([...fall,
-        [e0, { dir: (-L.d) as Dir, dur: 300, motion: "pet-shake", say: "흠… 킁킁" }],
-        [e0 + 800, { dir: L.d, dur: 300, motion: "pet-eatnod", say: "…맛있네?" }],
-        [e0 + 2400, { item: null, bowl: null, motion: null, say: "잘 먹었습니다!" }]], e0 + 2800);
+        [e0, { dir: (-L.d) as Dir, dur: 300, motion: "pet-shake", say: line("feed_picky1") }],
+        [e0 + 800, { dir: L.d, dur: 300, motion: "pet-eatnod", say: line("feed_picky2") }],
+        [e0 + 2400, { item: null, bowl: null, motion: null, say: line("feed_done") }]], e0 + 2800);
     }
     return mk([...fall, ...go,
       [e0, { motion: "pet-eatnod" }],
-      [e0 + 1700, { item: null, bowl: null, motion: null, say: pick(["잘 먹었습니다!", "냠냠, 맛있다!", "꺼억~", "더 주세요!"]) }]], e0 + 2200);
+      [e0 + 1700, { item: null, bowl: null, motion: null, say: line("feed_done") }]], e0 + 2200);
   }
 
   if (action === "treat") {
@@ -234,27 +228,27 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
     const ix = P(w * 0.3, 0).x;
     if (variant === "catch") {
       return mk([
-        [0, { item: { e, x: ix, y: L.y - h - 22, dur: 0, size: 10 }, say: "간식이다!" }],
+        [0, { item: { e, x: ix, y: L.y - h - 22, dur: 0, size: 10 }, say: line("treat_start") }],
         [100, { item: { e, x: ix, y: L.y - h * 0.75, dur: 450, size: 10 }, motion: "pet-hop" }],
-        [650, { item: null, say: pick(["냠!", "공중에서 잡았다!"]) }],
+        [650, { item: null, say: line("treat_catch") }],
         [1300, { motion: null }]], 1700);
     }
     if (variant === "sit") {
       return mk([
-        [0, { item: { e, x: ix, y: L.y - h - 22, dur: 0, size: 10 }, say: "간식이다!" }],
+        [0, { item: { e, x: ix, y: L.y - h - 22, dur: 0, size: 10 }, say: line("treat_start") }],
         [100, { item: { e, x: ix, y: L.y - 3, dur: 520, size: 10 } }],
-        [700, { motion: "pet-sit", say: "기다려… 앉아!" }],
-        [1500, { item: null, motion: "pet-eatnod", say: "냠냠!" }],
+        [700, { motion: "pet-sit", say: line("treat_sit") }],
+        [1500, { item: null, motion: "pet-eatnod", say: line("treat_eat") }],
         [2500, { motion: null }]], 2800);
     }
     if (variant === "tease") {
       const hy = L.y - h - 14;
       return mk([
-        [0, { item: { e, x: ix, y: hy, dur: 0, size: 10 }, say: "자, 간다~" }],
-        [200, { item: { e, x: ix, y: hy - 6, dur: 300, size: 10 }, motion: "pet-hop", say: "점프!" }],
-        [900, { item: { e, x: ix, y: hy + 2, dur: 300, size: 10 }, say: "아깝다!" }],
-        [1500, { item: { e, x: ix, y: L.y - h * 0.75, dur: 300, size: 10 }, say: "한 번 더!" }],
-        [1900, { item: null, say: "냠!" }],
+        [0, { item: { e, x: ix, y: hy, dur: 0, size: 10 }, say: line("treat_tease") }],
+        [200, { item: { e, x: ix, y: hy - 6, dur: 300, size: 10 }, motion: "pet-hop", say: line("treat_jump") }],
+        [900, { item: { e, x: ix, y: hy + 2, dur: 300, size: 10 }, say: line("treat_miss") }],
+        [1500, { item: { e, x: ix, y: L.y - h * 0.75, dur: 300, size: 10 }, say: line("treat_again") }],
+        [1900, { item: null, say: line("treat_catch") }],
         [2500, { motion: null }]], 2800);
     }
     const tx = clamp(L.x + L.d * rnd(26, 56), 14, 146);
@@ -262,11 +256,11 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
     const gx = clamp(tx - L.d * w * 0.4, 12, 148);
     const m = runMs(gx - L.x);
     return mk([
-      [0, { item: { e, x: L.x + L.d * 6, y: L.y - h * 0.7, dur: 0, size: 10 }, say: "받아라!" }],
+      [0, { item: { e, x: L.x + L.d * 6, y: L.y - h * 0.7, dur: 0, size: 10 }, say: line("treat_throw") }],
       [100, { item: { e, x: (L.x + tx) / 2, y: L.y - h - 14, dur: 350, size: 10 } }],
       [450, { item: { e, x: tx, y: ty - 2, dur: 350, size: 10 } }],
-      [850, { x: gx, y: ty, dur: m, motion: "pet-trot", say: "내 거야!" }],
-      [850 + m + 60, { item: null, motion: "pet-eatnod", say: "냠냠!" }],
+      [850, { x: gx, y: ty, dur: m, motion: "pet-trot", say: line("treat_fetch") }],
+      [850 + m + 60, { item: null, motion: "pet-eatnod", say: line("treat_eat") }],
       [850 + m + 1500, { motion: null }]], 850 + m + 1800);
   }
 
@@ -280,13 +274,13 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
       const seq = (i % 2 === 0) !== flip ? base : [...base].reverse();
       xs.push(...seq);
     }
-    const steps: [number, Patch][] = [[0, { motion: "pet-wiggle", say: pick(["빗질 시원해요!", "털이 반짝반짝~", "엉킨 털이 풀려요.", "더 해 주세요!"]) }]];
+    const steps: [number, Patch][] = [[0, { motion: "pet-wiggle", say: line("brush_start") }]];
     xs.forEach((lx, i) => {
       const p = P(w * lx, ly);
       steps.push([300 + i * 240, { item: { e: "🪮", x: p.x, y: p.y - 3, dur: i === 0 ? 0 : 220, size: 12 } }]);
     });
     const end = 300 + xs.length * 240;
-    steps.push([end, { item: null, fx: ["sparkle"], motion: null, say: pick(["반질반질해졌어요!", "윤기가 좔좔~"]) }]);
+    steps.push([end, { item: null, fx: ["sparkle"], motion: null, say: line("brush_end") }]);
     return mk(steps, end + 900);
   }
 
@@ -295,69 +289,69 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
     const top = L.y - h - 8;
     if (variant === "soap") {
       return mk([
-        [0, { item: { e: "🧴", x: P(0, 0).x, y: top, dur: 0, size: 13 }, say: "비누칠 시작!" }],
-        [500, { fx: ["bubbles"], motion: "pet-wiggle", say: "거품이 간질간질!" }],
-        [1700, { item: { e: "🚿", x: P(0, 0).x, y: top - 2, dur: 0, size: 15 }, fx: ["drops", "bubbles"], motion: null, say: "헹구는 중~" }],
-        [2800, { item: null, fx: ["spray"], motion: "pet-shake", say: "부르르르~" }],
-        [3700, { fx: [], motion: null, say: pick(["뽀송뽀송!", "개운해요!"]) }]], 4200);
+        [0, { item: { e: "🧴", x: P(0, 0).x, y: top, dur: 0, size: 13 }, say: line("bath_soap") }],
+        [500, { fx: ["bubbles"], motion: "pet-wiggle", say: line("bath_foam") }],
+        [1700, { item: { e: "🚿", x: P(0, 0).x, y: top - 2, dur: 0, size: 15 }, fx: ["drops", "bubbles"], motion: null, say: line("bath_rinse") }],
+        [2800, { item: null, fx: ["spray"], motion: "pet-shake", say: line("bath_shake") }],
+        [3700, { fx: [], motion: null, say: line("bath_done") }]], 4200);
     }
     const bucket = variant === "bucket";
     return mk([
-      [0, { item: { e: bucket ? "🪣" : "🚿", x: P(0, 0).x - L.d * 6, y: top - 2, dur: 0, size: 15 }, say: bucket ? "물 붓는다~" : "샤워 시작!" }],
+      [0, { item: { e: bucket ? "🪣" : "🚿", x: P(0, 0).x - L.d * 6, y: top - 2, dur: 0, size: 15 }, say: line(bucket ? "bath_bucket" : "bath_shower") }],
       [500, { fx: ["drops"] }],
-      [1500, { fx: ["drops", "bubbles"], say: pick(["거품이 간질간질!", "으~ 시원해요!"]) }],
-      [2400, { item: null, fx: ["spray"], motion: "pet-shake", say: "부르르르~" }],
-      [3300, { fx: [], motion: null, say: pick(["뽀송뽀송!", "개운해요!"]) }]], 3800);
+      [1500, { fx: ["drops", "bubbles"], say: line("bath_foam") }],
+      [2400, { item: null, fx: ["spray"], motion: "pet-shake", say: line("bath_shake") }],
+      [3300, { fx: [], motion: null, say: line("bath_done") }]], 3800);
   }
 
   if (action === "train") {
     const k2 = pick(["sit", "paw", "spin", "roll", "jump", "bow", "dead"] as const);
     const top = L.y - h - 8;
-    const bone = (t: number): [number, Patch] => [t, { hand: null, item: { e: "🦴", x: P(w * 0.4, 0).x, y: L.y - h * 0.6, dur: 0, size: 9 }, say: pick(["잘했어!", "착하다!", "최고!"]) }];
+    const bone = (t: number): [number, Patch] => [t, { hand: null, item: { e: "🦴", x: P(w * 0.4, 0).x, y: L.y - h * 0.6, dur: 0, size: 9 }, say: line("train_reward") }];
     if (k2 === "sit") {
       return mk([
-        [0, { hand: { x: P(w * 0.3, 0).x, y: top, dur: 0, rot: 0, stroke: false, e: "☝️" }, say: "앉아!" }],
+        [0, { hand: { x: P(w * 0.3, 0).x, y: top, dur: 0, rot: 0, stroke: false, e: "☝️" }, say: line("train_sit") }],
         [400, { motion: "pet-sit" }], bone(1500), [2100, { item: null, motion: null }]], 2600);
     }
     if (k2 === "paw") {
       const p = P(w * 0.66, h * -0.3);
       return mk([
-        [0, { hand: { x: p.x + L.d * 14, y: p.y, dur: 0, rot: 0, stroke: false, e: "✋" }, say: "손!" }],
+        [0, { hand: { x: p.x + L.d * 14, y: p.y, dur: 0, rot: 0, stroke: false, e: "✋" }, say: line("train_paw") }],
         [300, { hand: { x: p.x, y: p.y, dur: 300, rot: 0, stroke: false, e: "✋" }, motion: "pet-hop" }],
         [900, { hand: { x: p.x, y: p.y, dur: 0, rot: 0, stroke: true, e: "✋" }, motion: "pet-wiggle" }],
         bone(1900), [2500, { item: null, motion: null }]], 3000);
     }
     if (k2 === "spin") {
       return mk([
-        [0, { say: "빙글빙글!" }],
+        [0, { say: line("train_spin") }],
         [150, { dir: (-L.d) as Dir, dur: 280 }], [550, { dir: L.d, dur: 280 }],
         [950, { dir: (-L.d) as Dir, dur: 280 }], [1350, { dir: L.d, dur: 280 }],
         bone(1750), [2350, { item: null }]], 2800);
     }
     if (k2 === "roll") {
-      return mk([[0, { say: "구르기!" }], [300, { motion: "pet-flip" }], [1300, { motion: null }], bone(1500), [2100, { item: null }]], 2600);
+      return mk([[0, { say: line("train_roll") }], [300, { motion: "pet-flip" }], [1300, { motion: null }], bone(1500), [2100, { item: null }]], 2600);
     }
     if (k2 === "jump") {
-      return mk([[0, { say: "점프!" }], [250, { motion: "pet-hop" }], [1500, { motion: null }], bone(1700), [2300, { item: null }]], 2700);
+      return mk([[0, { say: line("train_jump") }], [250, { motion: "pet-hop" }], [1500, { motion: null }], bone(1700), [2300, { item: null }]], 2700);
     }
     if (k2 === "bow") {
-      return mk([[0, { say: "인사!" }], [250, { motion: "pet-eatnod" }], [1700, { motion: null }], bone(1900), [2500, { item: null }]], 2900);
+      return mk([[0, { say: line("train_bow") }], [250, { motion: "pet-eatnod" }], [1700, { motion: null }], bone(1900), [2500, { item: null }]], 2900);
     }
-    return mk([[0, { say: "빵! 죽은 척~" }], [300, { motion: "pet-roll" }], [2800, { motion: null, say: "살아났다!" }], bone(3100), [3700, { item: null }]], 4100);
+    return mk([[0, { say: line("train_dead") }], [300, { motion: "pet-roll" }], [2800, { motion: null, say: line("train_alive") }], bone(3100), [3700, { item: null }]], 4100);
   }
 
   // walk: 가끔 나비나 새를 만난다
   const bug = pick(["🦋", "🐦", null, null]);
   const steps: [number, Patch][] = [
-    [0, { scroll: true, motion: "pet-trot", say: "산책 나가요!" }],
-    [1400, { say: pick(["풀 냄새~", "바람이 좋아요!", "멍멍!"]) }],
-    [2700, { say: pick(["저기 가 봐요!", "신난다!", "헥헥~"]) }],
+    [0, { scroll: true, motion: "pet-trot", say: line("walk_start") }],
+    [1400, { say: line("walk_mid1") }],
+    [2700, { say: line("walk_mid2") }],
   ];
   if (bug) {
     const by = rnd(44, 66);
     steps.push([700, { item: { e: bug, x: -8, y: by, dur: 0, size: 9 } }]);
     steps.push([760, { item: { e: bug, x: 168, y: by - 8, dur: 3000, size: 9 } }]);
-    steps.push([1200, { motion: "pet-hop", say: bug === "🦋" ? "나비다!" : "새다!" }]);
+    steps.push([1200, { motion: "pet-hop", say: line(bug === "🦋" ? "walk_butterfly" : "walk_bird") }]);
     steps.push([1900, { motion: "pet-trot" }]);
     steps.push([3800, { item: null }]);
   }
@@ -375,17 +369,21 @@ type Props = {
   onSay: (text: string) => void;
   /** 한쪽에 말풍선을 두려고 도미의 가로 위치를 알려 준다 */
   onMove?: (x: number) => void;
+  /** 연출이 끝났을 때 */
+  onDone?: () => void;
 };
 
-export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove }: Props) {
+export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove, onDone }: Props) {
   const [s, setS] = useState<S>(HOME);
   const timers = useRef<number[]>([]);
-  const latest = useRef({ stage, onSay, onMove });
-  latest.current = { stage, onSay, onMove };
+  const latest = useRef({ stage, onSay, onMove, onDone });
+  latest.current = { stage, onSay, onMove, onDone };
+  const running = useRef(false);
 
   function run(plan: Plan) {
     timers.current.forEach(window.clearTimeout);
     timers.current = [];
+    running.current = true;
     plan.steps.forEach(([t, patch]) => {
       timers.current.push(
         window.setTimeout(() => {
@@ -399,6 +397,8 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove 
     timers.current.push(
       window.setTimeout(() => {
         setS((prev) => ({ ...HOME, x: prev.x, y: prev.y, dir: prev.dir, dur: 400 }));
+        running.current = false;
+        latest.current.onDone?.();
       }, plan.end)
     );
   }
@@ -485,7 +485,10 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove 
           motion={s.motion}
           light={light}
           collar={collar}
-          onTap={() => run(makePlan("tap", w))}
+          onTap={() => {
+            // 한 연출이 끝나기 전에는 다른 연출을 시작하지 않는다
+            if (!running.current) run(makePlan("tap", w));
+          }}
         />
       </g>
 
