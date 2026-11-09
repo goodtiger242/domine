@@ -7,7 +7,6 @@ import {
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteHeader } from "@/app/components/layout/SiteHeader";
 import { getTodayISO } from "@/lib/date/local";
-import { litDisplay } from "@/lib/fonts/display";
 import { SITE_NAV_EDIT } from "@/lib/nav/site-nav";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +38,7 @@ export default async function LiturgicalEditPage({
               관리
             </p>
             <h1
-              className={`${litDisplay.className} mt-4 text-3xl font-semibold tracking-tight text-[var(--lit-ink)] md:text-4xl`}
+              className="mt-4 text-3xl font-medium tracking-[-0.03em] text-[var(--lit-ink)] md:text-4xl"
             >
               전례 봉사 편집
             </h1>

@@ -150,11 +150,6 @@ export function LiturgicalScheduleCard({
             }
           >
             {formatDateLabel(schedule.liturgy_date)}
-            {enrich && emphasize ? (
-              <span className="rounded-sm bg-[var(--lit-ink)] px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-[0.04em] text-[var(--lit-bg-elevated)]">
-                다가오는 미사
-              </span>
-            ) : null}
           </p>
           {liturgy ? (
             <p className="mt-1.5 flex items-center gap-2 text-lg font-semibold leading-snug tracking-[-0.02em] text-[var(--lit-ink)]">

@@ -10,6 +10,7 @@ import {
 import { MassDatePicker } from "@/app/components/liturgical/MassDatePicker";
 import { MemberOrCustomInput } from "@/app/components/liturgical/MemberOrCustomInput";
 import { FIXED_CONDUCTOR_NAME } from "@/lib/constants/liturgical";
+import { defaultAnnouncementTitle } from "@/lib/liturgical/announcement-template";
 import {
   isLiturgicalOrganistName,
   LITURGICAL_ORGANIST_LEGAL_NAMES,
@@ -230,7 +231,7 @@ export function LiturgicalEditForm({
 
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-8">
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,34rem)_1fr] xl:grid-cols-[minmax(0,44rem)_1fr] 2xl:grid-cols-[minmax(0,52rem)_1fr] lg:items-start">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,26rem)_1fr] lg:items-start">
         <MassDatePicker
           value={liturgyDate}
           onChange={onDateChange}
@@ -248,7 +249,7 @@ export function LiturgicalEditForm({
                 setForm((f) => ({ ...f, title: e.target.value }))
               }
               className={fieldClass}
-              placeholder="선택 사항입니다"
+              placeholder={`${defaultAnnouncementTitle(liturgyDate)} (비우면 자동)`}
             />
           </div>
 
@@ -264,16 +265,16 @@ export function LiturgicalEditForm({
                   announcement_detail: e.target.value,
                 }))
               }
-              rows={8}
+              rows={10}
               className={fieldClass}
-              placeholder="투표 마감, 연습 일정 등 자유롭게 입력"
+              placeholder="투표 마감, 연습 일정 등 자유롭게 입력 (비우면 담당자로 📌·🙏·📍 안내문이 자동 표시됩니다)"
             />
           </div>
         </div>
       </div>
 
       <div className="space-y-6 border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-ink-subtle)]">
+        <h2 className="text-sm font-semibold tracking-[-0.01em] text-[var(--lit-ink)]">
           전례 봉사
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -308,7 +309,7 @@ export function LiturgicalEditForm({
       </div>
 
       <div className="space-y-6 border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-ink-subtle)]">
+        <h2 className="text-sm font-semibold tracking-[-0.01em] text-[var(--lit-ink)]">
           복사단
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -328,15 +329,17 @@ export function LiturgicalEditForm({
       </div>
 
       <div className="space-y-6 border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] p-5 sm:p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--lit-ink-subtle)]">
+        <h2 className="text-sm font-semibold tracking-[-0.01em] text-[var(--lit-ink)]">
           지휘 · 반주
         </h2>
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-xs font-medium text-[var(--lit-ink-muted)]">
-              지휘
-            </label>
-            <p className="mt-0.5 border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 py-2.5 text-sm text-[var(--lit-ink)]">
+            <div className="flex min-h-7 items-center">
+              <label className="text-xs font-medium text-[var(--lit-ink-muted)]">
+                지휘
+              </label>
+            </div>
+            <p className="mt-0.5 flex h-[2.65rem] items-center border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 text-sm text-[var(--lit-ink)]">
               {FIXED_CONDUCTOR_NAME}
             </p>
           </div>
@@ -357,7 +360,7 @@ export function LiturgicalEditForm({
         <button
           type="submit"
           disabled={pending}
-          className="h-12 flex-1 border border-[var(--lit-ink)] bg-[var(--lit-ink)] text-sm font-semibold text-[var(--lit-bg-elevated)] transition hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+          className="h-12 shrink-0 border border-[var(--lit-ink)] sm:flex-1 bg-[var(--lit-ink)] text-sm font-semibold text-[var(--lit-bg-elevated)] transition hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
         >
           {pending ? "저장 중…" : "저장"}
         </button>

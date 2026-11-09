@@ -5,6 +5,7 @@ import { ko } from "date-fns/locale";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DayPicker } from "react-day-picker";
 import { formatLocalYMD, parseLocalYMD } from "@/lib/date/local";
+import { getSundayLiturgy } from "@/lib/liturgical/sunday-names";
 
 import "react-day-picker/style.css";
 
@@ -127,6 +128,11 @@ export function MassDatePicker({
       {label ? (
         <p className="mt-4 text-center text-sm text-[var(--lit-ink-muted)] sm:text-left">
           선택: {label}
+          {getSundayLiturgy(value) ? (
+            <span className="mt-1 block font-semibold text-[var(--lit-ink)] sm:mt-0 sm:ml-2 sm:inline">
+              {getSundayLiturgy(value)?.name}
+            </span>
+          ) : null}
         </p>
       ) : null}
     </div>

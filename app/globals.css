@@ -238,42 +238,44 @@ body {
 }
 
 /* 전례 편집용 DayPicker */
-.rdp-mass-calendar {
+.rdp-root.rdp-mass-calendar {
   --rdp-accent-color: var(--lit-ink);
   --rdp-accent-background-color: rgba(17, 17, 17, 0.06);
-  --rdp-day-height: 3.75rem;
-  --rdp-day-width: 3.75rem;
-  --rdp-day_button-height: 3.5rem;
-  --rdp-day_button-width: 3.5rem;
+  --rdp-day-height: 2.6rem;
+  --rdp-day-width: 2.6rem;
+  --rdp-day_button-height: 2.5rem;
+  --rdp-day_button-width: 2.5rem;
   --rdp-nav_button-height: 2.75rem;
   --rdp-nav_button-width: 2.75rem;
   --rdp-nav-height: 3.25rem;
+  --rdp-today-color: var(--lit-ink);
+  --rdp-selected-border: 2px solid var(--lit-ink);
 }
 
 @media (min-width: 640px) {
-  .rdp-mass-calendar {
-    --rdp-day-height: 4.5rem;
-    --rdp-day-width: 4.5rem;
-    --rdp-day_button-height: 4.25rem;
-    --rdp-day_button-width: 4.25rem;
+  .rdp-root.rdp-mass-calendar {
+    --rdp-day-height: 3.6rem;
+    --rdp-day-width: 3.6rem;
+    --rdp-day_button-height: 3.4rem;
+    --rdp-day_button-width: 3.4rem;
     --rdp-nav_button-height: 3rem;
     --rdp-nav_button-width: 3rem;
   }
 }
 
 @media (min-width: 1024px) {
-  .rdp-mass-calendar {
-    --rdp-day-height: 5.25rem;
-    --rdp-day-width: 5.25rem;
-    --rdp-day_button-height: 5rem;
-    --rdp-day_button-width: 5rem;
-    --rdp-nav_button-height: 3.25rem;
-    --rdp-nav_button-width: 3.25rem;
+  .rdp-root.rdp-mass-calendar {
+    --rdp-day-height: 3.1rem;
+    --rdp-day-width: 3.1rem;
+    --rdp-day_button-height: 2.9rem;
+    --rdp-day_button-width: 2.9rem;
+    --rdp-nav_button-height: 2.75rem;
+    --rdp-nav_button-width: 2.75rem;
   }
 }
 
 @media (prefers-color-scheme: dark) {
-  .rdp-mass-calendar {
+  .rdp-root.rdp-mass-calendar {
     --rdp-accent-color: var(--lit-ink);
     --rdp-accent-background-color: rgba(245, 245, 245, 0.08);
   }
