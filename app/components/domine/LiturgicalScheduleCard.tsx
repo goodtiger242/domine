@@ -2,6 +2,14 @@ import Link from "next/link";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { FIXED_CONDUCTOR_NAME } from "@/lib/constants/liturgical";
 import { formatYouthMemberDisplay } from "@/lib/constants/youth-members";
+import { getSundayLiturgy } from "@/lib/liturgical/sunday-names";
+
+const LITURGY_DOT: Record<string, string> = {
+  녹: "bg-green-600",
+  백: "bg-white ring-1 ring-[var(--lit-border)]",
+  자: "bg-purple-600",
+  홍: "bg-red-600",
+};
 
 function formatDateLabel(iso: string) {
   const d = new Date(`${iso}T12:00:00`);
@@ -113,6 +121,7 @@ export function LiturgicalScheduleCard({
 
   const showRolesBlock = hasLiturgicalRoles || showEmptyRolePlaceholders;
   const conductorValue = syntheticEmpty ? "" : FIXED_CONDUCTOR_NAME;
+  const liturgy = getSundayLiturgy(schedule.liturgy_date);
 
   return (
     <article
@@ -133,6 +142,15 @@ export function LiturgicalScheduleCard({
           >
             {formatDateLabel(schedule.liturgy_date)}
           </p>
+          {liturgy ? (
+            <p className="mt-1 flex items-center gap-2 text-sm font-semibold leading-snug tracking-[-0.01em] text-[var(--lit-ink)]">
+              <span
+                aria-hidden
+                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${LITURGY_DOT[liturgy.color] ?? ""}`}
+              />
+              <span className="break-keep">{liturgy.name}</span>
+            </p>
+          ) : null}
           {schedule.title.trim() ? (
             <h3
               className={`mt-2 tracking-tight text-[var(--lit-ink)] ${
