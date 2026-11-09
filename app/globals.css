@@ -74,78 +74,97 @@ html {
   .cos-stagger-2,
   .cos-stagger-3,
   .cos-stagger-4,
-  .military-march,
-  .military-arm-a,
-  .military-arm-b,
-  .military-leg-a,
-  .military-leg-b,
-  .military-dog,
-  .military-dog-tail {
+  .mil-march,
+  .mil-swing-a,
+  .mil-swing-b,
+  .mil-bob,
+  .mil-bob-fast,
+  .mil-wag {
     animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
+  }
+  .mil-march {
+    transform: translateX(70px) !important;
   }
 }
 
-@keyframes military-march-across {
+@keyframes mil-march-across {
   from {
-    transform: translateX(-104px);
+    transform: translateX(-70px);
   }
   to {
-    transform: translateX(136px);
+    transform: translateX(210px);
   }
 }
 
-@keyframes military-limb-a {
+@keyframes mil-swing-a {
   0%,
   100% {
-    transform: rotate(15deg);
+    transform: rotate(24deg);
   }
   50% {
-    transform: rotate(-15deg);
+    transform: rotate(-24deg);
   }
 }
 
-@keyframes military-limb-b {
+@keyframes mil-swing-b {
   0%,
   100% {
-    transform: rotate(-15deg);
+    transform: rotate(-24deg);
   }
   50% {
-    transform: rotate(15deg);
+    transform: rotate(24deg);
   }
 }
 
-.military-march {
-  animation: military-march-across 7.2s linear infinite;
-  transform-box: fill-box;
-  transform-origin: center;
+@keyframes mil-bob {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0);
+  }
+  25%,
+  75% {
+    transform: translateY(-0.7px);
+  }
 }
 
-.military-arm-a,
-.military-leg-a {
-  animation: military-limb-a 0.58s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: 50% 10%;
+@keyframes mil-wag {
+  0%,
+  100% {
+    transform: rotate(-14deg);
+  }
+  50% {
+    transform: rotate(16deg);
+  }
 }
 
-.military-arm-b,
-.military-leg-b {
-  animation: military-limb-b 0.58s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: 50% 10%;
+/* 관절 기준 회전: 부모 g 의 translate 가 만든 로컬 원점(0,0)이 회전축 */
+.mil-march {
+  animation: mil-march-across 16s linear infinite;
 }
 
-.military-dog {
-  animation: military-limb-b 0.58s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: 50% 80%;
+.mil-swing-a,
+.mil-swing-b,
+.mil-wag {
+  transform-box: view-box;
+  transform-origin: 0 0;
 }
 
-.military-dog-tail {
-  animation: military-limb-a 0.58s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: 90% 50%;
+.mil-swing-a {
+  animation: mil-swing-a 1s ease-in-out infinite;
+}
+
+.mil-swing-b {
+  animation: mil-swing-b 1s ease-in-out infinite;
+}
+
+.mil-bob,
+.mil-bob-fast {
+  animation: mil-bob 1s ease-in-out infinite;
+}
+
+.mil-wag {
+  animation: mil-wag 0.5s ease-in-out infinite;
 }
 
 @keyframes cos-reveal {
