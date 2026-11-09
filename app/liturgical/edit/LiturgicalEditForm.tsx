@@ -10,7 +10,6 @@ import {
 import { MassDatePicker } from "@/app/components/liturgical/MassDatePicker";
 import { MemberOrCustomInput } from "@/app/components/liturgical/MemberOrCustomInput";
 import { FIXED_CONDUCTOR_NAME } from "@/lib/constants/liturgical";
-import { defaultAnnouncementTitle } from "@/lib/liturgical/announcement-template";
 import {
   isLiturgicalOrganistName,
   LITURGICAL_ORGANIST_LEGAL_NAMES,
@@ -40,10 +39,19 @@ function isValidRoleField(v: string): boolean {
   return isYouthMemberName(t) || isValidCustomLiturgicalName(t);
 }
 
+/** 새 미사의 추가 안내 기본 문구 (날짜는 매번 달라서 뺌) */
+const DEFAULT_ANNOUNCEMENT = `💫 투표는 금요일 10PM
+💫 늦참이신 분들은 도착시간 댓글로 남겨주세요
+
+🚨 전례 및 복사 인원 중 불참이신 분들은 각 단장님에게 미리 연락 부탁드립니다
+
+⚠️ 17 : 00 성가 + 전례연습
+🙏 19 : 15 미사전 기도`;
+
 function emptyFormState() {
   return {
     title: "",
-    announcement_detail: "",
+    announcement_detail: DEFAULT_ANNOUNCEMENT,
     role_commentator: "",
     role_reader_1: "",
     role_reader_2: "",
@@ -180,7 +188,8 @@ export function LiturgicalEditForm({
     startTransition(async () => {
       const r = await upsertLiturgicalSchedule({
         liturgy_date: liturgyDate,
-        title: form.title,
+        // 제목은 날짜·전례일 이름으로 자동 표시하므로 저장하지 않음
+        title: "",
         announcement_detail: form.announcement_detail,
         role_commentator: form.role_commentator,
         role_reader_1: form.role_reader_1,
@@ -240,21 +249,6 @@ export function LiturgicalEditForm({
         <div className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-[var(--lit-ink-muted)]">
-              제목
-            </label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, title: e.target.value }))
-              }
-              className={fieldClass}
-              placeholder={`${defaultAnnouncementTitle(liturgyDate)} (비우면 자동)`}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--lit-ink-muted)]">
               추가 안내
             </label>
             <textarea
@@ -265,7 +259,7 @@ export function LiturgicalEditForm({
                   announcement_detail: e.target.value,
                 }))
               }
-              rows={10}
+              rows={12}
               className={fieldClass}
               placeholder="투표 마감, 연습 일정 등 자유롭게 입력 (비우면 담당자로 📌·🙏·📍 안내문이 자동 표시됩니다)"
             />
