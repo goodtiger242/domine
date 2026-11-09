@@ -697,3 +697,73 @@ body {
 .pet-ball {
   animation: pet-ball 1.05s ease-in-out infinite alternate;
 }
+
+/* 도미 연출: 앉기·살랑살랑·손 쓰다듬기·물방울 */
+@keyframes pet-wiggle {
+  0%,
+  100% {
+    transform: rotate(-1.6deg) translateX(-0.6px);
+  }
+  50% {
+    transform: rotate(1.6deg) translateX(0.6px);
+  }
+}
+
+@keyframes pet-stroke {
+  0%,
+  100% {
+    transform: translateX(-4px) rotate(-6deg);
+  }
+  50% {
+    transform: translateX(4px) rotate(6deg);
+  }
+}
+
+@keyframes pet-drip {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(var(--fall, 30px));
+  }
+}
+
+@keyframes pet-spray {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy));
+  }
+}
+
+.pet-wiggle {
+  animation: pet-wiggle 0.28s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.pet-sit {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  transform: scale(1, 0.84) rotate(-6deg);
+}
+
+.pet-stroke {
+  animation: pet-stroke 0.3s ease-in-out infinite;
+}
+
+.pet-drip {
+  animation: pet-drip 0.55s linear infinite;
+}
+
+.pet-spray {
+  animation: pet-spray 0.7s ease-out infinite;
+}

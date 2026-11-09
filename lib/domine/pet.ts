@@ -1,7 +1,7 @@
-export type PetAction = "feed" | "treat" | "pet" | "play" | "walk" | "brush" | "bath";
+export type PetAction = "feed" | "treat" | "pet" | "play" | "walk" | "brush" | "bath" | "train";
 
 /** 화면에 나오는 순서 */
-export const PET_ACTIONS: PetAction[] = ["feed", "treat", "pet", "play", "walk", "brush", "bath"];
+export const PET_ACTIONS: PetAction[] = ["feed", "treat", "pet", "play", "walk", "brush", "bath", "train"];
 
 export type PetState = {
   name: string;
@@ -37,6 +37,7 @@ export const ACTION_LABEL: Record<PetAction, string> = {
   walk: "산책",
   brush: "빗질",
   bath: "목욕",
+  train: "훈련",
 };
 
 export const ACTION_DONE: Record<PetAction, string> = {
@@ -47,6 +48,7 @@ export const ACTION_DONE: Record<PetAction, string> = {
   walk: "산책을 시켰어요",
   brush: "빗질을 해 줬어요",
   bath: "목욕을 시켰어요",
+  train: "훈련을 시켰어요",
 };
 
 export const ACTION_ICON: Record<PetAction, string> = {
@@ -57,6 +59,7 @@ export const ACTION_ICON: Record<PetAction, string> = {
   walk: "🦮",
   brush: "🪮",
   bath: "🛁",
+  train: "🎓",
 };
 
 /** 행동이 끝난 뒤 효과가 보이는 시간(ms) */
@@ -68,6 +71,7 @@ export const ACTION_PLAY_MS: Record<PetAction, number> = {
   walk: 4000,
   brush: 2600,
   bath: 3200,
+  train: 3000,
 };
 
 /** 남은 쉬는 시간 표시: 2시간 13분 / 14분 / 40초 */
@@ -116,13 +120,22 @@ export function collarToday(now = new Date()) {
 }
 
 const SAYS: Record<string, string[]> = {
-  happy: ["오늘도 와 줘서 고마워요!", "같이 있으니 좋아요.", "꼬리가 절로 흔들려요."],
-  hungry: ["배에서 소리가 나요…", "맛있는 거 주세요."],
-  sad: ["조금 심심해요.", "쓰다듬어 주면 좋겠어요."],
-  dirty: ["몸이 간질간질해요.", "목욕하고 싶어요."],
-  sleepy: ["쿨쿨… 조금만 더 잘게요.", "꿈에서 산책 중이에요."],
+  happy: [
+    "오늘도 와 줘서 고마워요!",
+    "같이 있으니 좋아요.",
+    "꼬리가 절로 흔들려요.",
+    "산책 가고 싶은 날씨예요.",
+    "오늘은 뭐 하고 놀까요?",
+    "킁킁, 좋은 냄새가 나요.",
+    "멍! 반가워요!",
+    "배를 쓰다듬어도 돼요.",
+  ],
+  hungry: ["배에서 소리가 나요…", "맛있는 거 주세요.", "밥그릇이 텅 비었어요.", "꼬르륵…"],
+  sad: ["조금 심심해요.", "쓰다듬어 주면 좋겠어요.", "같이 놀아 줄래요?", "낑…"],
+  dirty: ["몸이 간질간질해요.", "목욕하고 싶어요.", "털이 꼬질꼬질해요.", "씻겨 주세요!"],
+  sleepy: ["쿨쿨… 조금만 더 잘게요.", "꿈에서 산책 중이에요.", "음냐음냐…", "하품이 나와요."],
 };
-export function saysText(face: string, seed = new Date().getDate()): string {
+export function saysText(face: string, seed = Math.floor(Math.random() * 1000)): string {
   const list = SAYS[face] ?? SAYS.happy;
   return list[seed % list.length];
 }
@@ -150,7 +163,7 @@ export function blip(kind: PetAction) {
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new Ctx();
-    const notes = kind === "feed" || kind === "treat" ? [523, 659] : kind === "pet" || kind === "brush" ? [659, 784] : kind === "bath" ? [784, 659, 523] : [440, 554, 659];
+    const notes = kind === "feed" || kind === "treat" || kind === "train" ? [523, 659] : kind === "pet" || kind === "brush" ? [659, 784] : kind === "bath" ? [784, 659, 523] : [440, 554, 659];
     notes.forEach((f, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
