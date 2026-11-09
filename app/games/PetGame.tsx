@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { createClient } from "@/lib/supabase/client";
 import {
   ACTION_DONE,
+  blip,
+  bumpStreak,
+  collarToday,
+  saysText,
   ACTION_LABEL,
   faceOf,
   formatWait,
@@ -26,6 +30,7 @@ import {
 import { PetBowl, PetDog } from "./PetDog";
 
 const NICK_KEY = "domine-pet-nick";
+const SOUND_KEY = "domine-pet-sound";
 const ACTIONS: PetAction[] = ["feed", "pet", "walk"];
 const ACTION_ICON: Record<PetAction, string> = { feed: "🍖", pet: "🤚", walk: "🦮" };
 
@@ -72,6 +77,9 @@ export function PetGame() {
   const [wait, setWait] = useState<Record<PetAction, number>>({ feed: 0, pet: 0, walk: 0 });
   const [hour, setHour] = useState(12);
   const [busy, setBusy] = useState(false);
+  const [sound, setSound] = useState(false);
+  const [trick, setTrick] = useState(false);
+  const [streak, setStreak] = useState(0);
 
   const load = useCallback(async (nickname: string) => {
     const { data, error } = await supabase.current.rpc("domine_pet_state", {
@@ -92,6 +100,7 @@ export function PetGame() {
   useEffect(() => {
     const saved = safeGet(NICK_KEY);
     setNick(saved);
+    setSound(safeGet(SOUND_KEY) === "1");
     setHour(currentHour());
     load(saved);
     const poll = window.setInterval(() => {
@@ -133,6 +142,14 @@ export function PetGame() {
     load(n);
   }
 
+  /** 공중제비 (산책이 끝났을 때, 또는 도미를 눌렀을 때) */
+  function doTrick() {
+    if (trick || playing) return;
+    setTrick(true);
+    navigator.vibrate?.(15);
+    window.setTimeout(() => setTrick(false), 950);
+  }
+
   async function care(action: PetAction) {
     if (busy || !nick) return;
     setBusy(true);
@@ -153,8 +170,14 @@ export function PetGame() {
       return;
     }
     setMessage(`${nick}님이 도미에게 ${ACTION_DONE[action]}.`);
+    setStreak(bumpStreak());
+    navigator.vibrate?.(25);
+    if (sound) blip(action);
     setPlaying(action);
-    window.setTimeout(() => setPlaying(null), action === "walk" ? 4000 : 2400);
+    window.setTimeout(() => {
+      setPlaying(null);
+      if (action === "walk") doTrick();
+    }, action === "walk" ? 4000 : 2400);
     load(nick);
   }
 
@@ -164,6 +187,7 @@ export function PetGame() {
   const stage = pet ? stageOf(pet.care_total) : "baby";
   const face = pet ? faceOf(pet, isNight) : "happy";
   const walking = playing === "walk";
+  const collar = collarToday();
 
   if (status === "missing") {
     return (
@@ -228,7 +252,10 @@ export function PetGame() {
               eating={playing === "feed"}
               petting={playing === "pet"}
               walking={walking}
+              flip={trick}
+              onTap={doTrick}
               light={isNight ? 0.6 : hour < 6 || hour >= 18 ? 0.82 : 1}
+              collar={collar.hex}
             />
           </g>
           {playing === "feed" ? (
@@ -250,6 +277,19 @@ export function PetGame() {
           <p className="t-body text-[var(--lit-ink-muted)]" aria-live="polite">
             {pet ? statusText(face) : "도미를 부르는 중…"}
           </p>
+          {pet ? (
+            <p className="t-label italic text-[var(--lit-ink-subtle)]">“{saysText(face)}”</p>
+          ) : null}
+          {collar.liturgy ? (
+            <p className="t-caption flex items-center gap-1.5 text-[var(--lit-ink-subtle)]">
+              <span
+                aria-hidden
+                className="inline-block h-2.5 w-2.5 rounded-full ring-1 ring-[var(--lit-border)]"
+                style={{ background: collar.hex }}
+              />
+              {collar.liturgy} · {collar.colorName} 목줄
+            </p>
+          ) : null}
           <div className="grid grid-cols-2 gap-4">
             <Gauge label="배부름" value={pet?.fullness ?? 0} color="#e0a050" />
             <Gauge label="기분" value={pet?.mood ?? 0} color="#e0707f" />
@@ -285,7 +325,24 @@ export function PetGame() {
             {message}
           </p>
           <p className="t-caption text-center text-[var(--lit-ink-subtle)]">
-            {nick}님으로 돌보는 중 ·{" "}
+            {nick}님으로 돌보는 중{streak > 1 ? ` · ${streak}일째` : ""} ·{" "}
+            <button
+              type="button"
+              className="underline underline-offset-2"
+              onClick={() => {
+                const next = !sound;
+                setSound(next);
+                try {
+                  localStorage.setItem(SOUND_KEY, next ? "1" : "0");
+                } catch {
+                  /* 무시 */
+                }
+                if (next) blip("pet");
+              }}
+            >
+              소리 {sound ? "끄기" : "켜기"}
+            </button>{" "}
+            ·{" "}
             <button
               type="button"
               className="underline underline-offset-2"

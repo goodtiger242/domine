@@ -60,6 +60,81 @@ export function sanitizeNickname(raw: string): string {
   return raw.replace(/[^가-힣a-zA-Z0-9]/g, "").slice(0, 8);
 }
 
+import { getSundayLiturgy } from "@/lib/liturgical/sunday-names";
+
+const LITURGY_COLOR: Record<string, { hex: string; name: string }> = {
+  녹: { hex: "#2f8f57", name: "초록" },
+  백: { hex: "#e9e2cf", name: "흰색" },
+  자: { hex: "#6b4aa0", name: "보라" },
+  홍: { hex: "#c0392b", name: "빨강" },
+};
+
+const pad = (n: number) => String(n).padStart(2, "0");
+export const localISO = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+/** 오늘 이후 첫 일요일(오늘 포함)의 전례일로 목줄 색을 정한다 */
+export function collarToday(now = new Date()) {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  const l = getSundayLiturgy(localISO(d));
+  const c = LITURGY_COLOR[l?.color ?? "녹"] ?? LITURGY_COLOR["녹"];
+  return { hex: c.hex, colorName: c.name, liturgy: l?.name ?? "" };
+}
+
+const SAYS: Record<string, string[]> = {
+  happy: ["오늘도 와 줘서 고마워요!", "같이 있으니 좋아요.", "꼬리가 절로 흔들려요."],
+  hungry: ["배에서 소리가 나요…", "맛있는 거 주세요."],
+  sad: ["조금 심심해요.", "쓰다듬어 주면 좋겠어요."],
+  sleepy: ["쿨쿨… 조금만 더 잘게요.", "꿈에서 산책 중이에요."],
+};
+export function saysText(face: string, seed = new Date().getDate()): string {
+  const list = SAYS[face] ?? SAYS.happy;
+  return list[seed % list.length];
+}
+
+/** 이 기기에서 연속으로 돌본 날 수 (localStorage) */
+export function bumpStreak(): number {
+  const key = "domine-pet-streak";
+  const today = localISO(new Date());
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  let n = 1;
+  try {
+    const s = JSON.parse(localStorage.getItem(key) ?? "{}") as { last?: string; n?: number };
+    if (s.last === today) n = s.n ?? 1;
+    else if (s.last === localISO(y)) n = (s.n ?? 0) + 1;
+    localStorage.setItem(key, JSON.stringify({ last: today, n }));
+  } catch {
+    /* 저장 못 해도 진행에는 영향 없음 */
+  }
+  return n;
+}
+
+/** 짧은 효과음 (사용자가 켰을 때만) */
+export function blip(kind: PetAction) {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    const notes = kind === "feed" ? [523, 659] : kind === "pet" ? [659, 784] : [440, 554, 659];
+    notes.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.12);
+      g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + i * 0.12 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.12 + 0.18);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + i * 0.12);
+      o.stop(ctx.currentTime + i * 0.12 + 0.2);
+    });
+    window.setTimeout(() => ctx.close(), 800);
+  } catch {
+    /* 소리를 못 내도 무시 */
+  }
+}
+
 export type PetFace = "happy" | "hungry" | "sad" | "sleepy";
 
 export function faceOf(p: Pick<PetState, "fullness" | "mood">, isNight: boolean): PetFace {
