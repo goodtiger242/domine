@@ -62,13 +62,13 @@ export function LiturgicalMinisterPrayersSection({
       }`}
       aria-labelledby="liturgical-prayers-heading"
     >
-      <div className="mx-auto max-w-5xl">
+      <div className={`mx-auto ${compact ? "max-w-3xl" : "max-w-5xl"}`}>
         <h2
           id="liturgical-prayers-heading"
-          className={`text-center font-light tracking-[-0.03em] text-[var(--lit-ink)] text-pretty max-lg:leading-snug ${
+          className={`tracking-[-0.03em] text-[var(--lit-ink)] text-pretty max-lg:leading-snug ${
             compact
-              ? "text-[clamp(1.35rem,4vw,1.85rem)] font-medium max-lg:text-[clamp(1.25rem,4.3vw,1.6rem)]"
-              : "mt-4 text-[clamp(1.75rem,4.5vw,2.5rem)] max-lg:text-[clamp(1.5rem,5.2vw,1.95rem)] md:mt-6"
+              ? "text-2xl font-medium sm:text-3xl md:text-4xl"
+              : "mt-4 text-center text-[clamp(1.75rem,4.5vw,2.5rem)] font-light max-lg:text-[clamp(1.5rem,5.2vw,1.95rem)] md:mt-6"
           }`}
         >
           전례 봉사자 기도

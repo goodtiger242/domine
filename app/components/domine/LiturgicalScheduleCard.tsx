@@ -136,7 +136,7 @@ export function LiturgicalScheduleCard({
     <article
       className={`${
         emphasize
-          ? `${cardBase} border-2 border-[var(--lit-ink)] shadow-[0_0_0_1px_rgba(0,0,0,0.04)] ring-2 ring-[var(--lit-ink)]/12 dark:ring-[var(--lit-ink)]/25`
+          ? `${cardBase} border-[var(--lit-ink)] shadow-[var(--lit-paper-shadow-soft)] ring-4 ring-[var(--lit-ink)]/[0.06]`
           : `${cardBase} border-[var(--lit-border)]`
       }${articleClassName ? ` ${articleClassName}` : ""}`}
     >
@@ -145,14 +145,19 @@ export function LiturgicalScheduleCard({
           <p
             className={
               enrich
-                ? "text-sm font-semibold leading-snug tracking-[-0.01em] text-[var(--lit-ink)]"
+                ? "flex flex-wrap items-center gap-x-2 text-[13px] font-medium leading-snug tracking-[-0.01em] text-[var(--lit-ink-muted)]"
                 : "text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]"
             }
           >
             {formatDateLabel(schedule.liturgy_date)}
+            {enrich && emphasize ? (
+              <span className="rounded-sm bg-[var(--lit-ink)] px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-[0.04em] text-[var(--lit-bg-elevated)]">
+                다가오는 미사
+              </span>
+            ) : null}
           </p>
           {liturgy ? (
-            <p className="mt-1 flex items-center gap-2 text-sm font-semibold leading-snug tracking-[-0.01em] text-[var(--lit-ink)]">
+            <p className="mt-1.5 flex items-center gap-2 text-lg font-semibold leading-snug tracking-[-0.02em] text-[var(--lit-ink)]">
               <span
                 aria-hidden
                 className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${LITURGY_DOT[liturgy.color] ?? ""}`}
@@ -162,9 +167,9 @@ export function LiturgicalScheduleCard({
           ) : null}
           {title ? (
             <h3
-              className={`mt-2 tracking-tight text-[var(--lit-ink)] ${
+              className={`mt-1.5 tracking-tight text-[var(--lit-ink)] ${
                 enrich
-                  ? "text-base font-semibold leading-snug sm:text-lg"
+                  ? "text-[15px] font-medium leading-snug text-[var(--lit-ink-muted)]"
                   : "text-xl font-light"
               }`}
             >
@@ -205,28 +210,26 @@ export function LiturgicalScheduleCard({
           }
         >
           {enrich ? (
-            <div className="space-y-2.5">
-              <div>
-                <div className="grid gap-y-2.5">
-                  <DenseRoleSlot
-                    label="해설"
-                    value={schedule.role_commentator}
-                    showEmptyWhenBlank={showEmpty}
-                  />
-                  <DenseRoleSlot
-                    label="1독서"
-                    value={schedule.role_reader_1}
-                    showEmptyWhenBlank={showEmpty}
-                  />
-                  <DenseRoleSlot
-                    label="2독서"
-                    value={schedule.role_reader_2}
-                    showEmptyWhenBlank={showEmpty}
-                  />
-                </div>
+            <div className="grid gap-y-2.5 sm:grid-cols-2 sm:gap-x-12">
+              <div className="grid gap-y-2.5 sm:col-start-1 sm:row-start-1">
+                <DenseRoleSlot
+                  label="해설"
+                  value={schedule.role_commentator}
+                  showEmptyWhenBlank={showEmpty}
+                />
+                <DenseRoleSlot
+                  label="1독서"
+                  value={schedule.role_reader_1}
+                  showEmptyWhenBlank={showEmpty}
+                />
+                <DenseRoleSlot
+                  label="2독서"
+                  value={schedule.role_reader_2}
+                  showEmptyWhenBlank={showEmpty}
+                />
               </div>
 
-              <div className="border-t border-[var(--lit-border)] pt-2.5">
+              <div className="border-t border-[var(--lit-border)] pt-2.5 sm:col-start-1 sm:row-start-2">
                 <DenseRoleSlot
                   label="복음 환호송"
                   value={schedule.role_gospel_acclamation}
@@ -234,34 +237,30 @@ export function LiturgicalScheduleCard({
                 />
               </div>
 
-              <div className="border-t border-[var(--lit-border)] pt-2.5">
-                <div className="grid gap-y-2.5">
-                  <DenseRoleSlot
-                    label="대복"
-                    value={schedule.thurifer_main}
-                    showEmptyWhenBlank={showEmpty}
-                  />
-                  <DenseRoleSlot
-                    label="소복"
-                    value={schedule.thurifer_sub}
-                    showEmptyWhenBlank={showEmpty}
-                  />
-                </div>
+              <div className="grid content-start gap-y-2.5 border-t border-[var(--lit-border)] pt-2.5 sm:col-start-2 sm:row-start-1 sm:border-t-0 sm:pt-0">
+                <DenseRoleSlot
+                  label="대복"
+                  value={schedule.thurifer_main}
+                  showEmptyWhenBlank={showEmpty}
+                />
+                <DenseRoleSlot
+                  label="소복"
+                  value={schedule.thurifer_sub}
+                  showEmptyWhenBlank={showEmpty}
+                />
               </div>
 
-              <div className="border-t border-[var(--lit-border)] pt-2.5">
-                <div className="grid gap-y-2.5">
-                  <DenseRoleSlot
-                    label="지휘"
-                    value={conductorValue}
-                    showEmptyWhenBlank={showEmpty}
-                  />
-                  <DenseRoleSlot
-                    label="반주"
-                    value={schedule.organist}
-                    showEmptyWhenBlank={showEmpty}
-                  />
-                </div>
+              <div className="grid content-start gap-y-2.5 border-t border-[var(--lit-border)] pt-2.5 sm:col-start-2 sm:row-start-2">
+                <DenseRoleSlot
+                  label="지휘"
+                  value={conductorValue}
+                  showEmptyWhenBlank={showEmpty}
+                />
+                <DenseRoleSlot
+                  label="반주"
+                  value={schedule.organist}
+                  showEmptyWhenBlank={showEmpty}
+                />
               </div>
             </div>
           ) : (
