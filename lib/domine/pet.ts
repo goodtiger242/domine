@@ -1,9 +1,13 @@
-export type PetAction = "feed" | "pet" | "walk";
+export type PetAction = "feed" | "treat" | "pet" | "play" | "walk" | "brush" | "bath";
+
+/** 화면에 나오는 순서 */
+export const PET_ACTIONS: PetAction[] = ["feed", "treat", "pet", "play", "walk", "brush", "bath"];
 
 export type PetState = {
   name: string;
   fullness: number;
   mood: number;
+  clean: number;
   care_total: number;
   today_top: { nickname: string; count: number }[];
   recent: { nickname: string; action: PetAction; created_at: string }[];
@@ -27,14 +31,43 @@ export const STAGE_LABEL: Record<PetStage, string> = {
 
 export const ACTION_LABEL: Record<PetAction, string> = {
   feed: "밥주기",
+  treat: "간식",
   pet: "쓰다듬기",
+  play: "공놀이",
   walk: "산책",
+  brush: "빗질",
+  bath: "목욕",
 };
 
 export const ACTION_DONE: Record<PetAction, string> = {
   feed: "밥을 줬어요",
+  treat: "간식을 줬어요",
   pet: "쓰다듬어 줬어요",
+  play: "공놀이를 했어요",
   walk: "산책을 시켰어요",
+  brush: "빗질을 해 줬어요",
+  bath: "목욕을 시켰어요",
+};
+
+export const ACTION_ICON: Record<PetAction, string> = {
+  feed: "🍖",
+  treat: "🦴",
+  pet: "🤚",
+  play: "🎾",
+  walk: "🦮",
+  brush: "🪮",
+  bath: "🛁",
+};
+
+/** 행동이 끝난 뒤 효과가 보이는 시간(ms) */
+export const ACTION_PLAY_MS: Record<PetAction, number> = {
+  feed: 2400,
+  treat: 2200,
+  pet: 2400,
+  play: 3200,
+  walk: 4000,
+  brush: 2600,
+  bath: 3200,
 };
 
 /** 남은 쉬는 시간 표시: 2시간 13분 / 14분 / 40초 */
@@ -86,6 +119,7 @@ const SAYS: Record<string, string[]> = {
   happy: ["오늘도 와 줘서 고마워요!", "같이 있으니 좋아요.", "꼬리가 절로 흔들려요."],
   hungry: ["배에서 소리가 나요…", "맛있는 거 주세요."],
   sad: ["조금 심심해요.", "쓰다듬어 주면 좋겠어요."],
+  dirty: ["몸이 간질간질해요.", "목욕하고 싶어요."],
   sleepy: ["쿨쿨… 조금만 더 잘게요.", "꿈에서 산책 중이에요."],
 };
 export function saysText(face: string, seed = new Date().getDate()): string {
@@ -116,7 +150,7 @@ export function blip(kind: PetAction) {
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new Ctx();
-    const notes = kind === "feed" ? [523, 659] : kind === "pet" ? [659, 784] : [440, 554, 659];
+    const notes = kind === "feed" || kind === "treat" ? [523, 659] : kind === "pet" || kind === "brush" ? [659, 784] : kind === "bath" ? [784, 659, 523] : [440, 554, 659];
     notes.forEach((f, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
@@ -135,11 +169,12 @@ export function blip(kind: PetAction) {
   }
 }
 
-export type PetFace = "happy" | "hungry" | "sad" | "sleepy";
+export type PetFace = "happy" | "hungry" | "sad" | "dirty" | "sleepy";
 
-export function faceOf(p: Pick<PetState, "fullness" | "mood">, isNight: boolean): PetFace {
+export function faceOf(p: Pick<PetState, "fullness" | "mood" | "clean">, isNight: boolean): PetFace {
   if (p.fullness < 25) return "hungry";
   if (p.mood < 25) return "sad";
+  if (p.clean < 25) return "dirty";
   return isNight ? "sleepy" : "happy";
 }
 
@@ -149,6 +184,8 @@ export function statusText(face: PetFace): string {
       return "도미는 배가 고파요.";
     case "sad":
       return "도미는 심심하고 시무룩해요.";
+    case "dirty":
+      return "도미가 꼬질꼬질해요. 씻겨 주세요.";
     case "sleepy":
       return "도미는 졸려서 꾸벅꾸벅 졸고 있어요.";
     default:

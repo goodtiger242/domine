@@ -122,6 +122,10 @@ html {
   .pet-trot,
   .pet-eatnod,
   .pet-flip,
+  .pet-hop,
+  .pet-shake,
+  .pet-drop,
+  .pet-ball,
   .pet-roll,
   .pet-lie,
   .pet-sag,
@@ -625,4 +629,78 @@ body {
   transform-box: view-box;
   transform-origin: 0 0;
   transform: scale(1, 0.94) rotate(2deg);
+}
+
+/* 간식·공놀이·빗질·목욕 */
+@keyframes pet-hop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  25% {
+    transform: translateY(0) scale(1.04, 0.93);
+  }
+  50% {
+    transform: translateY(-9px) scale(0.97, 1.05);
+  }
+}
+
+@keyframes pet-shake {
+  0%,
+  100% {
+    transform: rotate(0deg) translateX(0);
+  }
+  25% {
+    transform: rotate(-2.2deg) translateX(-1px);
+  }
+  75% {
+    transform: rotate(2.2deg) translateX(1px);
+  }
+}
+
+@keyframes pet-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(2px) scale(0.6);
+  }
+}
+
+@keyframes pet-ball {
+  0% {
+    transform: translate(-38px, 4px);
+  }
+  50% {
+    transform: translate(0px, -22px);
+  }
+  100% {
+    transform: translate(38px, 4px);
+  }
+}
+
+.pet-hop {
+  animation: pet-hop 0.7s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.pet-shake {
+  animation: pet-shake 0.16s linear infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.pet-drop {
+  animation: pet-drop 1.2s ease-out infinite;
+}
+
+.pet-ball {
+  animation: pet-ball 1.05s ease-in-out infinite alternate;
 }

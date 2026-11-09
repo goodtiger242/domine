@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { createClient } from "@/lib/supabase/client";
 import {
   ACTION_DONE,
+  ACTION_ICON,
+  ACTION_PLAY_MS,
+  PET_ACTIONS,
   blip,
   bumpStreak,
   collarToday,
@@ -31,8 +34,8 @@ import { PetBowl, PetDog } from "./PetDog";
 
 const NICK_KEY = "domine-pet-nick";
 const SOUND_KEY = "domine-pet-sound";
-const ACTIONS: PetAction[] = ["feed", "pet", "walk"];
-const ACTION_ICON: Record<PetAction, string> = { feed: "🍖", pet: "🤚", walk: "🦮" };
+const V1_ACTIONS: PetAction[] = ["feed", "pet", "walk"];
+const NO_WAIT = Object.fromEntries(PET_ACTIONS.map((a) => [a, 0])) as Record<PetAction, number>;
 
 function safeGet(key: string): string {
   try {
@@ -74,9 +77,10 @@ export function PetGame() {
   const [status, setStatus] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [playing, setPlaying] = useState<PetAction | null>(null);
   const [message, setMessage] = useState("");
-  const [wait, setWait] = useState<Record<PetAction, number>>({ feed: 0, pet: 0, walk: 0 });
+  const [wait, setWait] = useState<Record<PetAction, number>>(NO_WAIT);
   const [hour, setHour] = useState(12);
   const [busy, setBusy] = useState(false);
+  const [v2, setV2] = useState(false);
   const [sound, setSound] = useState(false);
   const [trick, setTrick] = useState(false);
   const [streak, setStreak] = useState(0);
@@ -91,7 +95,10 @@ export function PetGame() {
       setStatus(missing ? "missing" : "error");
       return;
     }
-    const state = data as PetState;
+    const raw = data as PetState;
+    // 서버가 아직 구버전이어도 깨지지 않게 빈 값을 채운다
+    const state: PetState = { ...raw, clean: raw.clean ?? 80, cooldown: { ...NO_WAIT, ...raw.cooldown } };
+    setV2(raw.clean !== undefined);
     setPet(state);
     setWait(state.cooldown);
     setStatus("ready");
@@ -109,11 +116,12 @@ export function PetGame() {
     }, 30_000);
     const tick = window.setInterval(
       () =>
-        setWait((w) => ({
-          feed: Math.max(0, w.feed - 1),
-          pet: Math.max(0, w.pet - 1),
-          walk: Math.max(0, w.walk - 1),
-        })),
+        setWait(
+          (w) =>
+            Object.fromEntries(
+              PET_ACTIONS.map((a) => [a, Math.max(0, w[a] - 1)])
+            ) as Record<PetAction, number>
+        ),
       1000
     );
     const onVisible = () => document.visibilityState === "visible" && load(saved);
@@ -177,7 +185,7 @@ export function PetGame() {
     window.setTimeout(() => {
       setPlaying(null);
       if (action === "walk") doTrick();
-    }, action === "walk" ? 4000 : 2400);
+    }, ACTION_PLAY_MS[action]);
     load(nick);
   }
 
@@ -249,16 +257,14 @@ export function PetGame() {
             <PetDog
               stage={stage}
               face={face}
-              eating={playing === "feed"}
-              petting={playing === "pet"}
-              walking={walking}
+              action={playing}
               flip={trick}
               onTap={doTrick}
               light={isNight ? 0.6 : hour < 6 || hour >= 18 ? 0.82 : 1}
               collar={collar.hex}
             />
           </g>
-          {playing === "feed" ? (
+          {playing === "feed" || playing === "treat" ? (
             <g transform="translate(124 93) scale(0.8)">
               <PetBowl />
             </g>
@@ -290,17 +296,18 @@ export function PetGame() {
               {collar.liturgy} · {collar.colorName} 목줄
             </p>
           ) : null}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid gap-3 ${v2 ? "grid-cols-3" : "grid-cols-2"}`}>
             <Gauge label="배부름" value={pet?.fullness ?? 0} color="#e0a050" />
             <Gauge label="기분" value={pet?.mood ?? 0} color="#e0707f" />
+            {v2 ? <Gauge label="청결" value={pet?.clean ?? 0} color="#5aa7d6" /> : null}
           </div>
         </div>
       </div>
 
       {nick ? (
         <>
-          <div className="grid grid-cols-3 gap-3" role="group" aria-label="도미 돌보기">
-            {ACTIONS.map((a) => {
+          <div className="grid grid-cols-4 gap-2.5" role="group" aria-label="도미 돌보기">
+            {(v2 ? PET_ACTIONS : V1_ACTIONS).map((a) => {
               const w = wait[a];
               return (
                 <button
@@ -308,14 +315,14 @@ export function PetGame() {
                   type="button"
                   onClick={() => care(a)}
                   disabled={busy || w > 0 || status !== "ready"}
-                  className="flex min-h-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-2 py-2 text-[var(--lit-ink)] transition duration-150 active:scale-[0.97] enabled:hover:border-[var(--lit-border-strong)] disabled:opacity-55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
+                  className="flex min-h-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-2 py-2 text-[var(--lit-ink)] transition duration-150 active:scale-[0.97] enabled:hover:border-[var(--lit-border-strong)] disabled:opacity-55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] focus-visible:ring-offset-2"
                 >
                   <span aria-hidden className="text-xl leading-none">
                     {ACTION_ICON[a]}
                   </span>
-                  <span className="text-[15px] font-semibold">{ACTION_LABEL[a]}</span>
+                  <span className="text-[13px] font-semibold">{ACTION_LABEL[a]}</span>
                   <span className="t-caption tabular-nums text-[var(--lit-ink-muted)]">
-                    {w > 0 ? `${formatWait(w)} 뒤` : "지금 가능"}
+                    {w > 0 ? formatWait(w) : "지금 가능"}
                   </span>
                 </button>
               );
@@ -372,9 +379,13 @@ export function PetGame() {
             <input
               id="pet-nick"
               value={nickInput}
-              onChange={(e) => setNickInput(sanitizeNickname(e.target.value))}
-              maxLength={8}
+              onChange={(e) => setNickInput(e.target.value.slice(0, 12))}
+              lang="ko"
+              inputMode="text"
               autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               className="h-12 min-w-0 flex-1 rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 text-[15px] text-[var(--lit-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
               placeholder="예: 별명"
             />
