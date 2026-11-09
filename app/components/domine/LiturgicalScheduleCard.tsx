@@ -126,8 +126,12 @@ export function LiturgicalScheduleCard({
   const showRolesBlock = hasLiturgicalRoles || showEmptyRolePlaceholders;
   const conductorValue = syntheticEmpty ? "" : FIXED_CONDUCTOR_NAME;
   const liturgy = getSundayLiturgy(schedule.liturgy_date);
-  const title =
+  const rawTitle =
     schedule.title.trim() || defaultAnnouncementTitle(schedule.liturgy_date);
+  // 메인(읽기 전용) 카드는 제목 앞뒤에 📌를 항상 붙여 보여 준다
+  const title = enrich
+    ? `📌${rawTitle.replace(/📌/g, "").trim()} 📌`
+    : rawTitle;
   const detail =
     schedule.announcement_detail.trim() ||
     (hasLiturgicalRoles ? defaultAnnouncementDetail(schedule) : "");
@@ -152,7 +156,7 @@ export function LiturgicalScheduleCard({
             {formatDateLabel(schedule.liturgy_date)}
           </p>
           {liturgy ? (
-            <p className="mt-1.5 flex items-center gap-2 text-lg font-semibold leading-snug tracking-[-0.02em] text-[var(--lit-ink)]">
+            <p className="mt-1.5 flex items-center gap-2 text-[13px] font-semibold leading-snug tracking-[-0.01em] text-[var(--lit-ink-muted)]">
               <span
                 aria-hidden
                 className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${LITURGY_DOT[liturgy.color] ?? ""}`}
@@ -162,9 +166,9 @@ export function LiturgicalScheduleCard({
           ) : null}
           {title ? (
             <h3
-              className={`mt-1.5 tracking-tight text-[var(--lit-ink)] ${
+              className={`mt-3 tracking-tight text-[var(--lit-ink)] ${
                 enrich
-                  ? "text-[15px] font-medium leading-snug text-[var(--lit-ink-muted)]"
+                  ? "text-xl font-semibold leading-snug sm:text-2xl"
                   : "text-xl font-light"
               }`}
             >
