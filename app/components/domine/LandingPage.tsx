@@ -2,6 +2,7 @@ import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { DeployStamp } from "@/app/components/layout/DeployStamp";
 import { SiteBrandLink } from "@/app/components/layout/SiteBrandLink";
 import { MilitaryServiceCompactCard } from "@/app/components/domine/HakJunMilitaryBanner";
+import { PetGame } from "@/app/games/PetGame";
 import { MobileDiggingSoldiers } from "@/app/components/domine/MobileDiggingSoldiers";
 import { ScrollToTop } from "@/app/components/domine/home/ScrollToTop";
 import { LiturgicalMinisterPrayersSection } from "@/app/components/domine/LiturgicalMinisterPrayersSection";
@@ -56,16 +57,31 @@ export function LandingPage({
             </div>
           </section>
 
+          <section
+            id="home-pet"
+            className="cos-stagger-2 order-2 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] px-5 py-8 md:px-10 md:py-12 lg:px-12"
+          >
+            <div className="mx-auto max-w-3xl">
+              <h2 className="t-title text-[var(--lit-ink)]">우리 강아지 도미</h2>
+              <p className="t-body mt-2 text-[var(--lit-ink-muted)]">
+                함께 키우는 강아지예요. 들를 때마다 돌봐 주세요.
+              </p>
+              <div className="mt-5 max-w-xl">
+                <PetGame />
+              </div>
+            </div>
+          </section>
+
           <LiturgicalMonthSection
             year={liturgicalYear}
             month={liturgicalMonth}
             schedules={[]}
             variant="home"
             homeLiturgical={homeLiturgical}
-            sectionClassName="cos-stagger-2 order-2 lg:order-2"
+            sectionClassName="cos-stagger-3 order-3 lg:order-3"
           />
 
-          <div className="cos-stagger-3 order-3 lg:order-3">
+          <div className="cos-stagger-4 order-4 lg:order-4">
             <LiturgicalMinisterPrayersSection compact />
           </div>
         </div>

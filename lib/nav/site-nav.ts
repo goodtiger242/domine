@@ -17,20 +17,16 @@ const navYouth: SiteNavLink[] = SITE_NAV_SHOW_YOUTH
   ? [{ href: "/youth", label: "청년회 멤버" }]
   : [];
 
-const navGames: SiteNavLink[] = [{ href: "/games", label: "게임" }];
-
 /** 메인(/) 상단 네비 */
 export const SITE_NAV_HOME: SiteNavLink[] = [
   { href: "/liturgical", label: "전례 안내" },
   { href: "/liturgical/edit", label: "전례 편집" },
-  ...navGames,
   ...navCalendar,
   ...navYouth,
 ];
 
 export const SITE_NAV_LITURGICAL: SiteNavLink[] = [
   { href: "/liturgical/edit", label: "전례 편집" },
-  ...navGames,
   ...navCalendar,
   ...navYouth,
 ];
@@ -49,13 +45,6 @@ export const SITE_NAV_YOUTH: SiteNavLink[] = [
 
 export const SITE_NAV_EDIT: SiteNavLink[] = [
   { href: "/liturgical", label: "전례 안내" },
-  ...navGames,
   ...navCalendar,
   ...navYouth,
-];
-
-export const SITE_NAV_GAMES: SiteNavLink[] = [
-  { href: "/liturgical", label: "전례 안내" },
-  { href: "/liturgical/edit", label: "전례 편집" },
-  { href: "/games", label: "게임" },
 ];
