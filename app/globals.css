@@ -104,6 +104,8 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* 도미를 돌볼 때의 짧은 반응(간식·공놀이·빗질·목욕·쓰다듬기·밥·산책)은
+     눌러서 보는 피드백이라 시스템 '동작 줄이기'에서도 남겨 둔다. 계속 도는 장식 움직임만 끈다. */
   html {
     scroll-behavior: auto;
   }
@@ -119,21 +121,12 @@ html {
   .mil-scroll-road,
   .mil-scroll-tufts,
   .pet-bob,
-  .pet-trot,
-  .pet-eatnod,
-  .pet-flip,
-  .pet-hop,
-  .pet-shake,
-  .pet-drop,
-  .pet-ball,
-  .pet-roll,
   .pet-lie,
   .pet-sag,
   .pet-wag,
   .pet-munch,
   .pet-nuzzle,
   .pet-ear,
-  .pet-heart,
   .pet-zzz,
   .mil-swing-a,
   .mil-swing-b,
