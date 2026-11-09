@@ -118,6 +118,15 @@ html {
   .mil-scroll-hill,
   .mil-scroll-road,
   .mil-scroll-tufts,
+  .pet-bob,
+  .pet-trot,
+  .pet-eatnod,
+  .pet-wag,
+  .pet-munch,
+  .pet-nuzzle,
+  .pet-ear,
+  .pet-heart,
+  .pet-zzz,
   .mil-swing-a,
   .mil-swing-b,
   .mil-bob,
@@ -423,4 +432,130 @@ body {
 /* 선택일: td에 배경이 있을 때 버튼 글자색이 today 등과 충돌하지 않도록 */
 .rdp-mass-calendar .rdp-selected .rdp-day_button {
   color: var(--lit-bg-elevated);
+}
+
+/* 도미(게임) 움직임 */
+@keyframes pet-breathe {
+  50% {
+    transform: translateY(-0.8px);
+  }
+}
+
+@keyframes pet-munch {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(2px, 6px) rotate(14deg);
+  }
+}
+
+@keyframes pet-nuzzle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-8deg);
+  }
+}
+
+@keyframes pet-wag {
+  0%,
+  100% {
+    transform: rotate(-14deg);
+  }
+  50% {
+    transform: rotate(16deg);
+  }
+}
+
+@keyframes pet-heart {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(1);
+  }
+}
+
+@keyframes pet-zzz {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translateY(2px);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateY(-3px);
+  }
+}
+
+.pet-bob {
+  animation: pet-breathe 2.8s ease-in-out infinite;
+}
+
+.pet-munch {
+  animation: pet-munch 0.5s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.pet-nuzzle {
+  animation: pet-nuzzle 0.9s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.pet-wag {
+  animation: pet-wag 0.4s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.pet-heart {
+  animation: pet-heart 1.4s ease-out infinite both;
+}
+
+.pet-zzz {
+  animation: pet-zzz 2.4s ease-in-out infinite;
+}
+
+/* 도미 사진: 걸을 때 통통 튀고, 먹을 때 고개 숙이듯 살짝 기울인다 (발바닥 기준) */
+@keyframes pet-trot {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.8deg);
+  }
+  50% {
+    transform: translateY(-1.4px) rotate(0.8deg);
+  }
+}
+
+@keyframes pet-eatnod {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+.pet-trot {
+  animation: pet-trot 0.45s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.pet-eatnod {
+  animation: pet-eatnod 0.6s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 0 0;
 }
