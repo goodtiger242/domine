@@ -39,6 +39,8 @@ const HOME: S = {
   ball: null, hand: null, item: null, bowl: null, fx: [], scroll: false, carry: null,
 };
 
+/** 연출 전체의 속도 배율 (클수록 느리다) */
+const SLOW = 1.6;
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -391,7 +393,7 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
           if (say) latest.current.onSay(say);
           if (rest.x !== undefined) latest.current.onMove?.(rest.x);
           setS((prev) => ({ ...prev, ...rest }));
-        }, t)
+        }, t * SLOW)
       );
     });
     timers.current.push(
@@ -399,7 +401,7 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
         setS((prev) => ({ ...HOME, x: prev.x, y: prev.y, dir: prev.dir, dur: 400 }));
         running.current = false;
         latest.current.onDone?.();
-      }, plan.end)
+      }, plan.end * SLOW)
     );
   }
 

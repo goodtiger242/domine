@@ -82,7 +82,7 @@ export function PetGame() {
     window.setTimeout(() => {
       sceneBusyRef.current = false;
       setSceneBusy(false);
-    }, 14000);
+    }, 26000);
   }, []);
   const endScene = useCallback(() => {
     sceneBusyRef.current = false;
@@ -90,10 +90,30 @@ export function PetGame() {
   }, []);
   const sayUntil = useRef(0);
 
-  const say = useCallback((text: string) => {
-    sayUntil.current = Date.now() + 2600;
-    setBubble(text);
+  // 말풍선은 한 줄씩 충분히 읽을 시간 동안 보여 주고, 그사이 새 말은 줄을 세운다(밀리면 오래된 것부터 버림)
+  const sayQueue = useRef<string[]>([]);
+  const sayBusy = useRef(false);
+  const pump = useCallback(() => {
+    if (sayBusy.current) return;
+    const next = sayQueue.current.shift();
+    if (!next) return;
+    sayBusy.current = true;
+    const ms = Math.min(3800, Math.max(2400, 1700 + next.length * 75));
+    sayUntil.current = Date.now() + ms + 600;
+    setBubble(next);
+    window.setTimeout(() => {
+      sayBusy.current = false;
+      pump();
+    }, ms);
   }, []);
+  const say = useCallback(
+    (text: string) => {
+      sayQueue.current.push(text);
+      if (sayQueue.current.length > 2) sayQueue.current.splice(0, sayQueue.current.length - 2);
+      pump();
+    },
+    [pump]
+  );
 
   const load = useCallback(async (nickname: string) => {
     const { data, error } = await supabase.current.rpc("domine_pet_state", { p_nickname: nickname });
