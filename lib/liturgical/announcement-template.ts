@@ -13,12 +13,23 @@ type Roles = {
   organist: string;
 };
 
-/** 제목을 비워 두면 쓰는 기본 제목: 📌11월 15일 연중 제33주일 미사 📌 */
-export function defaultAnnouncementTitle(dateISO: string): string {
+/**
+ * 카드 제목 (날짜·미사 이름이 한 번만 나오도록): 📌11월 15일 연중 제33주일 미사 📌
+ * 저장된 제목이 있으면 쓰되 날짜가 없으면 앞에 붙이고, 앞뒤 📌는 항상 맞춘다.
+ */
+export function buildAnnouncementTitle(dateISO: string, stored = ""): string {
   const [, m, d] = dateISO.split("-").map(Number);
-  const name = getSundayLiturgy(dateISO)?.name;
-  const base = name ? `${m}월 ${d}일 ${name}` : `${m}월 ${d}일`;
-  return `📌${base} 미사 📌`;
+  const dateStr = `${m}월 ${d}일`;
+  const custom = stored.replace(/📌/g, "").trim();
+  let bare: string;
+  if (custom) {
+    const hasDate = new RegExp(`(?<!\\d)${m}월\\s*${d}일`).test(custom);
+    bare = hasDate ? custom : `${dateStr} ${custom}`;
+  } else {
+    const name = getSundayLiturgy(dateISO)?.name;
+    bare = `${name ? `${dateStr} ${name}` : dateStr} 미사`;
+  }
+  return `📌${bare} 📌`;
 }
 
 /** 추가 안내를 비워 두면 담당자로 만드는 기본 안내문 (📌 제목 / 🙏 구역 / 📍 담당) */

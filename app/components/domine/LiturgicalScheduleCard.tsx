@@ -4,27 +4,8 @@ import { FIXED_CONDUCTOR_NAME } from "@/lib/constants/liturgical";
 import { formatYouthMemberDisplay } from "@/lib/constants/youth-members";
 import {
   defaultAnnouncementDetail,
-  defaultAnnouncementTitle,
+  buildAnnouncementTitle,
 } from "@/lib/liturgical/announcement-template";
-import { getSundayLiturgy } from "@/lib/liturgical/sunday-names";
-
-const LITURGY_DOT: Record<string, string> = {
-  녹: "bg-green-600",
-  백: "bg-white ring-1 ring-[var(--lit-border)]",
-  자: "bg-purple-600",
-  홍: "bg-red-600",
-};
-
-function formatDateLabel(iso: string) {
-  const d = new Date(`${iso}T12:00:00`);
-  return d.toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  });
-}
-
 function RoleCell({
   label,
   value,
@@ -125,13 +106,7 @@ export function LiturgicalScheduleCard({
 
   const showRolesBlock = hasLiturgicalRoles || showEmptyRolePlaceholders;
   const conductorValue = syntheticEmpty ? "" : FIXED_CONDUCTOR_NAME;
-  const liturgy = getSundayLiturgy(schedule.liturgy_date);
-  const rawTitle =
-    schedule.title.trim() || defaultAnnouncementTitle(schedule.liturgy_date);
-  // 메인(읽기 전용) 카드는 제목 앞뒤에 📌를 항상 붙여 보여 준다
-  const title = enrich
-    ? `📌${rawTitle.replace(/📌/g, "").trim()} 📌`
-    : rawTitle;
+  const title = buildAnnouncementTitle(schedule.liturgy_date, schedule.title);
   const detail =
     schedule.announcement_detail.trim() ||
     (hasLiturgicalRoles ? defaultAnnouncementDetail(schedule) : "");
@@ -146,35 +121,9 @@ export function LiturgicalScheduleCard({
     >
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p
-            className={
-              enrich
-                ? "flex flex-wrap items-center gap-x-2 text-[13px] font-medium leading-snug tracking-[-0.01em] text-[var(--lit-ink-muted)]"
-                : "text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[var(--lit-ink-subtle)]"
-            }
-          >
-            {formatDateLabel(schedule.liturgy_date)}
-          </p>
-          {liturgy ? (
-            <p className="mt-1.5 flex items-center gap-2 text-[13px] font-semibold leading-snug tracking-[-0.01em] text-[var(--lit-ink-muted)]">
-              <span
-                aria-hidden
-                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${LITURGY_DOT[liturgy.color] ?? ""}`}
-              />
-              <span className="break-keep">{liturgy.name}</span>
-            </p>
-          ) : null}
-          {title ? (
-            <h3
-              className={`mt-3 tracking-tight text-[var(--lit-ink)] ${
-                enrich
-                  ? "text-xl font-semibold leading-snug sm:text-2xl"
-                  : "text-xl font-light"
-              }`}
-            >
-              {title}
-            </h3>
-          ) : null}
+          <h3 className="text-[clamp(0.9rem,calc((100vw-4.5rem)/17.5),1.5rem)] font-semibold leading-snug tracking-tight text-[var(--lit-ink)]">
+            {title}
+          </h3>
         </div>
         {showEditLink ? (
           <Link
