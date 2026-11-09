@@ -2,6 +2,10 @@ import Link from "next/link";
 import type { LiturgicalSchedule } from "@/app/actions/liturgical";
 import { FIXED_CONDUCTOR_NAME } from "@/lib/constants/liturgical";
 import { formatYouthMemberDisplay } from "@/lib/constants/youth-members";
+import {
+  defaultAnnouncementDetail,
+  defaultAnnouncementTitle,
+} from "@/lib/liturgical/announcement-template";
 import { getSundayLiturgy } from "@/lib/liturgical/sunday-names";
 
 const LITURGY_DOT: Record<string, string> = {
@@ -122,6 +126,11 @@ export function LiturgicalScheduleCard({
   const showRolesBlock = hasLiturgicalRoles || showEmptyRolePlaceholders;
   const conductorValue = syntheticEmpty ? "" : FIXED_CONDUCTOR_NAME;
   const liturgy = getSundayLiturgy(schedule.liturgy_date);
+  const title =
+    schedule.title.trim() || defaultAnnouncementTitle(schedule.liturgy_date);
+  const detail =
+    schedule.announcement_detail.trim() ||
+    (hasLiturgicalRoles ? defaultAnnouncementDetail(schedule) : "");
 
   return (
     <article
@@ -151,7 +160,7 @@ export function LiturgicalScheduleCard({
               <span className="break-keep">{liturgy.name}</span>
             </p>
           ) : null}
-          {schedule.title.trim() ? (
+          {title ? (
             <h3
               className={`mt-2 tracking-tight text-[var(--lit-ink)] ${
                 enrich
@@ -159,7 +168,7 @@ export function LiturgicalScheduleCard({
                   : "text-xl font-light"
               }`}
             >
-              {schedule.title}
+              {title}
             </h3>
           ) : null}
         </div>
@@ -173,7 +182,7 @@ export function LiturgicalScheduleCard({
         ) : null}
       </div>
 
-      {schedule.announcement_detail.trim() ? (
+      {detail ? (
         <div className={enrich ? "mb-4" : "mb-6"}>
           <p
             className={`whitespace-pre-wrap text-[var(--lit-ink)] ${
@@ -182,7 +191,7 @@ export function LiturgicalScheduleCard({
                 : "text-[15px] leading-[1.75]"
             }`}
           >
-            {schedule.announcement_detail}
+            {detail}
           </p>
         </div>
       ) : null}
