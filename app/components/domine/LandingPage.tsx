@@ -39,7 +39,7 @@ export function LandingPage({
         <div className="flex flex-col">
           <section
             id="home-military"
-            className="order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-1"
+            className="cos-stagger-1 order-1 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] lg:order-1"
           >
             <div className="mx-auto max-w-3xl px-4 pb-2 pt-5 md:px-6 md:pb-3 md:pt-7 lg:px-2">
               <div className="overflow-hidden rounded-xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.03] dark:ring-white/[0.05]">
@@ -62,10 +62,10 @@ export function LandingPage({
             schedules={[]}
             variant="home"
             homeLiturgical={homeLiturgical}
-            sectionClassName="order-2 lg:order-2"
+            sectionClassName="cos-stagger-2 order-2 lg:order-2"
           />
 
-          <div className="order-3 lg:order-3">
+          <div className="cos-stagger-3 order-3 lg:order-3">
             <LiturgicalMinisterPrayersSection compact />
           </div>
         </div>

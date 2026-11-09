@@ -38,11 +38,11 @@ export default async function LiturgicalEditPage({
               관리
             </p>
             <h1
-              className="mt-4 text-3xl font-medium tracking-[-0.03em] text-[var(--lit-ink)] md:text-4xl"
+              className="t-title mt-4 text-[var(--lit-ink)]"
             >
               전례 봉사 편집
             </h1>
-            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--lit-ink-muted)]">
+            <p className="t-body mt-4 max-w-xl text-[var(--lit-ink-muted)]">
               미사 날짜를 고른 뒤 봉사자를 입력하고 저장합니다. 메인·전례 안내에 반영됩니다.
             </p>
             <Link

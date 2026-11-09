@@ -58,7 +58,7 @@ export function LiturgicalMinisterPrayersSection({
     <section
       id="home-prayers"
       className={`scroll-mt-28 border-t border-[var(--lit-border)]/80 bg-[var(--lit-bg)] px-5 md:px-10 lg:scroll-mt-24 lg:px-12 ${
-        compact ? "pb-10 pt-2 md:py-16" : "py-24 md:py-32"
+        compact ? "pb-12 pt-8 md:py-16" : "py-24 md:py-32"
       }`}
       aria-labelledby="liturgical-prayers-heading"
     >
@@ -67,7 +67,7 @@ export function LiturgicalMinisterPrayersSection({
           id="liturgical-prayers-heading"
           className={`tracking-[-0.03em] text-[var(--lit-ink)] text-pretty max-lg:leading-snug ${
             compact
-              ? "text-2xl font-medium sm:text-3xl md:text-4xl"
+              ? "t-title"
               : "mt-4 text-center text-[clamp(1.75rem,4.5vw,2.5rem)] font-light max-lg:text-[clamp(1.5rem,5.2vw,1.95rem)] md:mt-6"
           }`}
         >
@@ -92,7 +92,7 @@ export function LiturgicalMinisterPrayersSection({
                     role="tab"
                     aria-selected={selected}
                     onClick={() => setActivePrayer(key as "before" | "after")}
-                    className={`h-10 text-xs font-semibold tracking-[0.08em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lit-ring)] ${
+                    className={`h-11 text-[13px] font-semibold tracking-[0.08em] transition duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--lit-ring)] ${
                       selected
                         ? "bg-[var(--lit-ink)] text-[var(--lit-bg-elevated)]"
                         : "text-[var(--lit-ink-muted)] hover:bg-[var(--lit-bg)] hover:text-[var(--lit-ink)]"
@@ -104,7 +104,7 @@ export function LiturgicalMinisterPrayersSection({
               })}
             </div>
             <div className="mt-3 rounded-xl border border-[var(--lit-border)]/90 bg-[var(--lit-bg-elevated)] p-4 shadow-[var(--lit-paper-shadow-soft)] ring-1 ring-black/[0.02] dark:ring-white/[0.04]">
-              <div className="space-y-1.5 text-[15px] leading-[1.65] text-[var(--lit-ink-muted)]">
+              <div key={activePrayer} className="fade-in t-body space-y-1.5 text-[var(--lit-ink-muted)]">
                 {activePrayerLines.map((line, i) => (
                   <p key={i}>{line}</p>
                 ))}

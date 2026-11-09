@@ -55,6 +55,43 @@
   --font-display: var(--font-lit-display);
 }
 
+/* 글자 크기 단계: title 28/36 · heading 20 · body 15 · label 13 · caption 11 */
+.t-title {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+@media (min-width: 768px) {
+  .t-title {
+    font-size: 2.25rem;
+  }
+}
+
+.t-heading {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.t-body {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+.t-label {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.t-caption {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 5.5rem;
@@ -74,6 +111,9 @@ html {
   .cos-stagger-2,
   .cos-stagger-3,
   .cos-stagger-4,
+  .slide-next,
+  .slide-prev,
+  .fade-in,
   .mil-scroll-far,
   .mil-scroll-hill,
   .mil-scroll-road,
@@ -192,7 +232,7 @@ html {
 @keyframes cos-reveal {
   from {
     opacity: 0;
-    transform: translate3d(0, 28px, 0);
+    transform: translate3d(0, 16px, 0);
   }
   to {
     opacity: 1;
@@ -201,16 +241,49 @@ html {
 }
 
 .cos-stagger-1 {
-  animation: cos-reveal 1s var(--cos-ease) 0.08s both;
+  animation: cos-reveal 0.6s var(--cos-ease) 0.05s both;
 }
 .cos-stagger-2 {
-  animation: cos-reveal 1s var(--cos-ease) 0.2s both;
+  animation: cos-reveal 0.6s var(--cos-ease) 0.15s both;
 }
 .cos-stagger-3 {
-  animation: cos-reveal 1s var(--cos-ease) 0.32s both;
+  animation: cos-reveal 0.6s var(--cos-ease) 0.25s both;
 }
 .cos-stagger-4 {
-  animation: cos-reveal 1s var(--cos-ease) 0.44s both;
+  animation: cos-reveal 0.6s var(--cos-ease) 0.35s both;
+}
+
+/* 미사 카드 넘길 때: 넘기는 방향에서 들어온다 */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+}
+
+.slide-next {
+  animation: slide-in-right 0.3s var(--cos-ease-out-soft) both;
+}
+
+.slide-prev {
+  animation: slide-in-left 0.3s var(--cos-ease-out-soft) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.25s ease-out both;
 }
 
 @keyframes sheet-up {

@@ -52,10 +52,10 @@ function DenseRoleSlot({
   const shown = trimmed ? formatYouthMemberDisplay(value) : "";
   return (
     <div className="flex min-w-0 items-baseline justify-between gap-3">
-      <span className="shrink-0 text-xs font-semibold leading-tight tracking-[-0.01em] text-[var(--lit-ink-muted)]">
+      <span className="t-label shrink-0 font-semibold text-[var(--lit-ink-muted)]">
         {label}
       </span>
-      <span className="min-w-0 break-keep text-right text-sm font-medium leading-snug text-[var(--lit-ink)] sm:text-[15px]">
+      <span className="t-body min-w-0 break-keep text-right font-medium !leading-snug text-[var(--lit-ink)]">
         {shown || "\u00a0"}
       </span>
     </div>
@@ -140,7 +140,7 @@ export function LiturgicalScheduleCard({
           <p
             className={`whitespace-pre-wrap text-[var(--lit-ink)] ${
               enrich
-                ? "text-sm leading-relaxed"
+                ? "t-body"
                 : "text-[15px] leading-[1.75]"
             }`}
           >

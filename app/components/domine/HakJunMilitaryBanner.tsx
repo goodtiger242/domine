@@ -60,7 +60,7 @@ export function MilitaryServiceCompactCard({ member }: CardProps) {
       </div>
 
       <div className="mx-auto mt-2 max-w-[12rem] md:mt-3">
-        <p className="truncate text-[13px] font-semibold tracking-[-0.01em] text-[var(--lit-ink)] md:text-[15px]">
+        <p className="t-label truncate font-semibold text-[var(--lit-ink)] md:text-[15px]">
           {member.label}
         </p>
         <div className="mt-1.5 flex items-baseline justify-center gap-2.5 md:mt-2 md:gap-3">
@@ -71,7 +71,7 @@ export function MilitaryServiceCompactCard({ member }: CardProps) {
             {pctLabel}%
           </span>
         </div>
-        <p className="mt-1.5 break-keep text-[10px] leading-relaxed text-[var(--lit-ink-muted)] md:mt-2 md:text-[11px]">
+        <p className="t-caption mt-1.5 break-keep text-[var(--lit-ink-muted)] md:mt-2">
           {formatShortDate(member.enlistDate)} -{" "}
           {formatShortDate(member.dischargeDate)}
         </p>
