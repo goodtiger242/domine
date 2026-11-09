@@ -74,7 +74,10 @@ html {
   .cos-stagger-2,
   .cos-stagger-3,
   .cos-stagger-4,
-  .mil-march,
+  .mil-scroll-far,
+  .mil-scroll-hill,
+  .mil-scroll-road,
+  .mil-scroll-tufts,
   .mil-swing-a,
   .mil-swing-b,
   .mil-bob,
@@ -82,17 +85,23 @@ html {
   .mil-wag {
     animation: none !important;
   }
-  .mil-march {
-    transform: translateX(70px) !important;
+}
+
+@keyframes mil-scroll-200 {
+  to {
+    transform: translateX(-200px);
   }
 }
 
-@keyframes mil-march-across {
-  from {
-    transform: translateX(-70px);
-  }
+@keyframes mil-scroll-50 {
   to {
-    transform: translateX(210px);
+    transform: translateX(-50px);
+  }
+}
+
+@keyframes mil-scroll-20 {
+  to {
+    transform: translateX(-20px);
   }
 }
 
@@ -139,8 +148,21 @@ html {
 }
 
 /* 관절 기준 회전: 부모 g 의 translate 가 만든 로컬 원점(0,0)이 회전축 */
-.mil-march {
-  animation: mil-march-across 16s linear infinite;
+/* 걷는 속도(한 걸음 주기 0.5s)에 맞춰 층마다 다른 속도로 흘림: 멀수록 느리게 */
+.mil-scroll-far {
+  animation: mil-scroll-200 18s linear infinite;
+}
+
+.mil-scroll-hill {
+  animation: mil-scroll-200 9s linear infinite;
+}
+
+.mil-scroll-road {
+  animation: mil-scroll-20 0.6s linear infinite;
+}
+
+.mil-scroll-tufts {
+  animation: mil-scroll-50 1.5s linear infinite;
 }
 
 .mil-swing-a,
@@ -151,20 +173,20 @@ html {
 }
 
 .mil-swing-a {
-  animation: mil-swing-a 1s ease-in-out infinite;
+  animation: mil-swing-a 0.5s ease-in-out infinite;
 }
 
 .mil-swing-b {
-  animation: mil-swing-b 1s ease-in-out infinite;
+  animation: mil-swing-b 0.5s ease-in-out infinite;
 }
 
 .mil-bob,
 .mil-bob-fast {
-  animation: mil-bob 1s ease-in-out infinite;
+  animation: mil-bob 0.5s ease-in-out infinite;
 }
 
 .mil-wag {
-  animation: mil-wag 0.5s ease-in-out infinite;
+  animation: mil-wag 0.3s ease-in-out infinite;
 }
 
 @keyframes cos-reveal {
