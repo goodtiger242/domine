@@ -11,3 +11,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## 모바일·브라우저
 
 모바일·주요 브라우저에서 깨짐 없이 읽히게 하는 보수적 기준은 `.cursor/rules/mobile-browser-baseline.mdc` 를 따른다.
+
+## 이미지 규칙 (기본 절차)
+
+사이트에 새 이미지를 넣을 때는 항상 `scripts/optimize_images.py`로 먼저 줄이고 WebP로 바꾼다(투명 배경 유지).
+`--kind character`(640px) / `item`(256px) / `background`(1200px). 원본 PNG·JPG는 `public/`에 두지 않는다.
+SVG 안의 `<image>` 처럼 `next/image`를 못 쓰는 곳은 이 변환 결과를 직접 참조하고, 처음 화면에 필요 없는 이미지는 필요할 때 불러온다.

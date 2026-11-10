@@ -8,9 +8,9 @@ import type { PetFace, PetStage } from "@/lib/domine/pet";
  */
 export const DOG_W: Record<PetStage, number> = { baby: 50, young: 66, adult: 76 };
 const HREF: Record<PetStage, string> = {
-  baby: "/pet/puppy.png",
-  young: "/pet/puppy.png",
-  adult: "/pet/adult.png",
+  baby: "/pet/puppy.webp",
+  young: "/pet/puppy.webp",
+  adult: "/pet/adult.webp",
 };
 export const RATIO = 622 / 900;
 
