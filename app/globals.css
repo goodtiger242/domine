@@ -750,6 +750,24 @@ body {
   transform-origin: 0 0;
 }
 
+.pet-photo-fade {
+  transition: opacity 1.2s ease-in-out;
+}
+
+@keyframes pet-photo-pan {
+  from { transform: translateX(8px); }
+  to { transform: translateX(-8px); }
+}
+
+.pet-photo-pan {
+  animation: pet-photo-pan 8s ease-in-out 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-photo-fade { transition: none; }
+  .pet-photo-pan { animation: none; }
+}
+
 .pet-sit {
   transform-box: view-box;
   transform-origin: 0 0;

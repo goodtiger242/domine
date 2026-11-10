@@ -5,6 +5,7 @@ import type { PetAction, PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
 import { ART, BALL, BOWL, preloadArt } from "@/lib/domine/pet-art";
 import { line } from "@/lib/domine/pet-lines";
+import { BACKGROUNDS, backgroundAt, POSES } from "@/lib/domine/pet-photos";
 import { DOG_W, PetDog, RATIO } from "./PetDog";
 
 /**
@@ -404,6 +405,43 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
   const latest = useRef({ stage, onSay, onMove, onDone });
   latest.current = { stage, onSay, onMove, onDone };
   const running = useRef(false);
+  const period = backgroundAt(hour);
+  const [photos, setPhotos] = useState<Record<string, boolean>>({});
+  const [shown, setShown] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const images: HTMLImageElement[] = [];
+    const load = (src: string, current = false) => {
+      const img = new Image();
+      images.push(img);
+      img.decoding = "async";
+      img.onload = () => {
+        if (cancelled) return;
+        setPhotos((prev) => ({ ...prev, [src]: true }));
+        if (current) window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+          if (!cancelled) setShown(src);
+        }));
+      };
+      img.onerror = () => { if (current && !cancelled) setShown(null); };
+      img.src = src;
+    };
+    load(BACKGROUNDS[period], true);
+    const idle = () => {
+      Object.values(BACKGROUNDS).filter((src) => src !== BACKGROUNDS[period]).forEach((src) => load(src));
+      Object.values(POSES).forEach(({ src }) => load(src));
+    };
+    const supportsIdle = typeof window.requestIdleCallback === "function";
+    const id = supportsIdle
+      ? window.requestIdleCallback(idle, { timeout: 4000 })
+      : window.setTimeout(idle, 2500);
+    return () => {
+      cancelled = true;
+      images.forEach((img) => { img.onload = null; img.onerror = null; });
+      if (supportsIdle) window.cancelIdleCallback(id);
+      else window.clearTimeout(id);
+    };
+  }, [period]);
 
   function run(plan: Plan) {
     timers.current.forEach(window.clearTimeout);
@@ -486,6 +524,14 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
       </g>
       <rect y="66" width="160" height="30" fill={c.ground} />
 
+      <g pointerEvents="none" className={s.scroll ? "pet-photo-pan" : undefined}>
+        {Object.values(BACKGROUNDS).filter((src) => photos[src]).map((src) => (
+          <image key={src} href={src} x="-10" y="6" width="180" height="90"
+            preserveAspectRatio="xMidYMid slice" className="pet-photo-fade"
+            style={{ opacity: shown === src ? 1 : 0 }} />
+        ))}
+      </g>
+
       {s.bowl !== null ? (
         <g transform={`translate(${s.bowl} ${HOME.y + 1})`} className="fade-in">
           <image href={BOWL} x={-12} y={-13} width={24} height={14} />
@@ -508,6 +554,7 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
           motion={s.motion}
           light={light}
           collar={collar}
+          photos={photos}
           onTap={() => {
             // 한 연출이 끝나기 전에는 다른 연출을 시작하지 않는다
             if (!running.current) run(makePlan("tap", w));

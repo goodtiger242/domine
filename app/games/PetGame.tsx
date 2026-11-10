@@ -271,18 +271,18 @@ export function PetGame() {
     <div>
       {head}
       <div className="space-y-2.5">
-      <div className="relative overflow-hidden rounded-2xl border border-[var(--lit-border)] shadow-[var(--lit-paper-shadow-soft)]">
-        <PetScene
+      <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] shadow-[var(--lit-paper-shadow-soft)]">
+        {pet && <PetScene
           stage={stage}
           face={face}
-          light={isNight ? 0.6 : hour < 6 || hour >= 18 ? 0.82 : 1}
+          light={isNight ? 0.8 : hour < 7 || hour >= 17 ? 0.9 : 1}
           hour={hour}
           collar={collar.hex}
           cue={cue}
           onSay={say}
           onMove={setDogX}
           onDone={endScene}
-        />
+        />}
         <div className="pointer-events-none absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-white backdrop-blur-sm">
           <span className="text-[13px] font-semibold leading-none">도미</span>
           <span className="text-[10px] leading-none opacity-80">
