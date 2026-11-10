@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { PetAction, PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
+import { ART, BALL, BOWL, preloadArt } from "@/lib/domine/pet-art";
 import { line } from "@/lib/domine/pet-lines";
-import { DOG_W, PetBowl, PetDog, RATIO } from "./PetDog";
+import { DOG_W, PetDog, RATIO } from "./PetDog";
 
 /**
  * 도미가 노는 장면. 행동마다 여러 가지 연출(대본)이 있고 그중 하나를 무작위로 고른다.
@@ -292,10 +293,13 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
     if (variant === "soap") {
       return mk([
         [0, { item: { e: "🧴", x: P(0, 0).x, y: top, dur: 0, size: 13 }, say: line("bath_soap") }],
-        [500, { fx: ["bubbles"], motion: "pet-wiggle", say: line("bath_foam") }],
+        [500, { item: { e: "sponge", x: P(-w * 0.2, 0).x, y: L.y - h * 0.62, dur: 0, size: 9 }, fx: ["bubbles"], motion: "pet-wiggle", say: line("bath_foam") }],
+        [900, { item: { e: "sponge", x: P(w * 0.2, 0).x, y: L.y - h * 0.62, dur: 380, size: 9 } }],
+        [1300, { item: { e: "sponge", x: P(-w * 0.15, 0).x, y: L.y - h * 0.6, dur: 380, size: 9 } }],
         [1700, { item: { e: "🚿", x: P(0, 0).x, y: top - 2, dur: 0, size: 15 }, fx: ["drops", "bubbles"], motion: null, say: line("bath_rinse") }],
         [2800, { item: null, fx: ["spray"], motion: "pet-shake", say: line("bath_shake") }],
-        [3700, { fx: [], motion: null, say: line("bath_done") }]], 4200);
+        [3700, { fx: [], motion: "pet-wiggle", item: { e: "towel", x: P(0, 0).x, y: L.y - h * 0.72, dur: 0, size: 12 }, say: line("bath_done") }],
+        [4500, { item: null, motion: null }]], 4800);
     }
     const bucket = variant === "bucket";
     return mk([
@@ -303,7 +307,8 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
       [500, { fx: ["drops"] }],
       [1500, { fx: ["drops", "bubbles"], say: line("bath_foam") }],
       [2400, { item: null, fx: ["spray"], motion: "pet-shake", say: line("bath_shake") }],
-      [3300, { fx: [], motion: null, say: line("bath_done") }]], 3800);
+      [3300, { fx: [], motion: "pet-wiggle", item: { e: "towel", x: P(0, 0).x, y: L.y - h * 0.72, dur: 0, size: 12 }, say: line("bath_done") }],
+      [4100, { item: null, motion: null }]], 4400);
   }
 
   if (action === "train") {
@@ -360,6 +365,24 @@ function makePlan(action: PetAction | "tap", w: number): Plan {
   return mk(steps, 4100);
 }
 
+/** 소품: 사진이 있으면 사진(가운데 기준), 없으면 이모지 */
+function Prop({ e, size, className }: { e: string; size: number; className?: string }) {
+  const src = ART[e];
+  if (src) {
+    const s2 = size * 1.7;
+    return <image href={src} x={-s2 / 2} y={-s2 * 0.75} width={s2} height={s2} className={className} />;
+  }
+  return (
+    <text textAnchor="middle" fontSize={size} className={className}>
+      {e}
+    </text>
+  );
+}
+
+function Ball() {
+  return <image href={BALL} x={-3.2} y={-3.2} width={6.4} height={6.4} />;
+}
+
 type Props = {
   stage: PetStage;
   face: PetFace;
@@ -412,6 +435,7 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
   }, [cue?.id]);
 
   useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+  useEffect(() => preloadArt(), []);
 
   const c = skyAt(hour);
   const body = bodyAt(hour);
@@ -464,7 +488,7 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
 
       {s.bowl !== null ? (
         <g transform={`translate(${s.bowl} ${HOME.y + 1})`} className="fade-in">
-          <PetBowl />
+          <image href={BOWL} x={-12} y={-13} width={24} height={14} />
         </g>
       ) : null}
 
@@ -472,14 +496,11 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
       <g style={move(s.x, s.y, s.dur, ` scale(${s.dir * sc}, ${sc})`)}>
         <ellipse cx="0" cy="1" rx={w * 0.42} ry="3" fill="#000" opacity="0.28" />
         {s.carry ? (
-          <circle
-            cx={{ mouth: w * 0.47, back: 0, tail: -w * 0.47, head: w * 0.34 }[s.carry]}
-            cy={{ mouth: -h * 0.76, back: -h * 0.8, tail: -h * 0.33, head: -h * 1.0 }[s.carry]}
-            r="2.4"
-            fill="#e6ef3d"
-            stroke="#9aa313"
-            strokeWidth="0.4"
-          />
+          <g
+            transform={`translate(${{ mouth: w * 0.47, back: 0, tail: -w * 0.47, head: w * 0.34 }[s.carry]} ${{ mouth: -h * 0.76, back: -h * 0.8, tail: -h * 0.33, head: -h * 1.0 }[s.carry]})`}
+          >
+            <Ball />
+          </g>
         ) : null}
         <PetDog
           stage={stage}
@@ -551,20 +572,19 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
       {/* 도구·공·손 */}
       {s.ball ? (
         <g style={move(s.ball.x, s.ball.y, s.ball.dur)}>
-          <circle r="2.6" fill="#e6ef3d" stroke="#9aa313" strokeWidth="0.4" />
-          <path d="M-2.2 -1 Q0 0.6 2.2 -1" stroke="#fff" strokeWidth="0.5" fill="none" />
+          <Ball />
         </g>
       ) : null}
       {s.item ? (
-        <text textAnchor="middle" fontSize={s.item.size} style={move(s.item.x, s.item.y, s.item.dur)}>
-          {s.item.e}
-        </text>
+        <g style={move(s.item.x, s.item.y, s.item.dur)}>
+          <Prop e={s.item.e} size={s.item.size} />
+        </g>
       ) : null}
       {s.hand ? (
         <g style={move(s.hand.x, s.hand.y, s.hand.dur)} pointerEvents="none">
-          <text textAnchor="middle" fontSize="15" className={s.hand.stroke ? "pet-stroke" : undefined} style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,.35))" }}>
-            {s.hand.e}
-          </text>
+          <g className={s.hand.stroke ? "pet-stroke" : undefined} style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,.35))" }}>
+            <Prop e={s.hand.e} size={15} />
+          </g>
         </g>
       ) : null}
     </svg>
