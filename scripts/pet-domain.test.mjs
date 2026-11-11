@@ -55,17 +55,25 @@ s=reduce(s,{type:"resume"}); s=reduce(s,{type:"map",map:"D5",id:4});
 assert.equal(s.committedMap,"E5"); assert.equal(reduce(s,{type:"map-ready",id:3}),s);
 s=reduce(s,{type:"map-ready",id:4}); assert.equal(s.committedMap,"D5"); assert.equal(s.visual,"switching-map");
 s=reduce(s,{type:"done",id:4}); assert.equal(s.visual,"idle");
-const actions=["feed","treat","pet","play","walk","brush","bath","train","tap","priest"];
+const actions=["feed","treat","pet","play","walk","brush","bath","train","tap","priest","sleep","shop"];
 let plans=0;
-for (const [map, zone] of Object.entries(SAFE_ZONES)) for (const scale of [1,.72]) for (const width of [18,22,26]) for (const action of actions) for (let seed=1;seed<=20;seed++) {
+for (const [map, zone] of Object.entries(SAFE_ZONES)) for (const scale of [1,.8]) for (const width of [18,22,26]) for (const action of actions) for (let seed=1;seed<=20;seed++) {
   let x=seed; const random=()=>((x=(x*1664525+1013904223)>>>0)/2**32);
-  const w=width*scale*(map==="church"?.85:1), bounds=actorBounds(w);
-  const plan=buildScenePlan({action,id:1},{map,width:w,ratio:.76},random);
+  const propScale=2*(scale === .8 ? .8/.72 : 1)*(map==="church"?.85:1);
+  const w=width*2*scale*(map==="church"?.85:1), bounds=actorBounds(w);
+  const plan=buildScenePlan({action,id:1,shop:3},{map,width:w,ratio:.76,propScale},random);
   assert.ok(plan.durationMs<=4500);
   for (const f of [...plan.keyframes,{pose:plan.finalPose}]) {
     assert.ok(f.pose.x+bounds.left>=zone.left-1e-9 && f.pose.x+bounds.right<=zone.right+1e-9);
     assert.ok(f.pose.y>=zone.top && f.pose.y+bounds.bottom<=zone.bottom);
-    if (f.pose.ball) assert.ok(f.pose.ball.x>=6.2 && f.pose.ball.x<=153.8 && f.pose.ball.y>=18 && f.pose.ball.y<=80.8);
+    assert.ok(f.pose.y+bounds.top>=6, "head and hat stay within the scene");
+    if (f.pose.bowl !== null) assert.ok(f.pose.bowl-12*propScale*.7>=3 && f.pose.bowl+12*propScale*.7<=157);
+    for (const prop of [f.pose.item, f.pose.hand].filter(Boolean)) {
+      const size=(prop.size ?? 15)*propScale*1.7;
+      assert.ok(prop.x-size/2>=3-1e-9 && prop.x+size/2<=157+1e-9);
+      assert.ok(prop.y-size*.75>=9-1e-9 && prop.y+size*.25<=90+1e-9);
+    }
+    if (f.pose.ball) assert.ok(f.pose.ball.x>=3+3.2*propScale && f.pose.ball.x<=157-3.2*propScale && f.pose.ball.y>=18 && f.pose.ball.y<=84-3.2*propScale);
   }
   for(let t=0;t<=plan.durationMs;t+=125) assert.ok(Number.isFinite(sampleScenePlan(plan,t).x));
   assert.deepEqual(sampleScenePlan(plan,plan.durationMs),plan.finalPose); plans++;

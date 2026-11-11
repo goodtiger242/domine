@@ -10,7 +10,7 @@ import { queueSpeech, type Speech } from "@/lib/domine/pet-bubble";
 import { actionsForMap } from "@/lib/domine/pet-maps";
 import { worldCell } from "@/lib/domine/pet-world";
 import { PETS, petText } from "@/lib/domine/pet-photos";
-import { encounterFor } from "@/lib/domine/pet-battle-view";
+import { encounterFor, encounterSlot, ENCOUNTER_STORAGE, readEncounterWins } from "@/lib/domine/pet-battle-view";
 import { PET_LEGAL_NAMES } from "@/lib/domine/pet-identity";
 import type { PetApi } from "@/lib/domine/pet-rpc";
 import { visualLocked } from "@/lib/domine/pet-machine";
@@ -52,6 +52,10 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   const { machine, shared: pet, personal, care } = game;
   const [sheet, setSheet] = useState<Sheet>(null), [category, setCategory] = useState<PetCategory>("먹이");
   const [encounter, setEncounter] = useState<ReturnType<typeof encounterFor>>(null);
+  const [slot, setSlot] = useState(encounterSlot);
+  const [wins, setWins] = useState<string[]>([]);
+  const [animalMap, setAnimalMap] = useState(false), [noOpponent, setNoOpponent] = useState(false);
+  const [storageError, setStorageError] = useState("");
   const [nameSearch, setNameSearch] = useState(""), [connecting, setConnecting] = useState(false);
   const query = nameSearch.normalize("NFC").trim();
   const [invalidName, setInvalidName] = useState(false);
@@ -64,11 +68,12 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   const groups = availableActionGroups(actionsForMap(PET_ACTIONS, cell.theme));
   const selected = groups.find((g) => g.category === category) ?? groups[0];
   const locked = sheet === "battle" || !game.worldReady || visualLocked(machine), disabled = !game.registered || game.capability !== "ready" || machine.command !== "idle";
-  const notice = game.capability === "missing" ? "우리 강아지 준비 중 · 돌보기는 계속할 수 있어요."
-    : game.capability === "error" ? "우리 강아지 연결을 확인하지 못했어요. 잠시 후 다시 열어 주세요."
+  const notice = game.capability === "missing" ? "강아지를 준비 중이에요."
+    : game.capability === "error" ? "연결을 확인하지 못했어요."
     : !game.registered ? "내 이름을 입력하면 함께 키울 수 있어요" : "";
   const busyText = game.busy ? `${game.busy.nickname}님이 ${PETS[game.petId].name}에게 ${BUSY_ACTION[game.busy.action]} 중이에요` : "";
-  const status = game.message || (game.canRetry ? "응답을 확인하지 못했어요. 결과 확인을 눌러 주세요." : "") || notice;
+  const status = storageError || game.message || (game.canRetry ? "응답을 확인하지 못했어요." : "") || notice;
+  const currentEncounter = encounterFor(cell.id, personal?.levels?.[game.petId] ?? personal?.player?.level ?? 1, slot, wins);
   const careLocked = locked || !!game.busy || (!!game.features?.busyLock && machine.command !== "idle");
   const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeeches((queue) => queueSpeech(queue, { text, speaker })), []);
   const strokePet = useCallback(() => care("pet", true), [care]);
@@ -100,15 +105,52 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   }, [speech, game.active, sheet]);
   useEffect(() => { setHour(new Date().getHours()); }, []);
   useEffect(() => {
+    if (sheet === "battle") return;
+    const refresh = () => {
+      const next = encounterSlot();
+      setSlot(next);
+      try { setWins(previous => [...new Set([...previous.filter(key => key.startsWith(`${next}:`)), ...readEncounterWins(window.localStorage, next)])]); }
+      catch { /* Storage may be unavailable; keep this session's wins. */ }
+    };
+    refresh();
+    const timer = setInterval(refresh, 60000);
+    window.addEventListener("storage", refresh);
+    return () => { clearInterval(timer); window.removeEventListener("storage", refresh); };
+  }, [sheet]);
+  useEffect(() => {
+    setNoOpponent(false);
+  }, [cell.id]);
+  useEffect(() => {
+    if (!noOpponent) return;
+    const timer = setTimeout(() => setNoOpponent(false), 5000);
+    return () => clearTimeout(timer);
+  }, [noOpponent]);
+  useEffect(() => {
     if (!game.active || sheet) return;
     const timer = setInterval(() => { setHour(new Date().getHours()); }, 9000);
     return () => clearInterval(timer);
   }, [game.active, sheet]);
-  function open(next: Sheet) { game.pause(next === "battle"); setSheet(next); }
+  function open(next: Sheet) { setNoOpponent(false); game.pause(next === "battle"); setSheet(next); }
+  function openMap(animals = false) { setAnimalMap(animals); open("map"); }
   function startBattle() {
     if (sheet || locked || machine.command !== "idle" || game.busy) return;
-    const next = encounterFor(cell.id, personal?.levels?.[game.petId] ?? personal?.player?.level ?? 1);
+    const now = encounterSlot();
+    let saved = wins;
+    try { saved = [...new Set([...wins, ...readEncounterWins(window.localStorage, now)])]; } catch { /* Use the session record. */ }
+    setSlot(now); setWins(saved);
+    const next = encounterFor(cell.id, personal?.levels?.[game.petId] ?? personal?.player?.level ?? 1, now, saved);
     if (next) { setEncounter(next); open("battle"); }
+    else setNoOpponent(true);
+  }
+  function winBattle() {
+    if (!encounter || encounter.slot !== encounterSlot()) return;
+    let next = [...new Set([...wins, `${encounter.slot}:${encounter.cellId}`])];
+    try {
+      next = [...new Set([...readEncounterWins(window.localStorage, encounter.slot), ...next.filter(key => key.startsWith(`${encounter.slot}:`))])];
+      window.localStorage.setItem(ENCOUNTER_STORAGE, JSON.stringify(next));
+      setStorageError("");
+    } catch { setStorageError("승리 기록을 저장하지 못했어요. 새로 열면 상대가 다시 보여요."); }
+    setWins(next);
   }
   function close() { setNameSearch(""); setInvalidName(false); setSheet(null); game.resume(); }
   const equipment = (slot: string) => personal?.equipment?.find((e) => e.pet_id === game.petId && e.slot === slot)?.item_id;
@@ -125,14 +167,13 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       <div role="group" aria-label="강아지 선택">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeeches([]); }}>{PETS[id].name}</button>)}</div>
       <button type="button" className="pet-record-button" onClick={() => open("record")}>{game.nickname || "내 이름"}</button>
     </div>
-    <div className="pet-progress-row">{personal && !personal.player ? <span role="status">{PETS[game.petId].name} 진행 불러오는 중… · 우리 코인(공용) {personal.coins ?? 0}</span> : <PetProgress key={game.petId} name={PETS[game.petId].name} xp={personal?.player?.xp ?? 0} coins={personal?.coins ?? personal?.player?.coins ?? 0} />}
-      {game.capability === "missing" && <span className="pet-preparing">준비 중</span>}
+    <div className="pet-progress-row">{personal && !personal.player ? <span role="status">불러오는 중… · <span aria-label={`우리 코인(공용) ${personal.coins ?? 0}`}>🪙 {personal.coins ?? 0}</span></span> : <PetProgress key={game.petId} name={PETS[game.petId].name} xp={personal?.player?.xp ?? 0} coins={personal?.coins ?? personal?.player?.coins ?? 0} />}
       {game.canRetry && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>
     {status && <PetNotice key={`${game.petId}-${status}`} parts={[status]} onOpen={() => open(game.registered ? "notice" : "record")} />}
     <div className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
-      {game.worldReady ? <PetScene key={game.petId} busyText={busyText} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => open("map")} onLocal={game.localScene} locked={locked}
-        onBattle={cell.id !== "E5" && cell.id !== "D5" ? startBattle : undefined} battleDisabled={careLocked || machine.command !== "idle"}
+      {game.worldReady ? <PetScene key={game.petId} busyText={busyText} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => openMap()} onLocal={game.localScene} locked={locked}
+        onBattle={startBattle} hasOpponent={!!currentEncounter} battleDisabled={careLocked || machine.command !== "idle"}
         tapDisabled={careLocked || machine.command !== "idle"} onPet={strokePet}
         bagToy={personal?.inventory?.find((id) => CATALOG.some((item) => item.id === id && item.slot === "toy"))}
         paused={!game.active || !!sheet || machine.visual === "paused"} stage={stage} face={face} hour={hour}
@@ -140,6 +181,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
         cue={game.cue} onSay={say} onDone={game.done} speaker={speech?.speaker} needs={pet ?? undefined}
         bubble={speech?.arrival ? speech.text : petText(speech?.text || "반가워요!", game.petId)} wearable={equipment("wearable")} toy={equipment("toy")} />
         : <p className="p-8 text-center text-sm" role="status">동네를 불러오고 있어요…</p>}
+      {noOpponent && !currentEncounter && <div className="pet-encounter-notice" role="status"><button type="button" onClick={() => openMap(true)}>여긴 겨룰 상대가 없어요 · 지도에서 🐾를 찾아보세요</button></div>}
       {pet && <div className="pointer-events-none absolute inset-x-0 bottom-0 flex gap-4 bg-gradient-to-t from-black/55 to-transparent px-3 pb-1 pt-3">
         <Mini label="배부름" icon="🍖" value={pet.fullness} color="#f5c878" /><Mini label="기분" icon="♥" value={pet.mood} color="#ffabbc" /><Mini label="청결" icon="💧" value={pet.clean ?? 80} color="#9ae4f0" />
       </div>}
@@ -159,8 +201,8 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       </button>)}
     </div>)}
     <nav className="pet-menu" aria-label="진행과 기록"><button type="button" onClick={() => open("shop")}><span aria-hidden="true">🛍️</span>상점</button><button type="button" onClick={() => open("bag")}><span aria-hidden="true">🎒</span>가방</button><button type="button" onClick={() => open("album")}><span aria-hidden="true">📖</span>도감</button><button type="button" onClick={() => open("achievements")}><span aria-hidden="true">🏅</span>업적</button><button type="button" onClick={() => open("history")}><span aria-hidden="true">🕘</span>이력</button></nav>
-    {sheet === "battle" && encounter && <PetBattleSheet key={`${encounter.cellId}:${game.petId}`} encounter={encounter} petId={game.petId} stage={stage} hour={hour} onClose={close} />}
-    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close}
+    {sheet === "battle" && encounter && <PetBattleSheet key={`${encounter.cellId}:${game.petId}`} encounter={encounter} petId={game.petId} stage={stage} hour={hour} onClose={close} onWin={winBattle} />}
+    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={wins} showAnimals={animalMap}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
     {(sheet === "shop" || sheet === "bag") && <PetShopSheet bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={game.execute} onClose={close} onSelectPet={game.selectPet} multiPet={game.multiPet} onShop={() => setSheet("shop")} />}
     {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}
@@ -168,9 +210,8 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     {sheet === "achievements" && <PetAchievementSheet badges={personal?.badges ?? []} notice={notice} onClose={close} />}
     {(sheet === "record" || sheet === "notice") && <PetSheet title={sheet === "notice" ? "안내" : "내 이름"} onClose={close}>
       {sheet === "notice" ? <p className="pet-sheet-note">{status || "새 안내가 없어요."}</p> : <>
-      {game.nickname && <p className="pet-current-name">지금: {game.nickname}</p>}
       <form className="pet-record-form" onSubmit={(event) => { event.preventDefault(); void connect(query); }}>
-        <input id={`${tabsId}-name-search`} aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder="이름" enterKeyHint="go" />
+        <input id={`${tabsId}-name-search`} aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder={game.nickname || "이름"} enterKeyHint="go" />
         {invalidName && <p role="status">도미네 청년회 이름을 정자로 사용해주세요</p>}
         <button type="submit" className="pet-primary" disabled={connecting || !query || machine.command !== "idle"}>시작</button>
       </form>

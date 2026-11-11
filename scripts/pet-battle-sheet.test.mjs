@@ -7,7 +7,7 @@ import { loadTS } from "./pet-test-loader.mjs";
 
 const require = createRequire(import.meta.url);
 const engine = loadTS("lib/domine/battle/engine.ts");
-const { encounterFor, showBattleEvent, actionLabel, battleCues, hpColor, HINT_ICON, MOVE_KIND, moveEffect } = loadTS("lib/domine/pet-battle-view.ts");
+const { encounterFor, showBattleEvent, actionLabel, battleCues, battleEffectId, hpColor, HINT_ICON, MOVE_KIND, moveEffect } = loadTS("lib/domine/pet-battle-view.ts");
 const { MOVES, PUSH } = loadTS("lib/domine/battle/data.ts");
 const { BATTLE_MOVE_FX } = loadTS("lib/domine/pet-battle-fx.ts");
 const { seedFor } = loadTS("lib/domine/battle/rng.ts");
@@ -72,19 +72,31 @@ function mount(t, props, initial, reduced = false) {
   };
   return h;
 }
-const encounter = (cell = "F5", level = 10) => encounterFor(cell, level, "2026-11-11");
+const encounter = (cell = "F5", level = 10) => {
+  for (let slot = 0; slot < 100; slot++) { const found = encounterFor(cell, level, slot); if (found) return found; }
+  throw new Error("fixture has no encounter");
+};
 function initialFor(e, petId) { return engine.createBattle({ seed: seedFor(`${e.cellId}:${petId}:0`, e.daySeed), player: engine.buildFighter(petId === 1 ? "B001" : "B002", e.playerLevel), opponent: e.fighter, difficulty: e.difficulty }); }
 
-test("조우: 성당·집 제외, 같은 날·칸 고정, 돌보기 레벨 1~30", () => {
-  for (const cell of PET_WORLD) {
-    const a = encounterFor(cell.id, 10, "2026-11-11");
-    if (["E5", "D5"].includes(cell.id)) assert.equal(a, null);
-    else { assert.deepEqual(a, encounterFor(cell.id, 10, "2026-11-11")); assert.deepEqual(a.fighter, engine.opponentFor(cell.id, a.daySeed, 10).fighter); }
+test("조우: 1000개 구간에서 30% 출현, 같은 구간·칸은 모두에게 동일", () => {
+  let count = 0, changed = 0;
+  for (let slot = 0; slot < 1000; slot++) for (const cell of PET_WORLD) {
+    const a = encounterFor(cell.id, 10, slot);
+    if (["E5", "D5"].includes(cell.id)) { assert.equal(a, null); continue; }
+    assert.deepEqual(a, encounterFor(cell.id, 10, slot));
+    if (JSON.stringify(a) !== JSON.stringify(encounterFor(cell.id, 10, slot + 1))) changed++;
+    if (a) {
+      count++;
+      assert.deepEqual(a.fighter, encounterFor(cell.id, 30, slot).fighter);
+      assert.deepEqual(a.npc, encounterFor(cell.id, 1, slot).npc);
+      assert.equal(encounterFor(cell.id, 10, slot, [`${slot}:${cell.id}`]), null);
+    }
   }
+  assert.ok(count / 98000 >= .27 && count / 98000 <= .33, `appearance rate ${count / 98000}`);
+  assert.ok(changed > 0);
   assert.equal(encounter("F5", 80).playerLevel, 30);
   assert.equal(encounter("F5", -2).playerLevel, 1);
   assert.equal(encounter("F5", NaN).playerLevel, 1);
-  assert.notEqual(encounter().daySeed, encounterFor("F5", 10, "2026-11-12").daySeed);
 });
 
 test("버틸 힘 색: 50%, 20% 경계와 빈 막대", () => {
@@ -94,13 +106,11 @@ test("버틸 힘 색: 50%, 20% 경계와 빈 막대", () => {
 test("등장 2.4초, 18ms 타이핑, 탭 완성·진행, 기술↔뒤로, 가방", t => {
   const h = mount(t, { encounter: encounter(), petId: 1, stage: "adult", onClose() {} });
   assert.equal(h.tree.type, "dialog"); assert.equal(h.body.style.overflow, "hidden");
-  h.advance(2399); assert.equal(h.phase, "intro"); h.advance(1); assert.equal(h.phase, "playback");
+  h.advance(2399); assert.equal(h.phase, "intro"); h.advance(1); assert.equal(h.phase, "command");
+  assert.equal(nodes(h.tree, n => n.props.className === "pet-battle-message").length, 0);
   const visible = () => text(nodes(h.tree, n => n.props.className === "pet-battle-message")[0].props.children[0]);
-  assert.equal(visible(), ""); h.advance(18); assert.equal(Array.from(visible()).length, 1);
-  h.click("대사 모두 보기"); assert.match(visible(), /함께 나왔어요/);
-  h.advance(899); assert.equal(h.phase, "playback"); h.advance(1); assert.equal(h.phase, "command");
   h.click("기술"); assert.equal(h.actions().length, 5);
-  for (const b of h.actions()) if (b.props["data-kind"] === "attack") assert.ok(text(b).includes(HINT_ICON[b.props["data-hint"]]));
+  for (const b of h.actions()) assert.ok(b.props["aria-label"].includes("기력"));
   h.click("뒤로"); assert.equal(h.actions().length, 0);
   h.click("가방"); assert.equal(h.phase, "playback"); h.click("대사 모두 보기"); assert.match(visible(), /가방이 비었어요/); h.click("다음 대사"); assert.equal(h.phase, "command");
   h.unmount();
@@ -109,9 +119,9 @@ test("등장 2.4초, 18ms 타이핑, 탭 완성·진행, 기술↔뒤로, 가방
 for (const [petId, cell, level, expected] of [[1, "F5", 30, "player"], [2, "J10", 1, "opponent"], [1, "F5", 10, "draw"]]) {
   test(`타이머로 등장→선택→전체 라운드→${expected}, 재도전·종료`, t => {
     const e = encounter(cell, level);
-    let state = initialFor(e, petId), closed = 0;
+    let state = initialFor(e, petId), closed = 0, wins = 0;
     if (expected === "draw") { state.round = 12; state.opponentAction = { kind: "rest" }; }
-    const h = mount(t, { encounter: e, petId, stage: "adult", onClose: () => closed++ }, expected === "draw" ? state : undefined);
+    const h = mount(t, { encounter: e, petId, stage: "adult", onClose: () => closed++, onWin: () => wins++ }, expected === "draw" ? state : undefined);
     h.settle();
     while (!state.outcome) {
       assert.equal(h.phase, "command");
@@ -123,15 +133,18 @@ for (const [petId, cell, level, expected] of [[1, "F5", 30, "player"], [2, "J10"
       click(); click(); h.render(); assert.equal(h.phase, "playback"); assert.equal(h.actions().length, 0);
       assert.deepEqual(h.hp, [state.opponent.hp, state.player.hp], "HP stays until the impact cue finishes");
       h.settle(); state = next.state;
-      assert.deepEqual(h.hp, [state.opponent.hp, state.player.hp]);
+      assert.deepEqual(h.hp, state.outcome ? [] : [state.opponent.hp, state.player.hp]);
     }
     assert.equal(state.outcome, expected); assert.equal(h.phase, "result");
-    assert.match(text(h.tree), /함께 놀아 줘서 고마워/); assert.match(text(h.tree), /곧 보상이 생겨요/);
+    assert.equal(wins, expected === "player" ? 1 : 0);
+    assert.doesNotMatch(text(h.tree), /함께 놀아 줘서 고마워|곧 보상이 생겨요|수고했어요|꾸벅|겨루기 종료/);
     assert.match(text(h.tree), expected === "player" ? /승리!/ : expected === "opponent" ? /아쉬운 패배/ : /무승부/);
-    h.click("다시 겨루기"); assert.equal(h.phase, "intro");
-    for (const bar of nodes(h.tree, n => n.props.role === "progressbar")) assert.equal(bar.props["aria-valuenow"], bar.props["aria-valuemax"]);
-    h.click("등장 연출 건너뛰기"); assert.equal(h.phase, "playback"); h.settle();
-    h.click("그만하기"); h.settle(); assert.match(text(h.tree), /다음에 또 만나요/);
+    if (expected === "opponent") {
+      h.click("다시"); assert.equal(h.phase, "intro");
+      for (const bar of nodes(h.tree, n => n.props.role === "progressbar")) assert.equal(bar.props["aria-valuenow"], bar.props["aria-valuemax"]);
+      h.click("등장 연출 건너뛰기"); assert.equal(h.phase, "command");
+      h.click("그만하기"); h.settle(); assert.match(text(h.tree), /그만뒀어요/);
+    } else assert.equal(h.button("다시"), undefined);
     h.click("돌아가기"); assert.equal(closed, 1); h.unmount();
   });
 }
@@ -145,7 +158,7 @@ test("연출 순서: 대사→돌진→피격→HP→상성, 기력 점은 하�
     { type: "energy", side: "player", amount: 2, energy: 8, reason: "round", round: 1 },
   ];
   const before = structuredClone(events), cues = battleCues(events, { player: "미네", opponent: "삽살개" });
-  assert.equal(cues[0].text, `미네의 가볍게 밀기! ${BATTLE_MOVE_FX.push.suffix}`);
+  assert.equal(cues[0].text, "미네의 가볍게 밀기!");
   assert.equal(cues[1].motion, "skill"); assert.equal(cues[1].duration, BATTLE_MOVE_FX.push.duration);
   assert.equal(cues[2].motion, "hit"); assert.equal(cues[2].event, undefined);
   assert.equal(cues[3].event.type, "damage"); assert.equal(cues[3].duration, 900);
@@ -179,7 +192,7 @@ test("기력이 충분해도 회복 불가능한 기술은 비활성", t => {
   h.settle(); h.click("기술"); assert.equal(h.button(actionLabel({ kind: "move", moveId: "T60" })).props.disabled, true); h.unmount();
 });
 
-test("기술 버튼은 종류 배지·효과·예상 피해가 즉시 보이고 공격→방어→보조 순서", t => {
+test("기술 버튼은 이름·아이콘만, 상세는 접근성 이름에 유지하고 공격→방어→보조 순서", t => {
   const e = encounter("F5", 30), state = initialFor(e, 1);
   state.player.moves = MOVES.map(m => m.id).reverse(); state.player.energy = 0;
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
@@ -191,13 +204,14 @@ test("기술 버튼은 종류 배지·효과·예상 피해가 즉시 보이고 
   assert.deepEqual(orders, [...orders].sort());
   for (const move of [...MOVES, PUSH]) {
     const button = h.button(move.name), kind = MOVE_KIND[move.kind];
-    assert.equal(text(nodes(button, n => n.props.className === "pet-battle-kind")[0]), kind.icon + kind.label);
-    assert.equal(text(nodes(button, n => n.props.className === "pet-battle-effect")[0]), moveEffect(move, state));
-    assert.equal(nodes(button, n => n.props.className === "pet-battle-matchup").length, move.kind === "attack" ? 1 : 0);
-    if (move.energy) { assert.equal(button.props.disabled, true); assert.match(text(button), /기력 부족/); }
+    assert.equal(text(nodes(button, n => n.props.className === "pet-battle-kind")[0]), kind.icon);
+    assert.equal(nodes(button, n => n.props.className === "pet-battle-effect").length, 0);
+    assert.ok(button.props["aria-label"].includes(moveEffect(move, state)));
+    assert.equal(nodes(button, n => n.props.className === "pet-battle-matchup").length, 0);
+    if (move.energy) { assert.equal(button.props.disabled, true); assert.match(button.props["aria-label"], /기력 부족/); }
     if (move.kind === "attack") {
       const damage = engine.previewDamage(move, state.player, state.opponent, state.round);
-      assert.ok(text(button).includes(`상대에게 피해 약 ${damage.min}~${damage.max}`));
+      assert.ok(button.props["aria-label"].includes(`상대에게 피해 약 ${damage.min}~${damage.max}`));
     }
   }
   h.unmount();
@@ -205,6 +219,7 @@ test("기술 버튼은 종류 배지·효과·예상 피해가 즉시 보이고 
 
 for (const move of [...MOVES, PUSH, { id: "rest", name: "숨 고르기" }]) test(`${move.name}: 양쪽 연출은 지정 길이를 기다리고 한 라운드를 완료`, t => {
   const e = encounter("F5", 30), state = initialFor(e, 1);
+  const visual = battleEffectId(move.id);
   const action = ["rest", "push"].includes(move.id) ? { kind: move.id } : { kind: "move", moveId: move.id };
   for (const side of ["player", "opponent"]) { state[side].moves = MOVES.map(m => m.id); state[side].energy = 10; state[side].hp -= 45; }
   state.opponentAction = action;
@@ -216,10 +231,10 @@ for (const move of [...MOVES, PUSH, { id: "rest", name: "숨 고르기" }]) test
   for (let i = 0; i < 1500 && h.phase === "playback"; i++) {
     if (fx()) {
       const current = fx(); sides.add(current.props["data-side"]);
-      assert.equal(current.props["data-trail"], BATTLE_MOVE_FX[move.id].trail);
-      assert.equal(current.props.style["--fx-duration"], `${BATTLE_MOVE_FX[move.id].duration}ms`);
+      assert.equal(current.props["data-trail"], BATTLE_MOVE_FX[visual].trail);
+      assert.equal(current.props.style["--fx-duration"], `${BATTLE_MOVE_FX[visual].duration}ms`);
       assert.deepEqual(h.arenaVars, { "--reach-x": "212px", "--reach-y": "-261px", "--trail-left": "92px", "--trail-top": "273px", "--trail-width": "212px", "--trail-height": "261px" });
-      h.advance(BATTLE_MOVE_FX[move.id].duration - 1);
+      h.advance(BATTLE_MOVE_FX[visual].duration - 1);
       assert.equal(fx().key, current.key, "animation must not be cut short");
       h.advance(1); assert.notEqual(fx()?.key, current.key, "animation completes at its own duration");
     } else h.nextTimer();
@@ -234,7 +249,7 @@ test("이동 줄이기에도 기술 아이콘과 대사를 읽을 시간이 남�
   h.settle(); h.click("숨 고르기");
   const fx = () => nodes(h.tree, n => n.props["data-trail"] === "energy-dots")[0];
   for (let i = 0; i < 1500 && !fx(); i++) h.nextTimer();
-  assert.ok(fx()); assert.match(text(h.tree), /천천히 숨 쉬며 기력을 채워요/);
+  assert.ok(fx()); assert.match(text(h.tree), /숨 고르기!/);
   const key = fx().key; h.advance(1099); assert.equal(fx().key, key);
   h.advance(1); assert.notEqual(fx()?.key, key); h.settle(); h.unmount();
 });
@@ -322,7 +337,7 @@ for (const reduced of [false, true]) test(`HP 숫자는 막대와 함께 감소�
 test("동작 줄이기: 등장 생략, 타이핑·라운드·종료 유지, 진동 없음", t => {
   const e = encounter("F5", 30), state = initialFor(e, 1); state.opponent.hp = 1;
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state, true);
-  h.advance(0); assert.equal(h.phase, "playback"); h.settle(); h.click("기술"); h.click("가볍게 밀기"); h.settle();
+  h.advance(0); assert.equal(h.phase, "command"); h.settle(); h.click("기술"); h.click("가볍게 밀기"); h.settle();
   assert.equal(h.phase, "result"); assert.deepEqual(h.vibration, []); h.unmount();
 });
 
@@ -334,4 +349,29 @@ test("상태·방어·버프 표시 갱신은 입력 상태와 엔진 결과를 
   assert.equal(shown.player.statuses[0].id, "slow"); assert.equal(shown.player.buffs[0].stat, "focus"); assert.equal(shown.player.shield.multiplier, .65);
   for (const event of [{ type: "status", status: "slow" }, { type: "buff", stat: "focus" }, { type: "shield", multiplier: .65 }]) shown = showBattleEvent(shown, { ...event, side: "player", change: "removed", round: 2 });
   assert.equal(shown.player.statuses.length, 0); assert.equal(shown.player.buffs.length, 0); assert.equal(shown.player.shield, undefined); assert.deepEqual(state, original);
+});
+
+function visibleTextNodes(node) {
+  if (typeof node === "string" || typeof node === "number") return String(node).trim() ? [String(node)] : [];
+  if (Array.isArray(node)) return node.flatMap(visibleTextNodes);
+  if (!node?.props || node.props["aria-hidden"] || node.props.className === "pet-battle-sr") return [];
+  return visibleTextNodes(node.props.children);
+}
+for (const outcome of ["player", "opponent", "draw", "quit"]) test(`결과 ${outcome}: 배너·한마디와 버튼만 남는다`, t => {
+  const e = encounter(), state = initialFor(e, 1); state.outcome = outcome;
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
+  h.settle();
+  const visible = visibleTextNodes(h.tree);
+  assert.equal(visible.length, outcome === "opponent" ? 4 : 3, visible.join(" / "));
+  assert.equal(nodes(h.tree, n => n.props.className === "pet-battle-result")[0].props.children.filter(Boolean).length, 2);
+  assert.doesNotMatch(visible.join(" "), /겨루기 종료|수고했어요|꾸벅|보상|라운드|버틸 힘|기력/);
+  h.unmount();
+});
+
+test("승리는 한 번 기록하고 그만두기·패배는 기록하지 않는다", t => {
+  const e = encounter(), state = initialFor(e, 1); state.opponent.hp = 1; state.opponentAction = { kind: "rest" };
+  let wins = 0;
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {}, onWin: () => wins++ }, state);
+  h.settle(); h.click("기술"); h.click("가볍게 밀기"); h.settle();
+  assert.equal(h.phase, "result"); assert.equal(wins, 1); h.unmount();
 });

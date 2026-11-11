@@ -29,10 +29,10 @@ const Shop=loadTS("app/games/PetShopSheet.tsx").default,Progress=loadTS("app/gam
 const shopProps={disabled:false,notice:"",execute:async()=>{},onClose(){}};
 const domiShop=renderToStaticMarkup(createElement(Shop,{...shopProps,petId:1,state:{inventory:["061"],player:{coins:60}}}));
 const mineShop=renderToStaticMarkup(createElement(Shop,{...shopProps,petId:2,state:{inventory:[],player:{coins:60}}}));
-assert.ok(domiShop.includes("✓ 도미 보유"));assert.ok(mineShop.includes("40 코인"));assert.ok(!mineShop.includes("✓ 미네 보유"));
+assert.ok(domiShop.includes(">보유</span>"));assert.ok(mineShop.includes("🪙 40"));assert.ok(!mineShop.includes("✓ 미네 보유"));
 assert.ok(mineShop.includes("우리 코인(공용)"));
 for(const [name,xp,level] of [["도미",40,2],["미네",32,1]]) {
-  const progress=renderToStaticMarkup(createElement(Progress,{name,xp,coins:60}));assert.ok(progress.includes(`${name} Lv. ${level}`));assert.ok(progress.includes("우리 코인(공용) 60"));
+  const progress=renderToStaticMarkup(createElement(Progress,{name,xp,coins:60}));assert.ok(progress.includes(`${name} Lv.${level}`));assert.ok(progress.includes("우리 코인(공용) 60"));
 }
 
 // Run the sheet's actual effects and refresh handler without installing a DOM/test library.

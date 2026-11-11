@@ -30,7 +30,8 @@ for(let hour=0;hour<24;hour++) for(const goal of ["food","clean","company","play
   for(let roll=0;roll<100;roll++) actions.add(chooseIdleAction(hour,goal,roll/100));
 }
 for(const action of actions) for(const {id:map} of PET_MAPS) for(const pet of Object.values(PETS)) {
-  const plan=buildIdlePlan(action,{map,width:26*pet.scale*(map==="church"?.85:1),ratio:pet.ratio});
+  const scale=2*(pet.scale===.72 ? .8/.72 : 1)*(map==="church"?.85:1);
+  const plan=buildIdlePlan(action,{map,width:26*pet.scale*scale,propScale:scale,ratio:pet.ratio});
   for(const frame of plan.keyframes) {
     assert.ok(frame.at<plan.durationMs);
     assert.ok(frame.pose.x>=20&&frame.pose.x<=140);

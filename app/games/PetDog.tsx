@@ -85,14 +85,14 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
       </g>}
       {garment && <image href={garment} pointerEvents="none"
         x={bodyWear ? -width * .3 : width * .12}
-        y={-height * (hat ? 1.14 : bodyWear ? .73 : .77)}
+        y={-height * (hat ? 1.14 : bodyWear ? .73 : .77) + 1.5 * scale}
         width={garmentWidth} height={height * (bodyWear ? .66 : .4)}
         preserveAspectRatio="xMidYMid meet" style={{ filter }} />}
       </g>
       </g>
       {stroke && <g pointerEvents="none" aria-hidden="true">
         {stroke.phase === "release" ? <text className="pet-stroke-heart" x={width * .4} y={-height - 2} fontSize="7">♥</text> :
-          <g style={{ transform: `translate(${stroke.point.x}px, ${stroke.point.y}px)` }}>
+          <g style={{ transform: `translate(${Math.max(-width / 2, Math.min(width / 2, stroke.point.x))}px, ${Math.max(-height, Math.min(-12 * scale, stroke.point.y))}px)` }}>
             <g className={stroke.phase === "hold" ? "pet-stroking-hand" : undefined}>
               <image href={ART["🤚"]} x={-9 * scale} y={-11 * scale} width={18 * scale} height={18 * scale} />
             </g>

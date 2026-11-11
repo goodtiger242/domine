@@ -10,7 +10,7 @@ import { line, PRIEST_LINES } from "@/lib/domine/pet-lines";
 import { backgroundAt, PETS, PRIEST, DOGHOUSE, type PetId } from "@/lib/domine/pet-photos";
 import { mapBackground, SHOPS, type SceneCue } from "@/lib/domine/pet-maps";
 import { DEFAULT_CELL, DIRECTIONS, neighborCell, worldCell, type MapTravel } from "@/lib/domine/pet-world";
-import { travelEdge } from "@/lib/domine/pet-geometry";
+import { clampBall, SCENE_SCALE, travelEdge } from "@/lib/domine/pet-geometry";
 import { DOG_W, PetDog } from "./PetDog";
 
 import { buildIdlePlan, buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
@@ -53,6 +53,7 @@ type Props = {
   onMap?: () => void;
   onBattle?: () => void;
   battleDisabled?: boolean;
+  hasOpponent?: boolean;
   onLocal?: (cue: SceneCue) => void;
   locked?: boolean;
   tapDisabled?: boolean;
@@ -82,6 +83,7 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
       const bubbleWidth = bubble.current.offsetWidth;
       const bubbleHeight = bubble.current.offsetHeight;
       const position = bubblePosition(x, y, width, height, bubbleWidth, bubbleHeight);
+      position.top = Math.min(position.top, Math.max(28, (y - 6) / 90 * height - bubbleHeight - 8) / height * 100);
       const size = `${text}:${width}:${height}:${bubbleWidth}:${bubbleHeight}`;
       // 글 길이·화면 크기가 바뀔 때는 즉시 보정하고, 도미가 이동할 때만 따라 움직인다.
       const transitionDuration = previousSize.current === size ? `${duration}ms` : "0ms";
@@ -109,12 +111,13 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
+export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, hasOpponent, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
   const cell = worldCell(cellId);
   const [moving, setMoving] = useState(false);
   const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
   const ask = asking?.from === cell.id ? neighborCell(cell.id, asking.direction) : null;
   const map = cell.theme;
+  const sceneScale = SCENE_SCALE * (map === "church" ? .85 : 1) * (petId === 2 ? .8 / PETS[2].scale : 1);
   const shadowId = useId();
   const [animated, setS] = useState<ScenePose>({ ...restingPose(map) });
   const [idlePose, setIdlePose] = useState<ScenePose | null>(null);
@@ -166,7 +169,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
         const { needs, hour } = idleInputs.current;
         const goal = chooseNeedGoal(needs, idleGoals.current, Array.from({ length: 5 }, () => Math.random()));
         idleGoals.current = [...idleGoals.current, goal].slice(-2);
-        const plan = buildIdlePlan(chooseIdleAction(hour, goal, Math.random()), { map, width: DOG_W[stage] * PETS[petId].scale * (map === "church" ? .85 : 1) });
+        const plan = buildIdlePlan(chooseIdleAction(hour, goal, Math.random()), { map, width: DOG_W[stage] * PETS[petId].scale * sceneScale, propScale: sceneScale });
         first = false;
         let index = 0;
         const next = () => {
@@ -183,14 +186,13 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
     media.addEventListener("change", schedule);
     document.addEventListener("visibilitychange", schedule);
     return () => { clearTimeout(timer); media.removeEventListener("change", schedule); document.removeEventListener("visibilitychange", schedule); };
-  }, [locked, tapDisabled, paused, travel, contact, ask, tap, map, stage, petId]);
+  }, [locked, tapDisabled, paused, travel, contact, ask, tap, map, stage, petId, sceneScale]);
   const idleInputs = useRef({ needs, hour });
   useLayoutEffect(() => { idleInputs.current = { needs, hour }; }, [needs, hour]);
   const latest = useRef({ onSay, onDone });
   useLayoutEffect(() => { latest.current = { onSay, onDone }; }, [onSay, onDone]);
   const period = backgroundAt(hour);
   const church = map === "church";
-  const sceneScale = church ? 0.85 : 1;
   const background = cellBackground(cell.id, hour);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
@@ -211,7 +213,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
   useEffect(() => {
     if (!cue || paused || cue.action === "map") return;
     const config = PETS[petId];
-    const plan = buildScenePlan(cue, { map, width: DOG_W[stage] * config.scale * sceneScale, ratio: config.ratio, origin: departure.current }, Math.random);
+    const plan = buildScenePlan(cue, { map, width: DOG_W[stage] * config.scale * sceneScale, ratio: config.ratio, propScale: sceneScale, origin: departure.current }, Math.random);
     const started = performance.now();
     let raf = 0, previous = -1, spoken = -1, cancelled = false;
     const tick = () => {
@@ -327,7 +329,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
       </g>
 
       {s.bowl !== null || (reacting?.kind === "hungry" && !reduced) ? (
-        <g transform={`translate(${s.bowl ?? s.x + s.dir * w * .6} ${s.y + 1}) scale(${sc * sceneScale})`} className="fade-in" style={{ filter: `brightness(${light})` }}>
+        <g transform={`translate(${s.bowl ?? clampBall({ x: s.x + s.dir * w * .6, y: s.y }, 12 * sceneScale * .7).x} ${s.y + 1}) scale(${sc * sceneScale * .7})`} className="fade-in" style={{ filter: `brightness(${light})` }}>
           <ellipse cy="1" rx="13" ry="2.5" fill={`url(#${shadowId})`} />
           <image href={BOWL} x={-12} y={-13} width={24} height={14} />
         </g>
@@ -427,7 +429,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
         ) : null}
       </g>
 
-      {!travel && toy && !s.ball && !s.carry && <g transform={`translate(${map === "home" ? 88 : 128} 81)`}><Ball toy={toy} /></g>}
+      {!travel && toy && !s.ball && !s.carry && <g transform={`translate(${map === "home" ? 106 : 124} 81)`}><Ball scale={sceneScale} toy={toy} /></g>}
       {/* 도구·공·손 */}
       <g style={{ filter: `brightness(${light}) drop-shadow(0 0.5px 0.5px #17231d40)` }}>
       {s.ball ? (
@@ -457,14 +459,14 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
       onClick={() => onLocal?.({ action: "shop", shop: index, id: Date.now() })}>{shop.name}</button>)}
     {!travel && !ask && bubble && <SpeechBubble text={bubble} label={speaker === "priest" ? "신부님의 말" : `${PETS[petId].name}의 말`}
       x={speaker === "priest" ? 18 : s.x + s.dir * w * sc * 0.25}
-      y={speaker === "priest" ? 31 : s.y - h * sc} duration={s.dur} />}
+      y={speaker === "priest" ? 31 : s.y - h * sc - 4} duration={s.dur} />}
     </div>
     <div className="pet-scene-picture pet-scene-ui">
       {busyText && <div className="pet-busy" role="status">{busyText}</div>}
       <div key={arrivalId ?? 0} className={`pet-location${arrivalId && !travel ? " pet-location-arrived" : ""}`} aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
       {cellShops(cell.id).length > 0 && <ul className="pet-shop-plates" aria-label="이 칸의 가게">{cellShops(cell.id).map((name) => <li key={name}>{name}</li>)}</ul>}
       <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기"><span>MAP</span></button>
-      {onBattle && !moving && !ask && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled} onClick={onBattle}>⚔️ 겨루기</button>}
+      {onBattle && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled || moving || !!ask} onClick={onBattle} aria-label={`겨루기${hasOpponent ? ", 동물 있음" : ""}`}>⚔️ 겨루기{hasOpponent && <i className="pet-encounter-dot" aria-hidden="true" />}</button>}
       <button type="button" className="pet-move-toggle" aria-pressed={moving} disabled={locked} onClick={() => { setMoving(!moving); setAsking(null); }}><span>{moving ? "닫기" : "이동"}</span></button>
       {moving && DIRECTIONS.map((direction) => {
         const destination = neighborCell(cell.id, direction);
@@ -476,8 +478,8 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
       })}
       {ask && asking && !locked && <div className="pet-move-confirm" role="alertdialog" aria-label={`${ask.name}(으)로 이동할까요?`}>
         <p><strong>{ask.name}</strong>(으)로 갈까요?</p>
-        <div><button type="button" onClick={() => setAsking(null)}>아니요</button>
-          <button type="button" data-primary onClick={() => { const direction = asking.direction; setAsking(null); onLocal?.({ action: "map", direction, id: Date.now() }); }}>이동</button></div>
+        <div><button type="button" data-primary onClick={() => { const direction = asking.direction; setAsking(null); onLocal?.({ action: "map", direction, id: Date.now() }); }}>이동</button>
+          <button type="button" onClick={() => setAsking(null)}>취소</button></div>
       </div>}
     </div>
     </div>

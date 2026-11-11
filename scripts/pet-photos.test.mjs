@@ -132,7 +132,7 @@ new Function("require", "exports", sheetSource)((name) => {
   return require(name);
 }, sheetModule.exports);
 const renderSheet = () => renderToStaticMarkup(createElement(sheetModule.exports.default, {
-  current: "E5", visited: ["E5", "D5"], onMove: (dir) => moves.push(dir), onClose() {},
+  current: "E5", visited: ["E5", "D5"], slot: 0, wins: [], onMove: (dir) => moves.push(dir), onClose() {},
 }));
 const worldSheet = renderSheet();
 assert.equal((worldSheet.match(/<button /g) ?? []).length,102);
@@ -142,8 +142,8 @@ assert.ok(worldSheet.includes("D5 도미네 집 마당, 이동"));
 sheetClicks.get("E5")(); assert.equal(moves.length,0);
 sheetClicks.get("A1")(); assert.deepEqual(moves,[]);
 assert.ok(renderSheet().includes("율곡마을 아파트 단지"));
-sheetClicks.get("아니요")(); assert.equal(selectedCell,"E5"); assert.deepEqual(moves,[]);
-sheetClicks.get("A1")(); renderSheet(); sheetClicks.get("이동하기")(); assert.deepEqual(moves,["A1"]);
+sheetClicks.get("취소")(); assert.equal(selectedCell,"E5"); assert.deepEqual(moves,[]);
+sheetClicks.get("A1")(); renderSheet(); sheetClicks.get("이동")(); assert.deepEqual(moves,["A1"]);
 const scales = [];
 for (const y of [77, 88]) {
   sceneState = { y, bowl: 110 };
@@ -164,6 +164,11 @@ sceneState = {};
 for (const petId of [1, 2]) {
   const imageWidth = (map) => Number(renderScene({ cellId: map === "church" ? "E5" : "A5", petId }).match(new RegExp(`href="${PETS[petId].standing.adult}"[^>]*width="([\\d.]+)"`))[1]);
   assert.ok(Math.abs(imageWidth("church") / imageWidth("field") - 0.85) < 1e-9);
+  const field = renderScene({ cellId: "A5", petId });
+  const depth = Number(field.match(/data-pet-actor="[^"]*"[^>]*scale\([^,]+,\s*([\d.]+)\)/)[1]);
+  const visibleRatio = imageWidth("field") * depth / 160;
+  assert.ok(Math.abs(visibleRatio - (petId === 1 ? .30 : .24)) < .015, `adult ${petId}: ${visibleRatio}`);
+
 }
 
 // Exercise mount loaders with a fake browser: no network or DB calls.

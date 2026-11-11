@@ -40,12 +40,12 @@ const gameView = mount("PetGame", {}, {
   "./PetScene": { PetScene: () => null }, "./PetProgress": {}, "./PetFeedback": {}, "./pet-game.css": {},
 });
 gameView.render(); button(gameView.tree, "김경석").props.onClick(); gameView.render();
-assert.ok(text(gameView.tree).includes("지금: 김경석"));
+assert.ok(!text(gameView.tree).includes("지금: 김경석"));
 const input = () => nodes(gameView.tree, n => n.type === "input")[0];
 const nameSheet = () => nodes(gameView.tree, n => n.type === "section" && n.props.title === "내 이름")[0];
 const submit = () => nodes(gameView.tree, n => n.type === "form")[0].props.onSubmit({preventDefault(){}});
 assert.equal(nodes(gameView.tree, n => n.type === "input").length, 1);
-assert.equal(input().props.placeholder, "이름"); assert.equal(input().props.enterKeyHint, "go");
+assert.equal(input().props.placeholder, "김경석"); assert.equal(input().props.enterKeyHint, "go");
 function noRoster() {
   const html = renderToStaticMarkup(createElement("section", null, nameSheet().props.children));
   for (const name of PET_LEGAL_NAMES) if (name !== game.nickname) assert.ok(!html.includes(name), `sheet must not render ${name}`);
@@ -76,32 +76,32 @@ let calls = [], release;
 const shop = mount("PetShopSheet", { state, petId: 1, disabled: false, notice: "", onClose() {}, execute: command => { calls.push(command); return new Promise(resolve => { release = resolve; }); } });
 shop.render(); cards(shop.tree)[0].props.onClick(); shop.render();
 assert.equal(cards(shop.tree).length, 20, "detail keeps the list mounted to preserve its scroll position");
-button(shop.tree.props.footer, "도미용 구매 · 40 코인").props.onClick(); shop.render();
+button(shop.tree.props.footer, "구매 40").props.onClick(); shop.render();
 assert.equal(calls.length, 0, "opening confirmation never purchases");
-assert.match(text(shop.tree.props.footer), /도미용으로 40코인에 살까요/);
+assert.ok(button(shop.tree.props.footer, "구매 확인 40"));
 button(shop.tree.props.footer, "취소").props.onClick(); shop.render();
 assert.equal(calls.length, 0);
-button(shop.tree.props.footer, "도미용 구매 · 40 코인").props.onClick(); shop.render();
-const purchase = button(shop.tree.props.footer, "구매 확인"); purchase.props.onClick(); purchase.props.onClick(); shop.render();
+button(shop.tree.props.footer, "구매 40").props.onClick(); shop.render();
+const purchase = button(shop.tree.props.footer, "구매 확인 40"); purchase.props.onClick(); purchase.props.onClick(); shop.render();
 assert.equal(calls.length, 1, "double taps submit once"); assert.equal(calls[0].kind, "purchase");
 assert.equal(calls[0].pet, 1); assert.equal(calls[0].item, "061");
 release(); await Promise.resolve(); shop.render();
 assert.ok(!text(shop.tree.props.footer).includes("착용하기"), "promise resolution alone never claims ownership");
 shop.render({ state: { ...state, inventory: ["061"], coins: 60 } });
-assert.ok(button(shop.tree.props.footer, "도미에게 착용하기"), "server purchase result enables equip in the same panel");
-button(shop.tree.props.footer, "도미에게 착용하기").props.onClick(); shop.render();
+assert.ok(button(shop.tree.props.footer, "착용하기"), "server purchase result enables equip in the same panel");
+button(shop.tree.props.footer, "착용하기").props.onClick(); shop.render();
 assert.equal(calls.at(-1).kind, "equip");
 assert.ok(!text(shop.tree.props.panel).includes("착용했어요"), "no optimistic success before server equipment");
 release(); await Promise.resolve(); shop.render();
 assert.match(text(shop.tree.props.panel), /아직 적용되지 않았어요/);
 shop.render({ state: { ...state, inventory: ["061"], equipment: [{ pet_id: 1, slot: "wearable", item_id: "061" }] } });
-assert.match(text(shop.tree.props.panel), /도미에게 착용했어요/);
+assert.doesNotMatch(text(shop.tree.props.panel), /착용했어요|보유|아직 안 입었어요/);
 assert.ok(button(shop.tree.props.footer, "착용 해제"));
 
 const poor = mount("PetShopSheet", { state: { ...state, coins: 0 }, petId: 2, disabled: false, notice: "", onClose() {}, execute: async () => assert.fail("insufficient balance must not execute") });
-poor.render(); assert.match(text(cards(poor.tree)[0]), /40코인 부족/); cards(poor.tree)[0].props.onClick(); poor.render();
-button(poor.tree.props.footer, "미네용 구매 · 40 코인").props.onClick(); poor.render();
-assert.match(text(poor.tree.props.panel), /코인이 부족해요/);
+poor.render(); assert.match(text(cards(poor.tree)[0]), /🪙 40/); cards(poor.tree)[0].props.onClick(); poor.render();
+button(poor.tree.props.footer, "구매 40").props.onClick(); poor.render();
+assert.match(text(poor.tree.props.panel), /40코인 부족해요/);
 
 let selectedPet, openedShop = false;
 const bag = mount("PetShopSheet", { state: { ...state, inventory: ["061", "073"], equipment: [{ pet_id: 1, slot: "wearable", item_id: "061" }] }, bag: true, petId: 1, disabled: false, notice: "", onClose() {}, onSelectPet: id => { selectedPet = id; }, onShop: () => { openedShop = true; }, execute: async command => { calls.push(command); } });
@@ -170,13 +170,82 @@ const battleView = mount("PetGame", {}, {
   "./PetScene": { PetScene: () => null }, "./PetProgress": {}, "./PetFeedback": {}, "./pet-game.css": {},
 });
 const scene = () => nodes(battleView.tree, n => "onBattle" in n.props)[0];
-for (const cell of ["E5", "D5"]) { battleGame.machine.committedMap = cell; battleView.render(); assert.equal(scene().props.onBattle, undefined); }
-battleGame.machine.committedMap = "F5"; battleGame.machine.command = "pending"; battleView.render();
+const { encounterFor, encounterSlot, readEncounterWins, ENCOUNTER_STORAGE } = loadTS("lib/domine/pet-battle-view.ts");
+const { PET_WORLD } = loadTS("lib/domine/pet-world.ts");
+const saved = new Map();
+window.localStorage = { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) };
+for (const cell of ["E5", "D5"]) {
+  battleGame.machine.committedMap = cell; battleView.render();
+  assert.equal(typeof scene().props.onBattle, "function"); assert.equal(scene().props.hasOpponent, false);
+  scene().props.onBattle(); battleView.render(); assert.equal(battlePause, false);
+  button(battleView.tree, "여긴 겨룰 상대가 없어요 · 지도에서 🐾를 찾아보세요").props.onClick(); battleView.render();
+  const map = nodes(battleView.tree, n => "showAnimals" in n.props)[0];
+  assert.equal(map.props.showAnimals, true); map.props.onClose(); battleView.render();
+}
+const slot = encounterSlot(), found = PET_WORLD.find(cell => encounterFor(cell.id, 40, slot));
+battleGame.machine.committedMap = found.id; battleGame.machine.command = "pending"; battleView.render();
 assert.equal(scene().props.battleDisabled, true); scene().props.onBattle(); battleView.render(); assert.equal(battlePause, false);
 battleGame.machine.command = "idle"; battleView.render(); scene().props.onBattle(); battleView.render();
 assert.equal(battlePause, true); assert.equal(scene().props.locked, true);
 assert.ok(nodes(battleView.tree, n => n.props.className === "pet-action").every(n => n.props.disabled));
-const battleSheet = nodes(battleView.tree, n => n.props.encounter)[0];
+let battleSheet = nodes(battleView.tree, n => n.props.encounter)[0];
 assert.equal(battleSheet.props.petId, 2); assert.equal(battleSheet.props.encounter.playerLevel, 30);
 battleSheet.props.onClose(); battleView.render(); assert.equal(battlePause, false); assert.equal(scene().props.locked, false);
-console.log("Battle entry: safe cells, pending guard, selected pet/level, care and movement locks passed.");
+assert.equal(scene().props.hasOpponent, true, "closing without a win keeps the opponent");
+scene().props.onBattle(); battleView.render(); battleSheet = nodes(battleView.tree, n => n.props.encounter)[0];
+battleSheet.props.onWin(); battleView.render();
+assert.deepEqual(readEncounterWins(window.localStorage, slot), [`${slot}:${found.id}`]);
+battleSheet.props.onClose(); battleView.render();
+assert.equal(scene().props.hasOpponent, false); scene().props.onBattle(); battleView.render();
+assert.equal(nodes(battleView.tree, n => n.props.encounter).length, 0);
+assert.deepEqual(readEncounterWins(window.localStorage, slot + 1), []);
+for (const invalid of ["bad json", "{}", '[null,1,"bad","0:E5"]']) {
+  saved.set(ENCOUNTER_STORAGE, invalid); assert.deepEqual(readEncounterWins(window.localStorage, slot), []);
+}
+assert.deepEqual(readEncounterWins({ getItem() { throw new Error("blocked"); } }, slot), []);
+console.log("Battle entry: always-visible button, animal map, pending guard, selected pet, wins and storage validation passed.");
+
+// A shared clock refreshes both the scene and an open map, but never an active battle.
+const originalNow = Date.now, originalInterval = globalThis.setInterval, originalClear = globalThis.clearInterval;
+const intervals = new Map(); let clock = 100 * 1800000, intervalId = 0;
+Date.now = () => clock;
+globalThis.setInterval = (fn, ms) => { intervals.set(++intervalId, { fn, ms }); return intervalId; };
+globalThis.clearInterval = id => intervals.delete(id);
+let timed;
+try {
+  const changing = PET_WORLD.find(cell => encounterFor(cell.id, 10, 100) && !encounterFor(cell.id, 10, 101));
+  battleGame.machine.committedMap = changing.id;
+  timed = mount("PetGame", {}, {
+    "./usePetController": { usePetController: () => battleGame }, "next/dynamic": { default: () => "section" },
+    "./PetScene": { PetScene: () => null }, "./PetProgress": {}, "./PetFeedback": {}, "./pet-game.css": {},
+  });
+  const timedScene = () => nodes(timed.tree, n => "onBattle" in n.props)[0];
+  timed.render(); timed.flushEffects(); timed.render();
+  assert.equal(timedScene().props.hasOpponent, true);
+  timedScene().props.onMap(); timed.render(); timed.flushEffects(); timed.render();
+  const worldSheet = () => nodes(timed.tree, n => "showAnimals" in n.props)[0];
+  assert.equal(worldSheet().props.slot, 100);
+  clock += 1800000; [...intervals.values()].find(timer => timer.ms === 60000).fn(); timed.render(); timed.flushEffects(); timed.render();
+  assert.equal(worldSheet().props.slot, 101); assert.equal(timedScene().props.hasOpponent, false);
+  worldSheet().props.onClose(); timed.render(); timed.flushEffects(); timed.render();
+  clock = 100 * 1800000;
+  timedScene().props.onBattle(); timed.render(); timed.flushEffects(); timed.render();
+  const frozen = nodes(timed.tree, n => n.props.encounter)[0];
+  assert.equal(frozen.props.encounter.slot, 100);
+  assert.equal(intervals.size, 0, "no encounter timer while battling");
+  clock = 102 * 1800000;
+  frozen.props.onClose(); timed.render(); timed.flushEffects(); timed.render();
+  timedScene().props.onMap(); timed.render(); timed.flushEffects(); timed.render();
+  assert.equal(worldSheet().props.slot, 102, "closing a battle immediately catches up to the clock");
+} finally {
+  timed?.unmount(); Date.now = originalNow; globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
+}
+assert.equal(intervals.size, 0);
+const world = mount("PetWorldSheet", { current: found.id, visited: [], slot, wins: [], showAnimals: true, onMove() {}, onClose() {} });
+world.render();
+const place = () => nodes(world.tree, n => n.type === "button" && n.key === found.id)[0];
+assert.match(place().props["aria-label"], /동물 있음/);
+world.render({ wins: [`${slot}:${found.id}`] }); assert.doesNotMatch(place().props["aria-label"], /동물 있음/);
+world.render({ wins: [], slot: slot + 1 });
+assert.equal(place().props["aria-label"].includes("동물 있음"), !!encounterFor(found.id, 1, slot + 1));
+console.log("Encounter clock: open map/scene refresh, frozen battles, immediate catch-up and map win filtering passed.");

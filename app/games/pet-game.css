@@ -7,7 +7,7 @@
 .pet-record-button { margin-left: auto; }
 .pet-progress-row { min-height: 32px; font-size: max(12px, .75rem); }
 .pet-progress small { font-size: max(12px, .75rem); }
-.pet-progress { flex: 1; min-width: 0; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.pet-progress { flex: 1; min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pet-xp { height: 4px; background: #e2ddd1; border-radius: 9px; flex: 1; overflow: hidden; }
 .pet-xp i { display: block; height: 100%; width: 100%; transform-origin: left; background: #759478; }
 .pet-coin-total { color: #9c671e; }
@@ -97,7 +97,7 @@
 .pet-battle-number { position: absolute; top: 12%; right: 0; font-size: 32px; font-weight: 900; color: #fff6dc; text-shadow: 0 2px 1px #212236, 1px 0 2px #212236; animation: pet-battle-float .7s ease-out both; pointer-events: none; }
 .pet-battle-number[data-heal=true] { color: #a4f2bf; }
 .pet-battle-sparkles { position: absolute; inset: 0 -8%; color: #ffe294; font-size: 32px; text-align: center; animation: pet-battle-sparkles 1s ease-out both; pointer-events: none; }
-.pet-battle-forecast { position: absolute; bottom: 78px; left: 12px; right: 12px; margin: 0; color: #ffe9b0; font-size: 12px; line-height: 1.45; text-align: center; text-shadow: 0 1px 3px #000; word-break: keep-all; }
+.pet-battle-forecast { position: absolute; top: 0; left: calc(100% + 8px); width: calc(88% - 28px); margin: 0; padding: 6px 8px; border-radius: 10px; background: #17283e; color: #ffe9b0; font-size: 12px; line-height: 1.4; word-break: keep-all; overflow-wrap: anywhere; }
 .pet-battle-console { position: relative; z-index: 3; display: grid; gap: 10px; min-height: 0; padding: 0 max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: linear-gradient(180deg, #102033, #0b1626); }
 .pet-battle-message { position: relative; flex: 1; min-width: 0; min-height: 44px; max-height: 64px; padding: 9px 14px; border: 1px solid #c9b77b99; border-radius: 16px; background: #15263ef5; box-shadow: 0 5px 16px #0004, inset 0 1px #ffffff14; text-align: left; color: #fff; line-height: 22px; }
 .pet-battle-message > span:not(.pet-battle-sr) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 16px; overflow-wrap: anywhere; }
@@ -119,7 +119,7 @@
 .pet-battle-kind > span { font-size: 25px; line-height: 26px; }
 .pet-battle-move-copy .pet-battle-effect { display: block; font-size: 12px; line-height: 18px; font-weight: 500; word-break: keep-all; overflow-wrap: anywhere; }
 .pet-battle-preview { position: absolute; bottom: calc(100% + 10px); left: 0; right: 0; z-index: 4; margin: 0; padding: 10px 12px; border: 1px solid #c9b77b; border-radius: 14px; background: #102035; color: #ffe9b0; font-size: 12px; line-height: 1.5; box-shadow: 0 4px 18px #0008; word-break: keep-all; }
-.pet-battle-npc { position: absolute; top: 39%; right: 12px; z-index: 5; width: 88%; padding: 17px 22px; border: 1px solid #e0c780; border-radius: 18px; background: linear-gradient(110deg, #142237ed, #203951f5); animation: pet-battle-npc 1.5s .6s both; }
+.pet-battle-npc { position: absolute; top: 39%; right: 12px; z-index: 5; width: 88%; padding: 12px 16px; border: 1px solid #e0c780; border-radius: 18px; background: linear-gradient(110deg, #142237ed, #203951f5); animation: pet-battle-npc 1.5s .6s both; }
 .pet-battle-npc small { display: block; font-size: 12px; color: #d9c181; }
 .pet-battle-npc strong { display: block; margin: 2px 0 5px; font-size: 26px; font-weight: 900; }
 .pet-battle-npc p { margin: 0; font-size: 15px; }
@@ -278,7 +278,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .pet-battle-screen *, .pet-battle-screen *::before, .pet-battle-screen *::after { animation: none !important; transition: none !important; }
-  .pet-battle-stripes, .pet-battle-sparkles, .pet-battle-npc { display: none; }
+  .pet-battle-stripes, .pet-battle-sparkles { display: none; }
   .pet-battle-fx { opacity: 1; }
   .pet-battle-move-fx .pet-battle-fx-part { transform: translate(50%,-50%); opacity: 1; }
   .pet-battle-move-fx[data-local=true] .pet-battle-fx-part { transform: none; }
@@ -480,7 +480,7 @@
 .pet-tap-shake { animation-name: pet-tap-shake; }
 .pet-tap-yawn { animation-name: pet-tap-yawn; }
 .pet-tap-retreat { animation-name: pet-tap-retreat; }
-.pet-tap-belly { animation-name: pet-tap-belly; }
+.pet-tap-belly { animation-name: pet-tap-belly; transform-box: fill-box; transform-origin: center; }
 .pet-tap-hungry { animation-name: pet-tap-hungry; }
 .pet-tap-effect { animation: pet-tap-float 1000ms ease-out both; }
 @keyframes pet-tap-hop { 0%,100% { transform: none; } 20%,75% { transform: scale(1.12,.9) rotate(-3deg); } 45% { transform: translateY(-4px) scale(.93,1.1) rotate(3deg); } }
@@ -508,8 +508,15 @@
 .pet-move-toggle { position: absolute; right: 4px; bottom: 30px; z-index: 1; min-width: 52px; min-height: 30px; padding: 3px 12px; border: 1px solid #ffffff99; border-radius: 15px; background: #15221cd9; color: #fff; font-size: 13px; font-weight: 800; box-shadow: 0 1px 5px #0006; }
 .pet-move-toggle::after { content: ""; position: absolute; inset: -7px; }
 .pet-move-toggle[aria-pressed=true] { background: #f5c842; color: #26392e; }
-.pet-shop-plates { max-width: 72%; }
+.pet-shop-plates { max-width: 30%; }
 .pet-location { max-width: calc(100% - 70px); }
 .pet-world-scroll { position: relative; }
 .pet-world-grid em { position: absolute; right: 1px; bottom: 0; font-style: normal; font-size: 13px; line-height: 1; filter: drop-shadow(0 0 2px #fff); }
 .pet-world-credit { position: sticky; left: 0; bottom: 0; display: inline-block; padding: 0 4px; background: #ffffffb0; font-size: 9px; color: #333; }
+
+.pet-encounter-dot { display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; background: #319b59; }
+.pet-encounter-notice { position: absolute; z-index: 5; top: 8px; left: 8px; right: 8px; text-align: center; }
+.pet-encounter-notice button { min-height: 44px; padding: 8px 12px; border-radius: 12px; background: #17283e; color: #fff; font-size: 12px; word-break: keep-all; }
+.pet-battle-actions [data-group] { min-height: 48px; }
+.pet-battle-kind { flex-basis: 32px; font-size: 20px; }
+.pet-battle-move-copy strong { white-space: normal; overflow-wrap: anywhere; }

@@ -1,5 +1,5 @@
 import type { PetMap, SceneCue } from "./pet-maps";
-import { actorBounds, clampActor, clampBall, SAFE_ZONES, START_POINTS } from "./pet-geometry";
+import { actorBounds, clampActor, clampBall, SCENE_SCALE, SAFE_ZONES, START_POINTS } from "./pet-geometry";
 import type { IdleAction } from "./pet-idle";
 export type ScenePose = {
   x: number; y: number; dir: 1 | -1; dur: number; motion: string | null;
@@ -15,8 +15,9 @@ export function restingPose(map: PetMap): ScenePose {
   return { ...START_POINTS[map], dir: 1, dur: 0, motion: null, ball: null, hand: null, item: null, bowl: null, fx: [], scroll: false, carry: null };
 }
 export const SCENE_DURATION = { feed: 2400, treat: 2200, pet: 1800, play: 3500, walk: 4000, brush: 2600, bath: 3200, train: 3000, sleep: 1500, tap: 1100, priest: 1800, shop: 2000, map: 180 };
-export function buildScenePlan(cue: SceneCue, context: { map: PetMap; width: number; ratio: number; origin?: { x: number; y: number } }, random: () => number): ScenePlan {
+export function buildScenePlan(cue: SceneCue, context: { map: PetMap; width: number; ratio: number; propScale?: number; origin?: { x: number; y: number } }, random: () => number): ScenePlan {
   const { map, width: w, ratio } = context, zone = SAFE_ZONES[map], h = w * ratio;
+  const scale = context.propScale ?? SCENE_SCALE;
   const bound = actorBounds(w);
   const point = (x: number, y: number) => clampActor({ x, y }, bound, zone);
   const start = cue.action === "tap" && context.origin ? point(context.origin.x, context.origin.y) : point(zone.left + random() * (zone.right - zone.left), 82);
@@ -24,9 +25,17 @@ export function buildScenePlan(cue: SceneCue, context: { map: PetMap; width: num
   const frames: SceneKeyframe[] = [];
   const add = (at: number, patch: Partial<ScenePose>, say?: string) => {
     pose = { ...pose, ...patch };
-    if (cue.action !== "sleep") pose = { ...pose, ...point(pose.x, pose.y) };
-    if (pose.ball) pose.ball = { ...pose.ball, ...clampBall(pose.ball) };
-    if (pose.item) pose.item = { ...pose.item, x: Math.min(150, Math.max(10, pose.item.x)), y: Math.min(82, Math.max(22, pose.item.y)) };
+    pose = { ...pose, ...point(pose.x, pose.y) };
+    if (pose.ball) pose.ball = { ...pose.ball, ...clampBall(pose.ball, 3.2 * scale) };
+    if (pose.item) {
+      const size = pose.item.size * scale * 1.7;
+      pose.item = { ...pose.item, x: Math.min(157 - size / 2, Math.max(3 + size / 2, pose.item.x)), y: Math.min(90 - size / 4, Math.max(9 + size * .75, pose.item.y)) };
+    }
+    if (pose.hand) {
+      const size = 15 * scale * 1.7;
+      pose.hand = { ...pose.hand, x: Math.min(157 - size / 2, Math.max(3 + size / 2, pose.hand.x)), y: Math.min(90 - size / 4, Math.max(9 + size * .75, pose.hand.y)) };
+    }
+    if (pose.bowl !== null) pose.bowl = clampBall({ x: pose.bowl, y: pose.y }, 12 * scale * .7).x;
     frames.push({ at, pose: { ...pose }, say });
   };
   const prop = (e: string) => ({ e, x: start.x + pose.dir * w * .35, y: start.y - h * .65, dur: 250, size: 10 });
@@ -45,7 +54,7 @@ export function buildScenePlan(cue: SceneCue, context: { map: PetMap; width: num
     add(1700, { ...point(zone.right, 82), dir: 1, dur: 1600 }, "walk_butterfly");
     add(3400, { motion: null }, "walk_end");
   } else if (action === "sleep") {
-    add(0, { x: 132, y: 82, dir: 1, dur: 900, motion: "pet-trot" });
+    add(0, { x: map === "home" ? 76 : start.x, y: 82, dir: 1, dur: 900, motion: "pet-trot" });
     add(950, { motion: "pet-sleep" });
   } else if (action === "feed" || action === "treat") {
     add(0, { bowl: action === "feed" ? clampBall({x:start.x + pose.dir * w * .6,y:80}).x : null, item: prop(action === "feed" ? "🍖" : "🦴") }, `${action}_start`);
@@ -79,15 +88,18 @@ export function sampleScenePlan(plan: ScenePlan, elapsedMs: number): ScenePose {
   return pose;
 }
 
-export function buildIdlePlan(action: IdleAction, context: { map: PetMap; width: number }): ScenePlan {
-  const { map, width: w } = context;
+export function buildIdlePlan(action: IdleAction, context: { map: PetMap; width: number; propScale?: number }): ScenePlan {
+  const { map, width: w } = context, scale = context.propScale ?? SCENE_SCALE;
   const origin = restingPose(map), zone = SAFE_ZONES[map];
   const target = clampActor({ x: origin.x + 18, y: origin.y }, actorBounds(w), zone);
-  const bowl = clampBall({ x: target.x + w * .65, y: target.y }).x;
+  const bowl = clampBall({ x: target.x + w * .65, y: target.y }, 12 * scale * .7).x;
   let pose = origin;
   const keyframes: SceneKeyframe[] = [];
   const add = (at: number, patch: Partial<ScenePose>, say?: string) => {
-    pose = { ...pose, ...patch }; keyframes.push({ at, pose, say });
+    pose = { ...pose, ...patch };
+    pose = { ...pose, ...clampActor(pose, actorBounds(w), zone) };
+    if (pose.ball) pose.ball = { ...pose.ball, ...clampBall(pose.ball, 3.2 * scale) };
+    keyframes.push({ at, pose, say });
   };
   if (action === "food" || action === "snack") {
     add(0, { ...target, bowl, dur: 650, motion: "pet-trot" });

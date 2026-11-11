@@ -14,7 +14,7 @@ for (const direction of Object.keys(opposite)) {
   const out = travelEdge(direction), entry = travelEdge(direction, true), reverse = travelEdge(opposite[direction]);
   for (const key of ["x", "y", "scale", "opacity"]) assert.equal(entry[key], reverse[key]);
   assert.equal(entry.dir, out.dir, "entry keeps the direction of travel");
-  const bounds = actorBounds(26);
+  const bounds = actorBounds(26 * 2);
   for (const edge of [out, entry]) assert.ok(
     edge.x + bounds.right * edge.scale < 0 || edge.x + bounds.left * edge.scale > 160 ||
     edge.y + bounds.bottom * edge.scale < 6 || edge.y + bounds.top * edge.scale > 96,
@@ -45,3 +45,15 @@ for (const [map,name] of [["church","성당 마당"],["field","들판"],["street
 }
 assert.match(catalogHint(CATALOG.find(i=>i.id==="024")),/밤 발견/);
 console.log("Pet motion geometry, need boundaries, reward goals and album hints passed.");
+
+// Rolling around the body center keeps the enlarged dog and hat above the bottom edge.
+for (const base of [18,22,26]) for (const breed of [1,.8]) for (const church of [1,.85]) {
+  const width = base * 2 * breed * church, height = width * .76;
+  const scale = 2 * church * (breed === .8 ? .8/.72 : 1);
+  const centerY = -height * .57 + 1.5 * scale;
+  for (const x of [-width/2,width/2]) for (const y of [-height*.57,height*.57]) {
+    const angle = -150 * Math.PI / 180;
+    const rolledY = centerY - 8 + x * Math.sin(angle) + y * .9 * Math.cos(angle);
+    assert.ok(82 + rolledY < 96 && 82 + rolledY > 6, "belly animation stays in the scene");
+  }
+}

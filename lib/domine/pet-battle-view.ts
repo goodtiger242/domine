@@ -1,16 +1,27 @@
-import { getTodayISO } from "../date/local";
-import { opponentFor } from "./battle/engine";
+import { buildFighter, opponentFor } from "./battle/engine";
 import { ITEM_BY_ID, MOVE_BY_ID } from "./battle/data";
-import { seedFor } from "./battle/rng";
+import { random, seedFor } from "./battle/rng";
 import { previewDamage } from "./battle/rules";
 import { BATTLE_MOVE_FX, battleFxId } from "./pet-battle-fx";
 import type { Action, BattleEvent, BattleState, Move, Outcome, Side, Status } from "./battle/types";
 
-export function encounterFor(cellId: string, careLevel: number, day = getTodayISO()) {
-  if (cellId === "E5" || cellId === "D5") return null;
+export const encounterSlot = () => Math.floor(Date.now() / 1800000);
+export const ENCOUNTER_STORAGE = "domine-pet-encounter-wins";
+export function readEncounterWins(storage: Pick<Storage, "getItem">, slot: number): string[] {
+  try {
+    const saved: unknown = JSON.parse(storage.getItem(ENCOUNTER_STORAGE) ?? "[]");
+    return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string" && new RegExp(`^${slot}:[A-J](?:[1-9]|10)$`).test(key)) : [];
+  } catch { return []; }
+}
+export function encounterFor(cellId: string, careLevel: number, slot = encounterSlot(), wins: readonly string[] = []) {
+  if (cellId === "E5" || cellId === "D5" || wins.includes(`${slot}:${cellId}`)) return null;
+  const daySeed = seedFor(String(slot), 0), cellSeed = seedFor(cellId, daySeed);
+  if (random(seedFor("presence", cellSeed)).value >= .3) return null;
   const playerLevel = Number.isFinite(careLevel) ? Math.max(1, Math.min(30, Math.floor(careLevel))) : 1;
-  const daySeed = seedFor(day, 0);
-  return { ...opponentFor(cellId, daySeed, playerLevel), daySeed, playerLevel };
+  const opponent = opponentFor(cellId, daySeed, playerLevel);
+  const level = Math.max(1, Math.min(30, opponent.fighter.level + Math.floor(random(seedFor("level", cellSeed)).value * 5) - 2));
+  const fighter = buildFighter(opponent.fighter.breedId, level, opponent.fighter.equipment, { consumable: opponent.fighter.consumable });
+  return { ...opponent, fighter, levelDifference: level - playerLevel, daySeed, playerLevel, slot };
 }
 export type Encounter = NonNullable<ReturnType<typeof encounterFor>>;
 export const HINT_LABEL = { good: "좋아요", normal: "평범", weak: "잘 안 통해요" };
@@ -72,6 +83,9 @@ export type BattleCue = {
   side?: Side; amount?: number; outcome?: Outcome;
 };
 
+// shortcut: 새 기술은 기본 밀기 연출을 사용, 전용 연출이 추가되면 자동으로 전환한다.
+export const battleEffectId = (id: string) => BATTLE_MOVE_FX[id] ? id : "push";
+
 // The engine emits effectiveness before damage; only the presentation order changes.
 export function battleCues(events: readonly BattleEvent[], names: Record<Side, string>): BattleCue[] {
   const cues: BattleCue[] = [];
@@ -80,17 +94,19 @@ export function battleCues(events: readonly BattleEvent[], names: Record<Side, s
     const who = "side" in event ? names[event.side] : "";
     switch (event.type) {
       case "action": {
-        const id = battleFxId(event.action), fx = id ? BATTLE_MOVE_FX[id] : undefined;
-        cues.push({ text: event.action.kind === "quit" ? `${who}, 친구에게 인사하고 돌아가요.` : `${who}의 ${actionLabel(event.action)}!${fx ? ` ${fx.suffix}` : ""}` });
-        if (fx && (event.action.kind === "rest" || event.action.kind === "move" && MOVE_BY_ID[event.action.moveId].kind !== "attack")) {
+        const rawId = battleFxId(event.action), id = rawId ? battleEffectId(rawId) : undefined, fx = id ? BATTLE_MOVE_FX[id] : undefined;
+        cues.push({ text: event.action.kind === "quit" ? `${who}, 인사해요.` : `${who}의 ${actionLabel(event.action)}!` });
+        if (fx && (event.action.kind === "rest" || event.action.kind === "move" && (MOVE_BY_ID[event.action.moveId].kind !== "attack" || MOVE_BY_ID[event.action.moveId].mode === "charge" && event.action.phase !== "release"))) {
           cues.push({ motion: "skill", moveFx: id, side: event.side, duration: fx.duration });
         }
         break;
       }
-      case "hit": case "miss":
-        cues.push({ motion: "skill", moveFx: event.moveId, side: event.side, target: event.target, missed: event.type === "miss", duration: BATTLE_MOVE_FX[event.moveId].duration });
+      case "hit": case "miss": {
+        const id = battleEffectId(event.moveId);
+        cues.push({ motion: "skill", moveFx: id, side: event.side, target: event.target, missed: event.type === "miss", duration: BATTLE_MOVE_FX[id].duration });
         if (event.type === "miss") cues.push({ text: `${names[event.target]}, 가볍게 피했어요!` });
         break;
+      }
       case "effectiveness": effectiveness = event; break;
       case "damage":
         cues.push({ motion: effectiveness?.hint === "weak" ? "weak-hit" : "hit", fx: effectiveness?.hint === "good" ? "hit-good" : "hit", side: event.target, amount: event.amount, duration: 500 });
@@ -102,15 +118,14 @@ export function battleCues(events: readonly BattleEvent[], names: Record<Side, s
         break;
       case "energy":
         if (event.amount > 0) {
-          if (event.reason !== "round") cues.push({ text: `${who}, 기력이 돌아와요!` });
           for (let energy = event.energy - event.amount + 1; energy <= event.energy; energy++) cues.push({ event: { ...event, energy, amount: 1 }, duration: 140 });
         } else cues.push({ event, duration: 0 });
         break;
-      case "heal": cues.push({ event, motion: "heal", fx: "heal", side: event.side, amount: event.amount, text: `${who}, 버틸 힘을 ${event.amount} 되찾았어요!` }); break;
-      case "status": cues.push({ event, side: event.side, fx: event.change === "blocked" ? "shield" : event.change === "removed" ? undefined : event.status === "stagger" || event.status === "blur" ? "dizzy" : event.status === "slow" || event.status === "winded" ? "sleepy" : "debuff", text: `${who} · ${STATUS_LABEL[event.status]}${event.change === "applied" ? " 상태가 됐어요." : event.change === "blocked" ? " 상태를 막았어요!" : " 상태가 풀렸어요."}` }); break;
-      case "buff": cues.push({ event, side: event.side, fx: event.change === "applied" ? "buff" : "debuff", text: `${who}의 ${STAT_LABEL[event.stat]}${event.change === "applied" ? " 능력이 올랐어요!" : " 능력이 원래대로 돌아왔어요."}` }); break;
-      case "shield": cues.push({ event, side: event.side, fx: event.change === "applied" ? "shield" : undefined, text: event.change === "applied" ? `${who}, 단단히 버틸 준비를 해요!` : `${who}, 방어 자세를 풀어요.` }); break;
-      case "end": cues.push({ motion: "finish", outcome: event.outcome, text: event.outcome === "quit" ? "다음에 또 함께 놀아요!" : event.outcome === "draw" ? "둘 다 끝까지 버텼어요. 멋진 무승부!" : `${names[event.outcome === "player" ? "opponent" : "player"]}, 지쳐서 앉아 버렸어요…` }); break;
+      case "heal": cues.push({ event, motion: "heal", fx: "heal", side: event.side, amount: event.amount, duration: 900 }); break;
+      case "status": cues.push({ event, side: event.side, fx: event.change === "blocked" ? "shield" : event.change === "removed" ? undefined : event.status === "stagger" || event.status === "blur" ? "dizzy" : event.status === "slow" || event.status === "winded" ? "sleepy" : "debuff", duration: 500 }); break;
+      case "buff": cues.push({ event, side: event.side, fx: event.change === "applied" ? "buff" : "debuff", duration: 500 }); break;
+      case "shield": cues.push({ event, side: event.side, fx: event.change === "applied" ? "shield" : undefined, duration: 500 }); break;
+      case "end": cues.push({ motion: "finish", outcome: event.outcome, duration: 600 }); break;
     }
   }
   return cues;

@@ -5,13 +5,14 @@ import { loadTS } from "./pet-test-loader.mjs";
 
 const { MOVES, PUSH } = loadTS("lib/domine/battle/data.ts");
 const { BATTLE_MOVE_FX, battleFxId } = loadTS("lib/domine/pet-battle-fx.ts");
-const { battleCues, moveEffect } = loadTS("lib/domine/pet-battle-view.ts");
+const { actionLabel, battleCues, battleEffectId, moveEffect } = loadTS("lib/domine/pet-battle-view.ts");
 const { buildFighter, createBattle, previewDamage } = loadTS("lib/domine/battle/engine.ts");
 const css = readFileSync("app/games/pet-game.css", "utf8");
 const names = { player: "미네", opponent: "친구" };
 
 test("26개 기술: 빠짐·중복 없는 모션/궤적과 0.5~1.1초 길이, 실제 CSS 정의", () => {
-  assert.deepEqual(Object.keys(BATTLE_MOVE_FX).sort(), [...MOVES.map(m => m.id), "push", "rest"].sort());
+  assert.ok(Object.keys(BATTLE_MOVE_FX).every(id => ["push", "rest"].includes(id) || MOVES.some(move => move.id === id)));
+  for (const move of MOVES) assert.ok(BATTLE_MOVE_FX[battleEffectId(move.id)]);
   for (const field of ["motion", "trail", "suffix"]) assert.equal(new Set(Object.values(BATTLE_MOVE_FX).map(f => f[field])).size, 26);
   for (const fx of Object.values(BATTLE_MOVE_FX)) {
     assert.ok(fx.duration >= 500 && fx.duration <= 1100);
@@ -39,16 +40,17 @@ test("새 키프레임은 transform·opacity·filter만, 양방향 및 이동 �
 
 test("양쪽 공격·빗나감·방어·보조·숨 고르기 모두 기술별 연출을 한 번만 재생", () => {
   for (const side of ["player", "opponent"]) for (const move of [...MOVES, PUSH, { id: "rest", kind: "support" }]) {
-    const action = move.id === "rest" || move.id === "push" ? { kind: move.id } : { kind: "move", moveId: move.id };
+    const visual = battleEffectId(move.id);
+    const action = move.id === "rest" || move.id === "push" ? { kind: move.id } : { kind: "move", moveId: move.id, phase: move.mode === "charge" ? "release" : undefined };
     for (const hit of ["hit", "miss"]) {
       const events = [{ type: "action", side, action, round: 1 }];
       if (move.kind === "attack") events.push({ type: hit, side, target: side === "player" ? "opponent" : "player", moveId: move.id, round: 1 });
       const cues = battleCues(events, names), effects = cues.filter(c => c.moveFx);
       assert.equal(effects.length, 1);
-      assert.equal(effects[0].moveFx, move.id);
+      assert.equal(effects[0].moveFx, visual);
       assert.equal(effects[0].side, side);
-      assert.equal(effects[0].duration, BATTLE_MOVE_FX[move.id].duration);
-      assert.ok(cues[0].text.endsWith(BATTLE_MOVE_FX[move.id].suffix));
+      assert.equal(effects[0].duration, BATTLE_MOVE_FX[visual].duration);
+      assert.equal(cues[0].text, `${names[side]}의 ${actionLabel(action)}!`);
       if (move.kind === "attack") assert.equal(effects[0].missed, hit === "miss");
     }
   }
