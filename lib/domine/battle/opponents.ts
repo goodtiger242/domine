@@ -1,3 +1,4 @@
+import { ELEMENTS, MOVE_TAGS } from "./moves";
 import { PET_WORLD } from "../pet-world";
 import { buildFighter, MAX_LEVEL } from "./rules";
 import { random, seedFor } from "./rng";
@@ -37,7 +38,8 @@ export function opponentFor(cellId: string, daySeed: number, playerLevel: number
   if (rank >= 3) equipment.push(pick(["I07","I08"]));
   if (rank >= 4) equipment.push("I13");
   const consumable = rank >= 3 ? "I19" : undefined;
-  const fighter = buildFighter(breedId,level,equipment,{ consumable, owned: true });
+  const element = pick(ELEMENTS), weakTag = pick(MOVE_TAGS), resistTag = pick(MOVE_TAGS.filter(t => t !== weakTag));
+  const fighter = buildFighter(breedId,level,equipment,{ consumable, owned: true, element, weakTag, resistTag, aiTier: rank >= 4 ? "veteran" : "normal" });
   return { cellId, theme: cell.theme, distance, rank, fighter,
     npc: { name: pick(["유진","민호","서연","정우","다은","하람"]), title: TITLES[cell.theme] },
     difficulty: (rank >= 3 ? "hard" : "normal") as Difficulty, levelDifference: level - playerLevel };

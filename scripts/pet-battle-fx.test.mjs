@@ -5,7 +5,7 @@ import { loadTS } from "./pet-test-loader.mjs";
 
 const { MOVES, PUSH, FINISHERS } = loadTS("lib/domine/battle/data.ts");
 const { BATTLE_MOVE_FX, battleFxId } = loadTS("lib/domine/pet-battle-fx.ts");
-const { actionLabel, battleCues, battleEffectId, moveEffect, compactEffect, movePages, costBadge } = loadTS("lib/domine/pet-battle-view.ts");
+const { actionLabel, battleCues, battleEffectId, moveEffect, compactEffect, movePages, costBadge, MOVE_PAGE_SIZE } = loadTS("lib/domine/pet-battle-view.ts");
 const { buildFighter, createBattle, previewDamage } = loadTS("lib/domine/battle/engine.ts");
 const css = readFileSync("app/games/pet-game.css", "utf8");
 const names = { player: "미네", opponent: "친구" };
@@ -50,39 +50,39 @@ test("양쪽 공격·빗나감·방어·보조·숨 고르기 모두 기술별 �
       assert.equal(effects[0].moveFx, visual);
       assert.equal(effects[0].side, side);
       assert.equal(effects[0].duration, BATTLE_MOVE_FX[visual].duration);
-      assert.equal(cues[0].text, `${names[side]}의 ${actionLabel(action)}!`);
+      assert.equal(cues[0].moveName, actionLabel(action));
       if (move.kind === "attack") assert.equal(effects[0].missed, hit === "miss");
     }
   }
 });
 
-test("390×844 고정 패널: 2열×3행, 요약·배지 폭, 이름은 말줄임과 상세", () => {
+test("390×844 고정 패널: 1열×3행, 요약·배지 폭, 이름은 말줄임과 상세", () => {
   const width = (s, size) => Array.from(s).reduce((n, c) => n + (c.charCodeAt(0) < 128 ? .6 : 1) * size, 0);
-  const cardWidth = (390 - 24 - 6) / 2;
-  const copyWidth = cardWidth - 6 - 44 - 8 - 16 - 3;
-  assert.ok(copyWidth >= 100, copyWidth);
+  const cardWidth = 390 - 24;
+  const copyWidth = cardWidth - 6 - 50 - 14 - 24 - 14;
+  assert.ok(copyWidth >= 240, copyWidth);
   for (const level of [1, 10, 30]) {
     const state = createBattle({ seed: 1, player: buildFighter("B001", level), opponent: buildFighter("B020", 30) });
     for (const move of [...MOVES, ...FINISHERS, PUSH]) {
       assert.ok(width(costBadge(move.energy), 12) <= 40);
-      assert.ok(width(compactEffect(move, state), 12) <= copyWidth, compactEffect(move, state));
+      if (move.kind === "attack") assert.ok(width(compactEffect(move, state), 14) <= copyWidth, compactEffect(move, state));
       assert.ok(move.name.length > 0);
     }
   }
-  const panelHeight = 44 + 3 * 52 + 2 * 6 + 44 + 2 * 4;
-  assert.equal(panelHeight, 264);
+  const panelHeight = 44 + 3 * 56 + 2 * 6 + 44 + 2 * 4;
+  assert.equal(panelHeight, 276);
   assert.ok(844 - panelHeight - 8 - 34 >= 500, "safe area and command panel leave 500px arena");
-  assert.match(css, /grid-template-rows: repeat\(3, 52px\)/);
+  assert.match(css, /grid-template-rows: repeat\(3, 56px\)/);
   assert.match(css, /scroll-snap-type: x mandatory/);
   assert.match(css, /pet-battle-move-copy strong[^}]*text-overflow: ellipsis/);
   assert.doesNotMatch(css, /pet-battle-cost-dots/);
 });
 
-test("6칸 페이지와 분류, 0·2·8 비용 배지", () => {
+test("3칸 페이지와 분류, 0·2·8 비용 배지", () => {
   const actions = MOVES.map(move => ({ kind: "move", moveId: move.id }));
-  assert.equal(movePages(actions.slice(0, 6), "all").length, 1);
-  assert.equal(movePages(actions.slice(0, 7), "all").length, 2);
-  assert.equal(movePages(actions, "all").length, Math.ceil(actions.length / 6));
+  assert.equal(movePages(actions.slice(0, 3), "all").length, 1);
+  assert.equal(movePages(actions.slice(0, 4), "all").length, 2);
+  assert.equal(movePages(actions, "all").length, Math.ceil(actions.length / MOVE_PAGE_SIZE));
   for (const kind of ["attack", "defense", "support"]) {
     const ids = movePages(actions, kind).flat().map(a => a.moveId);
     assert.deepEqual(ids, MOVES.filter(m => m.kind === kind).map(m => m.id));

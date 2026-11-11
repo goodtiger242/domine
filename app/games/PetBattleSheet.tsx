@@ -6,8 +6,9 @@ import { availableActions, buildFighter, createBattle, effectHint, stepRound } f
 import { BREED_BY_ID } from "@/lib/domine/battle/data";
 import { MAX_ENERGY, MAX_ROUNDS, REST_ENERGY, critChance, effectiveStat, moveFor, sameAction } from "@/lib/domine/battle/rules";
 import { seedFor } from "@/lib/domine/battle/rng";
-import type { Action, BattleState, Side, Stat, Trait } from "@/lib/domine/battle/types";
-import { actionCost, actionLabel, battleCues, compactEffect, costBadge, moveDetail, movePages, HINT_ICON, GROUP_LABEL, HINT_LABEL, hpColor, MOVE_KIND, moveEffect, showBattleEvent, STAT_LABEL, STATUS_LABEL, type BattleCue, type Encounter, type MoveFilter } from "@/lib/domine/pet-battle-view";
+import type { Action, BattleState, Condition, Side, Stat, Trait } from "@/lib/domine/battle/types";
+import { BREED_BY_ID as KING_BREEDS } from "@/lib/domine/king/species";
+import { actionCost, actionLabel, battleCues, compactEffect, costBadge, encounterLine, moveDamage, moveDetail, movePages, opponentClue, rivalCues, speciesBadges, GROUP_LABEL, HINT_LABEL, hpColor, MOVE_KIND, moveEffect, showBattleEvent, STAT_LABEL, STATUS_LABEL, TAG_LABEL, type BattleCue, type Encounter, type MoveFilter } from "@/lib/domine/pet-battle-view";
 import { battleAssets, battleMoveFx, fxSheets } from "@/lib/domine/pet-battle-fx";
 import type { FxSheet } from "@/lib/domine/pet-fx-sheets";
 import { PETS, type PetId } from "@/lib/domine/pet-photos";
@@ -34,11 +35,11 @@ export function FxSprite({ sheet, reduced, delay = 0, duration = sheet.duration,
     "--sprite-end": `${-sheet.size * (sheet.frames - 1)}px`, "--sprite-steps": sheet.frames - 1, "--sprite-time": `${reduced ? 300 : duration}ms`, "--sprite-delay": `${reduced ? 0 : delay}ms` } as CSSProperties} />;
 }
 
-function BreedPicture({ breedId, name }: { breedId: string; name: string }) {
+function BreedPicture({ breedId, name, art }: { breedId: string; name: string; art?: string }) {
   const [failed, setFailed] = useState(false);
   const own = breedId === "B001" ? 1 : breedId === "B002" ? 2 : null;
-  if (failed) return own ? <Image src={PETS[own].standing.adult} alt={name} width={240} height={240} sizes="34vw" style={{ transform: "scaleX(-1)" }} /> : <span className="pet-battle-emoji" role="img" aria-label={name}>🐕</span>;
-  return <Image src={`/pet/breed/${breedId}.webp`} alt={name} width={240} height={240} sizes="34vw" unoptimized loading="eager" onError={() => setFailed(true)} />;
+  if (failed) return !art && own ? <Image src={PETS[own].standing.adult} alt={name} width={240} height={240} sizes="34vw" style={{ transform: "scaleX(-1)" }} /> : <span className="pet-battle-emoji" role="img" aria-label={name}>🐾</span>;
+  return <Image src={art ?? `/pet/breed/${breedId}.webp`} alt={name} width={240} height={240} sizes="34vw" unoptimized loading="eager" onError={() => setFailed(true)} />;
 }
 
 type Playback = { next: BattleState; cues: BattleCue[]; index: number; shown: BattleState; revealed: number; line: string };
@@ -46,18 +47,20 @@ function playbackFor(state: BattleState, next: BattleState, cues: BattleCue[]): 
   return { next, cues, index: 0, shown: state, revealed: 0, line: cues[0].text ?? "" };
 }
 
-export default function PetBattleSheet({ encounter, petId, stage, hour, onClose, onWin }: {
-  encounter: Encounter; petId: PetId; stage: PetStage; hour: number; onClose: () => void; onWin?: () => void;
+export default function PetBattleSheet({ encounter, petId, condition, stage, hour, onClose, onWin }: {
+  encounter: Encounter; petId: PetId; condition?: Condition; stage: PetStage; hour: number; onClose: () => void; onWin?: () => void;
 }) {
   const attempt = useRef(0);
-  const names = { player: PETS[petId].name, opponent: shortBreedName(encounter.fighter.breedId, BREED_BY_ID[encounter.fighter.breedId].name) };
+  const names = { player: PETS[petId].name, opponent: encounter.name };
+  const lastRival = useRef("");
   const start = (roundSeed: number) => createBattle({
     seed: seedFor(`${encounter.cellId}:${petId}:${roundSeed}`, encounter.daySeed),
-    player: buildFighter(petId === 1 ? "B001" : "B002", encounter.playerLevel),
+    player: buildFighter(petId === 1 ? "B001" : "B002", encounter.playerLevel, [], { condition }),
     opponent: encounter.fighter, difficulty: encounter.difficulty,
   });
   const introduction = (state: BattleState) => playbackFor(state, state, [
     { motion: "intro", duration: 2400 },
+    { rivalText: encounterLine(encounter, "enter", encounter.individual.seed), duration: 1600 },
   ]);
   const [battle, setBattle] = useState(() => start(0));
   const [playback, setPlayback] = useState<Playback | null>(() => introduction(battle));
@@ -124,7 +127,7 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
     }
   }, [cue, round]);
   const moveFx = cue?.moveFx ? battleMoveFx(cue.moveFx, round - 1) : undefined;
-  const text = cue?.text ?? playback?.line ?? "";
+  const text = cue?.text ?? "";
   const characters = Array.from(text);
   const typing = !!cue?.text && playback!.revealed < characters.length;
   const intro = cue?.motion === "intro";
@@ -169,7 +172,7 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
   }
   useEffect(() => {
     if (!playback || paused) return;
-    const delay = typing ? 18 : cue?.text ? 900 : reduced && cue?.motion && !cue.moveFx ? cue.fx || cue.critical ? 300 : 0 : cue?.duration ?? 0;
+    const delay = typing ? 18 : cue?.text ? 900 : cue?.moveName || cue?.result || cue?.rivalText ? cue.duration ?? 1200 : reduced && cue?.motion && !cue.moveFx ? cue.fx || cue.critical ? 300 : 0 : cue?.duration ?? 0;
     const timer = setTimeout(() => {
       if (typing) setPlayback({ ...playback, revealed: playback.revealed + 1 });
       else advance();
@@ -195,7 +198,9 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
     const next = stepRound(battle, action);
     if (next.state.outcome === "player") onWin?.();
     playing.current = true; cancelHold(); setPreview(""); setPreviewCost(0); setMenu("main");
-    setPlayback(playbackFor(battle, next.state, battleCues(next.events, names)));
+    const spoken = rivalCues(battleCues(next.events, names), encounter, next.state, lastRival.current);
+    lastRival.current = spoken.last;
+    setPlayback(playbackFor(battle, next.state, spoken.cues));
   }
   function bag() {
     if (playing.current) return;
@@ -225,7 +230,7 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
   function hud(side: Side) {
     const actor = shown[side];
     return <section className="pet-battle-hud" data-side={side} aria-label={`${names[side]} 상태`}>
-      <h3><span title={names[side]} onPointerDown={() => { cancelHold(); holdTimer.current = setTimeout(() => setDetailSide(side), 500); }} onPointerUp={cancelHold} onPointerCancel={cancelHold} onPointerLeave={cancelHold}>{names[side]}</span><small>Lv.{actor.level}</small><button type="button" className="pet-battle-info" aria-label={`${names[side]} 상세 보기`} onClick={e => { e.stopPropagation(); setDetailSide(side); }}>ⓘ</button></h3>
+      <h3><i className="pet-battle-aura" data-group={actor.element ?? BREED_BY_ID[actor.breedId].group} title={GROUP_LABEL[actor.element ?? BREED_BY_ID[actor.breedId].group]} /><span title={names[side]} onPointerDown={() => { cancelHold(); holdTimer.current = setTimeout(() => setDetailSide(side), 500); }} onPointerUp={cancelHold} onPointerCancel={cancelHold} onPointerLeave={cancelHold}>{side === "opponent" ? `${shortBreedName(encounter.individual.breedId, KING_BREEDS[encounter.individual.breedId].name)} ${encounter.individual.name}` : names[side]}</span><small>Lv.{actor.level}</small><button type="button" className="pet-battle-info" aria-label={`${names[side]} 상세 보기`} onClick={e => { e.stopPropagation(); setDetailSide(side); }}>ⓘ</button></h3>
       <div className="pet-battle-health-row"><span aria-hidden="true">♥</span>
       <div className="pet-battle-hp" data-color={hpColor(actor.hp, actor.stats.hp)} role="progressbar" aria-label={`${names[side]} 체력`} aria-valuemin={0} aria-valuemax={actor.stats.hp} aria-valuenow={actor.hp}>
         <span className="pet-battle-hp-trail" style={{ transform: `scaleX(${actor.hp / actor.stats.hp})` }} />
@@ -237,7 +242,8 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
           {Array.from({ length: MAX_ENERGY }, (_, i) => <i key={i} data-filled={i < actor.energy} data-spend={side === "player" && i < actor.energy && i >= Math.max(0, actor.energy - previewCost)} />)}
         </span>
       </div>
-      {side === "opponent" && !intro && !finished && <p className="pet-battle-forecast">다음: {actionLabel(battle.opponentAction)}</p>}
+      <div className="pet-battle-momentum" role="progressbar" aria-label={`${names[side]} 기세`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={actor.momentum ?? 0} data-full={(actor.momentum ?? 0) >= 100}><span style={{ transform: `scaleX(${(actor.momentum ?? 0) / 100})` }} /></div>
+      {side === "opponent" && !playback && !finished && opponentClue(battle) && <p className="pet-battle-clue">단서 · {opponentClue(battle)}</p>}
     </section>;
   }
   function fighter(side: Side) {
@@ -246,7 +252,7 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
     return <div className="pet-battle-fighter" data-side={side}>
       <div className="pet-battle-platform" />
       <div className="pet-battle-entry"><div key={animation ? `${shown.round}-${playback?.index}` : "idle"} className="pet-battle-portrait" data-motion={motion} style={animation ? { animation: `${animation} ${moveFx!.duration}ms ease-in-out both` } : undefined}>
-        {side === "player" ? <Image src={PETS[petId].standing[stage]} alt={names.player} width={320} height={320} sizes="42vw" loading="eager" /> : <BreedPicture key={shown.opponent.breedId} breedId={shown.opponent.breedId} name={names.opponent} />}
+        {side === "player" ? <Image src={PETS[petId].standing[stage]} alt={names.player} width={320} height={320} sizes="42vw" loading="eager" /> : <BreedPicture key={encounter.id} breedId={shown.opponent.breedId} name={names.opponent} art={encounter.art} />}
         <span className="pet-battle-flash" aria-hidden="true" />
         {motion === "win" && <span className="pet-battle-sparkles" aria-hidden="true">✦ · ✧<br />✧　✦</span>}
       </div></div>
@@ -261,21 +267,25 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
       {cue?.side === side && (cue.fx || cue.critical) && <span key={`${shown.round}-${playback?.index}-sprite`} className="pet-battle-art" data-critical={cue.critical} aria-hidden="true">
         <FxSprite sheet={fxSheets(cue.critical ? "particle" : cue.fx === "heal" ? "heal" : cue.fx === "buff" ? "buff" : cue.fx === "shield" ? "shield" : cue.fx === "hit" || cue.fx === "hit-good" ? "impact" : "debuff", cue.critical ? 3 : cue.fx === "buff" ? 4 : shown.round)} reduced={reduced} duration={cue.duration} />
       </span>}
-      {cue?.side === side && cue.amount !== undefined && <strong key={`${shown.round}-${playback?.index}`} className="pet-battle-number" data-heal={cue.motion === "heal"} aria-hidden="true">{cue.motion === "heal" ? "+" : "−"}{cue.amount}</strong>}
+      {cue?.side === side && cue.amount !== undefined && <strong key={`${shown.round}-${playback?.index}`} className="pet-battle-number" data-critical={cue.critical} data-good={cue.fx === "hit-good"} data-weak={cue.motion === "weak-hit"} data-heal={cue.motion === "heal"} aria-hidden="true">{cue.motion === "heal" ? "+" : "−"}{cue.amount}</strong>}
+      {cue?.side === side && cue.moveName && <p key={`${shown.round}-${playback?.index}-name`} className="pet-battle-skill-name" role="status">{cue.moveName}</p>}
+      {side === "opponent" && (cue?.rivalText || finished) && <p className="pet-battle-rival" role="status">{cue?.rivalText || encounterLine(encounter, outcome === "quit" ? "flee" : outcome === "player" ? "lose" : outcome === "opponent" ? "win" : "round", seedFor(String(shown.round), encounter.individual.seed), lastRival.current)}</p>}
     </div>;
   }
 
   function fighterDetails(side: Side) {
-    const actor = shown[side], breed = BREED_BY_ID[actor.breedId];
+    const actor = shown[side], breed = side === "opponent" ? KING_BREEDS[encounter.individual.breedId] : BREED_BY_ID[actor.breedId];
     const values = (Object.keys(STAT_LABEL) as Stat[]).map(stat => ({ stat, value: stat === "hp" ? actor.hp : effectiveStat(actor, stat, shown.round) }));
     const peak = Math.max(...values.filter(v => v.stat !== "hp").map(v => v.value), 1);
     const moves = side === "player" ? [...actor.moves, ...(actor.finisher ? [actor.finisher] : []), "push", "rest"] : seen.opponent;
     return <>
-      <div className="pet-battle-detail-picture"><BreedPicture breedId={actor.breedId} name={names[side]} /></div>
+      <div className="pet-battle-detail-picture"><BreedPicture breedId={actor.breedId} name={names[side]} art={side === "opponent" ? encounter.art : undefined} /></div>
       <p>{breed.name} · Lv.{actor.level}</p>
       {side === "opponent" && <p>{actor.owned !== false && encounter.npc ? `${encounter.npc.name}${encounter.npc.title ? ` · ${encounter.npc.title}` : ""}` : "길에서 지냄"}</p>}
       <div className="pet-battle-stat-list">{values.map(({ stat, value }) => <div key={stat}><span>{STAT_LABEL[stat]}</span><meter min={0} max={stat === "hp" ? actor.stats.hp : peak} value={value} aria-label={STAT_LABEL[stat]} /><strong>{value}{stat === "hp" ? `/${actor.stats.hp}` : ""}</strong></div>)}</div>
-      <p>{GROUP_LABEL[breed.group]} · {{ small: "소형", medium: "중형", large: "대형" }[breed.size]} · {{ lively: "활발", careful: "신중", kind: "다정", steady: "차분" }[breed.temperament]}</p>
+      <p>{GROUP_LABEL[actor.element ?? BREED_BY_ID[actor.breedId].group]} · {{ small: "소형", medium: "중형", large: "대형" }[breed.size]} · {{ lively: "활발", careful: "신중", kind: "다정", steady: "차분" }[breed.temperament]}</p>
+      {side === "opponent" && <div className="pet-species-badges">{speciesBadges(encounter).map(badge => <span key={badge}>{badge}</span>)}</div>}
+      {actor.knownWeakTag && actor.weakTag && <p>확인한 약점 · {TAG_LABEL[actor.weakTag]}</p>}{actor.knownResistTag && actor.resistTag && <p>확인한 내성 · {TAG_LABEL[actor.resistTag]}</p>}
       <p>{TRAIT_LABEL[breed.trait]}</p>
       {actor.condition && <p>포만 {actor.condition.fullness} · 기분 {actor.condition.mood} · 청결 {actor.condition.clean}</p>}
       {actor.statuses.filter(s => s.expires >= shown.round).map(s => <p key={s.id}>{STATUS_LABEL[s.id]} · {s.expires - shown.round + 1}라운드</p>)}
@@ -302,13 +312,14 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
             </span>
           </span>)}
         </div>}
-        {intro && encounter.npc && <div className="pet-battle-npc"><p>{encounter.npc.name} · 같이 놀아요!</p></div>}
+        {cue?.result && <p key={`${shown.round}-${playback?.index}-result`} className="pet-battle-center-result" role="status">{cue.result}</p>}
+        {cue?.cutin && <div className="pet-battle-cutin" data-side={cue.side} aria-hidden="true"><Image src={cue.side === "opponent" ? encounter.art : PETS[petId].standing[stage]} alt="" width={160} height={160} unoptimized /><strong>기세</strong><span>✦ ✧ ✦</span></div>}
         {finished && <div className="pet-battle-banner" data-victory={outcome === "player"} role="status"><h3>{result}</h3></div>}
       </div>
       <div className="pet-battle-console">
         {finished ? <div className="pet-battle-result"><p>{outcome === "player" ? "정말 멋진 움직임이었어요!" : outcome === "opponent" ? "끝까지 함께해 줘서 고마워요." : "다음에도 즐겁게 겨뤄요!"}</p><div className="pet-battle-result-actions">{outcome === "opponent" && <button ref={command} type="button" onClick={restart}>다시</button>}<button ref={outcome !== "opponent" ? command : undefined} type="button" onClick={onClose}>돌아가기</button></div></div>
           : <>
-            {playback && <div className="pet-battle-dialogue">
+            {playback && <div className={text ? "pet-battle-dialogue" : "pet-battle-sr"}>
             {playback && <button ref={message} type="button" className={intro ? "pet-battle-sr" : "pet-battle-message"} aria-label={intro ? "등장 연출 건너뛰기" : typing ? "대사 모두 보기" : playback ? "다음 대사" : "대결 안내"} onClick={e => { e.stopPropagation(); if (intro) advance(); else if (typing) setPlayback({ ...playback!, revealed: characters.length }); else if (cue?.text) advance(); }}>
               <span aria-hidden="true">{intro ? "" : typing ? characters.slice(0, playback!.revealed).join("") : text}</span>
               <span className="pet-battle-sr" role="status" aria-live="polite">{intro ? "등장 연출, 눌러서 건너뛰기" : text}</span>
@@ -331,23 +342,23 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
                       {items.map(action => {
                         const move = moveFor(action), label = actionLabel(action), kind = MOVE_KIND[move?.kind ?? "support"];
                         const hint = move?.kind === "attack" ? effectHint(move, battle.player, battle.opponent) : "normal";
-                        const cost = actionCost(action, battle), insufficient = cost > battle.player.energy;
+                        const cost = actionCost(action, battle), insufficient = move?.finisher ? (battle.player.momentum ?? 0) < 100 : cost > battle.player.energy;
+                        const damage = move?.kind === "attack" ? moveDamage(move, battle) : null;
                         const enabled = allowed.some(a => sameAction(a, action));
                         const detail = moveDetail(action, battle);
                         const showDetail = () => { setPreview(detail); setPreviewCost(cost); };
                         return <div key={label} className="pet-battle-card" data-kind={move?.kind ?? "support"} data-insufficient={insufficient}>
-                          <button type="button" className="pet-battle-move" data-group={move?.group ?? "neutral"} data-kind={move?.kind ?? "support"} data-hint={hint} disabled={!enabled}
+                          <button type="button" className="pet-battle-move" data-group={move?.group ?? "neutral"} data-kind={move?.kind ?? "support"} data-hint={hint} aria-disabled={!enabled}
                             aria-label={`${kind.label}, ${label}, ${move ? moveEffect(move, battle) : `기력 +${REST_ENERGY}`}, 기력 ${cost}${insufficient ? ", 기력 부족" : ""}${move?.kind === "attack" ? `, ${HINT_LABEL[hint]}` : ""}`}
-                            onFocus={() => setPreviewCost(cost)} onBlur={() => { cancelHold(); if (!preview) setPreviewCost(0); }} onPointerEnter={() => setPreviewCost(cost)}
+                            onFocus={() => setPreviewCost(cost)} onBlur={() => { cancelHold(); if (!preview) setPreviewCost(0); }} onPointerEnter={e => { setPreviewCost(cost); if (e.pointerType === "mouse") { cancelHold(); holdTimer.current = setTimeout(showDetail, 500); } }}
                             onPointerDown={e => { if (!e.isPrimary || e.button !== 0) return; cancelHold(); held.current = false; setPreviewCost(cost); holdTimer.current = setTimeout(() => { held.current = true; showDetail(); }, 500); }}
                             onPointerUp={cancelHold} onPointerCancel={() => { cancelHold(); held.current = false; setPreviewCost(0); }} onPointerLeave={() => { cancelHold(); if (!preview) setPreviewCost(0); }}
                             onContextMenu={e => e.preventDefault()} onKeyDown={e => { if (e.key === " " && !e.repeat) { held.current = false; holdTimer.current = setTimeout(() => { held.current = true; showDetail(); }, 500); } }} onKeyUp={cancelHold}
-                            onClick={() => { if (held.current) { held.current = false; return; } choose(action); }}>
+                            onClick={() => { cancelHold(); if (held.current) { held.current = false; return; } if (enabled) choose(action); }}>
                             <span className="pet-battle-kind" aria-hidden="true">{kind.icon}</span>
-                            <span className="pet-battle-move-copy"><strong title={label}>{label}</strong><small>{move ? compactEffect(move, battle) : `기력 +${REST_ENERGY}`}</small></span>
-
+                            <span className="pet-battle-move-copy"><span className="pet-battle-move-title"><strong title={label}>{label}</strong>{move?.kind === "attack" && hint !== "normal" && <span className="pet-battle-matchup" data-hint={hint}>{hint === "good" ? "↑ 효과 좋음" : "↓ 효과 약함"}</span>}</span><small>{damage ? <>피해 {damage.base}{damage.delta !== 0 && <span className="pet-battle-delta" data-good={damage.delta > 0}> {damage.delta > 0 ? "↑+" : "↓−"}{Math.abs(damage.delta)}</span>}</> : move ? compactEffect(move, battle) : `기력 +${REST_ENERGY}`}</small></span>
+                            <span className="pet-battle-cost" data-finisher={!!move?.finisher}>{move?.finisher ? "기세" : costBadge(cost)}{insufficient && <small>{move?.finisher ? "부족" : "기력 부족"}</small>}</span>
                           </button>
-                          <button type="button" className="pet-battle-card-info" aria-label={`${label} 상세`} onFocus={() => setPreviewCost(cost)} onBlur={() => { if (!preview) setPreviewCost(0); }} onPointerEnter={() => setPreviewCost(cost)} onPointerLeave={() => { if (!preview) setPreviewCost(0); }} onClick={showDetail}><span className="pet-battle-cost" data-insufficient={insufficient}>{costBadge(cost)}{move?.kind === "attack" && hint !== "normal" && <span className="pet-battle-matchup" data-hint={hint}>{HINT_ICON[hint]}</span>}</span>ⓘ</button>
                         </div>;
                       })}
                       {!items.length && <p className="pet-battle-empty">해당 기술 없음</p>}

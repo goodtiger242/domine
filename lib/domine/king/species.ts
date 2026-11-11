@@ -1,5 +1,6 @@
 import { BREEDS as ENGINE_BREEDS } from "../battle/data";
-import type { Breed, Group, Stats } from "../battle/types";
+import { profileFor } from "../battle/profiles";
+import type { BattleProfile, Species, Breed, Group, Stats } from "../battle/types";
 import type { RivalSpecies } from "../pet-rival-lines";
 import variants from "../../../public/pet/breed/variants.json";
 import variantsD1 from "../../../public/pet/breed/variants_d1.json";
@@ -29,6 +30,7 @@ export const SPECIES: readonly SpeciesDefinition[] = [
 export const GROUPS: readonly Group[] = ["rush", "trick", "track", "guard", "bond", "endure"];
 export const GROUP_LABEL: Record<Group, string> = { rush: "돌진", trick: "기교", track: "추적", guard: "수호", bond: "교감", endure: "지구" };
 export interface BreedDefinition extends Omit<Breed, "group"> {
+  battleProfile: BattleProfile;
   species: SpeciesKey; habitat: readonly Habitat[]; art: string; active: true;
   variantKind: "breed" | "regional_type" | "appearance_form";
   variants: readonly { art: string; look: string }[];
@@ -111,7 +113,7 @@ export const BREEDS: readonly BreedDefinition[] = rows.map(([id, name, species, 
   const existing = ENGINE_BREEDS.find(b => b.id === id);
   const total = values.reduce((sum, value) => sum + value, 0);
   const base = existing?.base ?? Object.fromEntries(statKeys.map((key, i) => [key, Math.round(values[i] * SIZE_BUDGET[size] / total)])) as Stats;
-  return { id, name, species, size, temperament, base, growth: existing?.growth ?? growth, trait, habitat,
+  return { id, name, species, size, temperament, base, battleProfile: profileFor(species === "waterdeer" ? "deer" : species as Species,id), growth: existing?.growth ?? growth, trait, habitat,
     learn: existing?.learn ?? [{ level: 1, move: "T01" }, { level: 1, move: "T43" }],
     active: true, variantKind: species === "dog" || species === "cat" && id !== "C01" ? "breed" : id === "C01" ? "regional_type" : "appearance_form",
     art: id === "B001" ? "/pet/adult.webp" : id === "B002" ? "/pet/mine/stand.webp" : `/pet/breed/${id}.webp`,

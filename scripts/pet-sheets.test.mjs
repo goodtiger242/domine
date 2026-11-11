@@ -176,32 +176,38 @@ const battleView = mount("PetGame", {}, {
   "./PetScene": { PetScene: () => null }, "./PetProgress": {}, "./PetFeedback": {}, "./pet-game.css": {},
 });
 const scene = () => nodes(battleView.tree, n => "onBattle" in n.props)[0];
-const { encounterFor, encounterSlot, readEncounterWins, ENCOUNTER_STORAGE } = loadTS("lib/domine/pet-battle-view.ts");
+const { encounterFor, spawnsFor, encounterSlot, readEncounterWins, ENCOUNTER_STORAGE } = loadTS("lib/domine/pet-battle-view.ts");
 const { PET_WORLD } = loadTS("lib/domine/pet-world.ts");
 const saved = new Map();
 window.localStorage = { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) };
 for (const cell of ["E5", "D5"]) {
   battleGame.machine.committedMap = cell; battleView.render();
-  assert.equal(typeof scene().props.onBattle, "function"); assert.equal(scene().props.hasOpponent, false);
+  assert.equal(typeof scene().props.onBattle, "function"); assert.equal(scene().props.encounters.length, 0);
   scene().props.onBattle(); battleView.render(); assert.equal(battlePause, false);
   button(battleView.tree, "여긴 겨룰 상대가 없어요 · 지도에서 🐾를 찾아보세요").props.onClick(); battleView.render();
   assert.equal(nodes(battleView.tree, n => n.props?.className === "pet-encounter-notice").length, 0, "tapping the notice closes it");
 }
-const slot = encounterSlot(), found = PET_WORLD.find(cell => encounterFor(cell.id, 40, slot));
+const slot = encounterSlot(), found = PET_WORLD.find(cell => spawnsFor(cell.id, 40, slot).length === 1);
 battleGame.machine.committedMap = found.id; battleGame.machine.command = "pending"; battleView.render();
 assert.equal(scene().props.battleDisabled, true); scene().props.onBattle(); battleView.render(); assert.equal(battlePause, false);
 battleGame.machine.command = "idle"; battleView.render(); scene().props.onBattle(); battleView.render();
+const confirmation = () => nodes(battleView.tree, n => "onStart" in n.props)[0];
+assert.equal(battlePause, false, "confirmation does not start a fight");
+assert.ok(confirmation().props.selected);
+confirmation().props.onStart(); battleView.render();
 assert.equal(battlePause, true); assert.equal(scene().props.locked, true);
 assert.ok(nodes(battleView.tree, n => n.props.className === "pet-action").every(n => n.props.disabled));
 let battleSheet = nodes(battleView.tree, n => n.props.encounter)[0];
-assert.equal(battleSheet.props.petId, 2); assert.equal(battleSheet.props.encounter.playerLevel, 30);
+assert.equal(battleSheet.props.petId, 2); assert.equal(battleSheet.props.encounter.playerLevel, 40);
 battleSheet.props.onClose(); battleView.render(); assert.equal(battlePause, false); assert.equal(scene().props.locked, false);
-assert.equal(scene().props.hasOpponent, true, "closing without a win keeps the opponent");
-scene().props.onBattle(); battleView.render(); battleSheet = nodes(battleView.tree, n => n.props.encounter)[0];
+assert.equal(scene().props.encounters.length, 1, "closing without a win keeps the opponent");
+scene().props.onBattle(); battleView.render(); confirmation().props.onStart(); battleView.render();
+battleSheet = nodes(battleView.tree, n => n.props.encounter)[0];
+const wonId = battleSheet.props.encounter.id;
 battleSheet.props.onWin(); battleView.render();
-assert.deepEqual(readEncounterWins(window.localStorage, slot), [`${slot}:${found.id}`]);
+assert.deepEqual(readEncounterWins(window.localStorage, slot), [wonId]);
 battleSheet.props.onClose(); battleView.render();
-assert.equal(scene().props.hasOpponent, false); scene().props.onBattle(); battleView.render();
+assert.equal(scene().props.encounters.length, 0); scene().props.onBattle(); battleView.render();
 assert.equal(nodes(battleView.tree, n => n.props.encounter).length, 0);
 assert.deepEqual(readEncounterWins(window.localStorage, slot + 1), []);
 for (const invalid of ["bad json", "{}", '[null,1,"bad","0:E5"]']) {
@@ -226,15 +232,18 @@ try {
   });
   const timedScene = () => nodes(timed.tree, n => "onBattle" in n.props)[0];
   timed.render(); timed.flushEffects(); timed.render();
-  assert.equal(timedScene().props.hasOpponent, true);
+  assert.equal(timedScene().props.encounters.length > 0, true);
   timedScene().props.onMap(); timed.render(); timed.flushEffects(); timed.render();
   const worldSheet = () => nodes(timed.tree, n => "showAnimals" in n.props)[0];
   assert.equal(worldSheet().props.slot, 100);
   clock += 1800000; [...intervals.values()].find(timer => timer.ms === 60000).fn(); timed.render(); timed.flushEffects(); timed.render();
-  assert.equal(worldSheet().props.slot, 101); assert.equal(timedScene().props.hasOpponent, false);
+  assert.equal(worldSheet().props.slot, 101); assert.equal(timedScene().props.encounters.length, 0);
   worldSheet().props.onClose(); timed.render(); timed.flushEffects(); timed.render();
   clock = 100 * 1800000;
   timedScene().props.onBattle(); timed.render(); timed.flushEffects(); timed.render();
+  const select = nodes(timed.tree, n => "onStart" in n.props)[0];
+  if (!select.props.selected) { select.props.onSelect(select.props.encounters[0]); timed.render(); }
+  nodes(timed.tree, n => "onStart" in n.props)[0].props.onStart(); timed.render(); timed.flushEffects(); timed.render();
   const frozen = nodes(timed.tree, n => n.props.encounter)[0];
   assert.equal(frozen.props.encounter.slot, 100);
   assert.equal(intervals.size, 0, "no encounter timer while battling");
@@ -246,11 +255,11 @@ try {
   timed?.unmount(); Date.now = originalNow; globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
 }
 assert.equal(intervals.size, 0);
-const world = mount("PetWorldSheet", { current: found.id, visited: [], slot, wins: [], showAnimals: true, onMove() {}, onClose() {} });
+const world = mount("PetWorldSheet", { current: found.id, visited: [], slot, wins: [], careLevel: 40, showAnimals: true, onMove() {}, onClose() {} });
 world.render();
 const place = () => nodes(world.tree, n => n.type === "button" && n.key === found.id)[0];
-assert.match(place().props["aria-label"], /동물 있음/);
-world.render({ wins: [`${slot}:${found.id}`] }); assert.doesNotMatch(place().props["aria-label"], /동물 있음/);
+assert.match(place().props["aria-label"], /동물 \d마리/);
+world.render({ wins: [`${slot}:${found.id}`] }); assert.doesNotMatch(place().props["aria-label"], /동물 \d마리/);
 world.render({ wins: [], slot: slot + 1 });
-assert.equal(place().props["aria-label"].includes("동물 있음"), !!encounterFor(found.id, 1, slot + 1));
+assert.equal(place().props["aria-label"].includes("마리"), !!encounterFor(found.id, 40, slot + 1));
 console.log("Encounter clock: open map/scene refresh, frozen battles, immediate catch-up and map win filtering passed.");

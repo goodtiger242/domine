@@ -1,17 +1,23 @@
 import { chooseOpponentAction } from "./ai";
 import { BREED_BY_ID, ITEM_BY_ID } from "./data";
-import { actionOrder, availableActions, buildFighter, clamp, critChance, damageAt, defenseMultiplier, effectHint, growthScale, hitChance, matchup, MAX_ENERGY, MAX_ROUNDS, moveFor, normalizedStat, recoveryLeft, REST_ENERGY, sameAction, START_ENERGY, statusChance, turnOrder } from "./rules";
+import { actionOrder, availableActions, buildFighter, clamp, critChance, damageAt, affinity, moveEnergy, defenseMultiplier, effectHint, growthScale, hitChance, MAX_ENERGY, MAX_ROUNDS, moveFor, normalizedStat, recoveryLeft, sameAction, START_ENERGY, statusChance, turnOrder } from "./rules";
 import { random } from "./rng";
-import type { Action, Actor, BattleEvent, BattleState, Difficulty, Fighter, Outcome, RoundInput, Side } from "./types";
+import { fighterProfile } from "./profiles";
+export { profileFor, BATTLE_PROFILES, BREED_PROFILE_BONUSES } from "./profiles";
+export type { BattleProfile } from "./types";
+import type { Action, Actor, BattleEvent, BattleState, AiTier, Difficulty, Fighter, Outcome, RoundInput, Side } from "./types";
 
 export { availableActions, buildFighter, effectHint, previewDamage, cumulativeXp, levelFromXp, xpToNext, growthQ, growthScale, recommendedAllocation, conditionPenalty, critChance, MAX_LEVEL } from "./rules";
+export { learnset, autoMoves, moveSlots } from "./learnset";
+export { JOBS, jobBonus, skillPoints } from "./jobs";
+export { chooseAction, AI_TIERS } from "./ai";
 export { opponentFor } from "./opponents";
 export { turnOrder, MAX_ENERGY, START_ENERGY, REST_ENERGY } from "./rules";
 
 function cloneActor(actor: Actor): Actor {
-  return { ...actor, stats: { ...actor.stats }, moves: [...actor.moves], equipment: [...actor.equipment],
+  return { ...actor, stats: { ...actor.stats }, baseStats: actor.baseStats && { ...actor.baseStats }, battleProfile: actor.battleProfile && { ...actor.battleProfile, statTilt: { ...actor.battleProfile.statTilt } }, moves: [...actor.moves], equipment: [...actor.equipment],
     items: actor.items && [...actor.items], usedItems: [...(actor.usedItems ?? [])], defense: actor.defense && { ...actor.defense },
-    allocation: actor.allocation && { ...actor.allocation }, job: actor.job && { ...actor.job }, condition: actor.condition && { ...actor.condition }, mastery: actor.mastery && { ...actor.mastery },
+    allocation: actor.allocation && { ...actor.allocation }, job: actor.job && (typeof actor.job === "string" ? actor.job : structuredClone(actor.job)), history: actor.history?.map(a => ({ ...a })), condition: actor.condition && { ...actor.condition }, mastery: actor.mastery && { ...actor.mastery },
     habitats: actor.habitats && [...actor.habitats], activeBands: actor.activeBands && [...actor.activeBands], environment: actor.environment && { ...actor.environment }, recoil: actor.recoil && { ...actor.recoil },
     statuses: actor.statuses.map(s => ({ ...s })), buffs: actor.buffs.map(b => ({ ...b })),
     shield: actor.shield && { ...actor.shield }, lastAction: actor.lastAction && { ...actor.lastAction } };
@@ -22,20 +28,23 @@ function newActor(fighter: Fighter, energy: number): Actor {
     condition: fighter.condition, mastery: fighter.mastery, movementType: fighter.movementType,
     habitats: fighter.habitats, activeBands: fighter.activeBands, environment: fighter.environment,
     items: fighter.items, owned: fighter.owned, boss: fighter.boss, equipmentStats: fighter.equipmentStats, finisher: fighter.finisher,
+    species: fighter.species, signatureBreedId: fighter.signatureBreedId, element: fighter.element,
+    weakTag: fighter.weakTag, resistTag: fighter.resistTag, knownWeakTag: fighter.knownWeakTag, knownResistTag: fighter.knownResistTag, aiTier: fighter.aiTier,
   });
   if (Object.entries(canonical.stats).some(([key,value]) => fighter.stats[key as keyof Fighter["stats"]] !== value)) throw new Error("출전 스탯이 견종·레벨·장비와 다릅니다.");
-  return { ...canonical, hp: canonical.stats.hp, energy, healed: 0, itemUsed: false, usedItems: [], momentum: 0, statuses: [], buffs: [], lastDefense: -1, traitUsed: false, rested: false };
+  return { ...canonical, hp: canonical.stats.hp, energy, healed: 0, itemUsed: false, usedItems: [], momentum: 0, statuses: [], buffs: [], lastDefense: -1, traitUsed: false, rested: false, history: [] };
 }
-export function createBattle(input: { seed: number; player: Fighter; opponent: Fighter; startEnergyBonus?: 0 | 1; difficulty?: Difficulty; criticals?: boolean }): BattleState {
+export function createBattle(input: { seed: number; player: Fighter; opponent: Fighter; startEnergyBonus?: 0 | 1; difficulty?: Difficulty; criticals?: boolean; aiTier?: AiTier }): BattleState {
   if (!Number.isSafeInteger(input.seed)) throw new Error("시드는 안전한 정수여야 합니다.");
   if (input.startEnergyBonus !== undefined && input.startEnergyBonus !== 0 && input.startEnergyBonus !== 1) throw new Error("시작 기력 보너스는 0 또는 1입니다.");
   if (input.difficulty && input.difficulty !== "normal" && input.difficulty !== "hard") throw new Error("올바른 난이도가 아닙니다.");
   if (input.criticals !== undefined && typeof input.criticals !== "boolean") throw new Error("크리티컬 설정은 참/거짓입니다.");
-  const state: BattleState = { round: 1, rng: input.seed >>> 0,
+  if (input.aiTier !== undefined && !["gentle","normal","veteran","boss","king"].includes(input.aiTier)) throw new Error("AI 등급을 확인해 주세요.");
+  const state: BattleState = { aiTier: input.aiTier ?? input.opponent.aiTier, round: 1, rng: input.seed >>> 0,
     player: newActor(input.player,Math.min(MAX_ENERGY,START_ENERGY + (input.startEnergyBonus ?? 0))), opponent: newActor(input.opponent,START_ENERGY),
     difficulty: input.difficulty ?? "normal", criticals: input.criticals ?? true, opponentAction: { kind: "rest" } };
   const forecast = chooseOpponentAction(state);
-  return { ...state, opponentAction: forecast.action, rng: forecast.rng };
+  return { ...state, opponentAction: forecast.action, opponentHint: forecast.hint, rng: forecast.rng };
 }
 
 type EventPayload = BattleEvent extends infer E ? E extends BattleEvent ? Omit<E, "round"> : never : never;
@@ -53,7 +62,7 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
   const cancelled = new Set<Side>();
   const momentum = (side: Side, amount: number) => {
     const actor = state[side], before = actor.momentum ?? 0;
-    actor.momentum = clamp(before + amount,0,100);
+    actor.momentum = clamp(before + amount * (amount > 0 ? fighterProfile(actor).momentumRate : 1),0,100);
     emit({ type: "momentum", side, amount: actor.momentum - before, momentum: actor.momentum });
   };
   const hurt = (side: Side, targetSide: Side, damage: number, critical = false) => {
@@ -111,8 +120,9 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
     emit({ type: "action", side, action: { ...action } });
     const lastAction = actor.lastAction;
     actor.lastAction = { ...action };
+    actor.history = [...(actor.history ?? []), { ...action }].slice(-4);
     if (action.kind === "quit") { finish("quit","quit"); return; }
-    if (action.kind === "rest") { actor.rested = true; energy(side,REST_ENERGY - (actor.statuses.some(s => s.id === "winded") ? 1 : 0),"rest"); return; }
+    if (action.kind === "rest") { actor.rested = true; energy(side,fighterProfile(actor).restEnergy - (actor.statuses.some(s => s.id === "winded") ? 1 : 0),"rest"); return; }
     if (action.kind === "item") {
       const item = ITEM_BY_ID[action.itemId]; actor.itemUsed = true;
       (actor.usedItems ??= []).push(item.id);
@@ -139,7 +149,7 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
     if (move.finisher) { momentum(side,-100); emit({ type: "finisher", side, moveId: move.id }); }
     if (actor.charging === move.id) delete actor.charging;
     else {
-      energy(side,-move.energy,"cost");
+      energy(side,-moveEnergy(move,actor),"cost");
       if (move.mode === "charge") { actor.charging = move.id; return; }
     }
     if (move.mode === "recoil") actor.recoil = { ...move.recoil, expires: state.round + 1 };
@@ -161,8 +171,13 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
         const critical = state.criticals !== false && !defending && (guaranteedCritical || criticalRoll * 100 < critChance(actor));
         const timing = side === "player" ? input.attackTiming === "perfect" ? 1.1 : input.attackTiming === "good" ? 1.05 : 1 : 1;
         const guardTiming = targetSide === "player" && defense ? input.guardTiming === "perfect" ? .8 : input.guardTiming === "good" ? .9 : 1 : 1;
-        const amount = Math.floor(damageAt(move,actor,target,[.95,1,1.05][Math.floor(draw() * 3)],state.round) * (critical ? 1.5 : 1) * timing * guardTiming);
-        emit({ type: "effectiveness", side, target: targetSide, hint: effectHint(move,actor,target), multiplier: matchup(move.group,BREED_BY_ID[target.breedId].group,actor,target) });
+        const amount = Math.floor(damageAt(move,actor,target,[.95,1,1.05][Math.floor(draw() * 3)],state.round,(critical ? fighterProfile(actor).critMultiplier : 1) * timing) * guardTiming);
+        for (const [affinityType,tag,key] of [["weak",target.weakTag,"knownWeakTag"],["resist",target.resistTag,"knownResistTag"]] as const) {
+          if (amount > 0 && tag && move.tags?.includes(tag) && !target[key]) {
+            target[key] = true; emit({ type: "reveal", side: targetSide, tag, affinity: affinityType });
+          }
+        }
+        emit({ type: "effectiveness", side, target: targetSide, hint: effectHint(move,actor,target), multiplier: affinity(move,actor,target) });
         hurt(side,targetSide,amount,critical);
         if (!move.finisher && amount > 0 && effectHint(move,actor,target) === "good") momentum(side,15);
         if (!move.finisher && critical) momentum(side,20);
@@ -183,9 +198,9 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
           if (defense.kind === "guard") { energy(targetSide,1,"trait"); momentum(targetSide,10); }
           if (defense.kind === "counter" && move.contact) {
             momentum(targetSide,30); emit({ type: "counter", side: targetSide, target: side });
-            const retaliation = Math.max(1,Math.floor((10 + .45 * normalizedStat(target,"defense",state.round)) * growthScale(target.level) * defense.strength));
+            const retaliation = Math.max(1,Math.floor((4 + .45 * normalizedStat(target,"defense",state.round)) * growthScale(target.level) * defense.strength));
             const stance = actor.defense?.kind === "stance" && actor.defense.expires >= state.round ? 1 - .3 * actor.defense.strength : 1;
-            hurt(targetSide,side,Math.floor(retaliation * (actor.shield?.multiplier ?? 1) * stance * (actor.exposedUntil === state.round ? 1.25 : 1)));
+            hurt(targetSide,side,Math.min(Math.floor(actor.stats.hp * .35),Math.floor(retaliation * (actor.shield?.multiplier ?? 1) * stance * (actor.exposedUntil === state.round ? 1.25 : 1))));
             removeShield(side);
             if (actor.hp === 0) { finish(targetSide,"hp"); return; }
           }
@@ -245,7 +260,7 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
   } else {
     state.round++;
     const forecast = chooseOpponentAction(state);
-    state.opponentAction = forecast.action; state.rng = forecast.rng;
+    state.opponentAction = forecast.action; state.opponentHint = forecast.hint; state.rng = forecast.rng;
   }
   return { state, events };
 }

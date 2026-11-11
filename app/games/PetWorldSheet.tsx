@@ -1,12 +1,12 @@
 "use client";
-import { encounterFor } from "@/lib/domine/pet-battle-view";
+import { spawnsFor } from "@/lib/domine/pet-battle-view";
 import { useState } from "react";
 import { PET_WORLD, worldCell } from "@/lib/domine/pet-world";
 import PetSheet from "./PetSheet";
 
-export default function PetWorldSheet({ current, visited, onMove, onClose, slot, wins, showAnimals = false }: {
+export default function PetWorldSheet({ current, visited, onMove, onClose, slot, wins, careLevel = 1, showAnimals = false }: {
   current: string; visited: string[]; onMove: (to: string) => void; onClose: () => void;
-  slot: number; wins: readonly string[]; showAnimals?: boolean;
+  slot: number; wins: readonly string[]; careLevel?: number; showAnimals?: boolean;
 }) {
   const [selected, setSelected] = useState(current);
   const cell = worldCell(selected);
@@ -22,15 +22,15 @@ export default function PetWorldSheet({ current, visited, onMove, onClose, slot,
       <div className="pet-world-grid" role="group" aria-label="서쪽 A열부터 동쪽 J열, 북쪽 1행부터 남쪽 10행">
         {PET_WORLD.map((place) => {
           const isHere = place.id === current;
-          const animal = animals && encounterFor(place.id, 1, slot, wins);
+          const foes = animals ? spawnsFor(place.id, careLevel, slot, wins) : [];
           return <button type="button" key={place.id}
-            aria-label={`${place.id} ${place.name}${isHere ? ", 현재 위치" : ", 이동"}${animal ? ", 동물 있음" : ""}`}
+            aria-label={`${place.id} ${place.name}${isHere ? ", 현재 위치" : ", 이동"}${foes.length ? `, 동물 ${foes.length}마리, ${foes.map(e => `${e.name} Lv.${e.level}`).join(", ")}` : ""}`}
             aria-current={isHere ? "location" : undefined} aria-pressed={place.id === selected}
             data-neighbor={!isHere} data-selected={place.id === selected}
             onClick={() => setSelected(place.id)}>
             <span aria-hidden="true">{isHere ? "🐕" : ""}</span>
             <small>{place.id}</small>
-            {animal && <em aria-hidden="true">🐾</em>}
+            {foes.length > 0 && <em className="pet-world-animals" aria-hidden="true"><span>{"🐾".repeat(foes.length)}</span><small>Lv.{Math.max(...foes.map(e => e.level))}</small></em>}
           </button>;
         })}
       </div>

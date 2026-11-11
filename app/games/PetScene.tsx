@@ -12,6 +12,8 @@ import { mapBackground, SHOPS, type SceneCue } from "@/lib/domine/pet-maps";
 import { DEFAULT_CELL, DIRECTIONS, neighborCell, worldCell, type MapTravel } from "@/lib/domine/pet-world";
 import { clampBall, SCENE_SCALE, travelEdge } from "@/lib/domine/pet-geometry";
 import { DOG_W, PetDog } from "./PetDog";
+import NextImage from "next/image";
+import { GROUP_LABEL, type Encounter } from "@/lib/domine/pet-battle-view";
 
 import { buildIdlePlan, buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
 import { chooseIdleAction, chooseNeedGoal, type IdleGoal } from "@/lib/domine/pet-idle";
@@ -53,7 +55,9 @@ type Props = {
   onMap?: () => void;
   onBattle?: () => void;
   battleDisabled?: boolean;
-  hasOpponent?: boolean;
+  encounters?: readonly Encounter[];
+  selectedEncounter?: string;
+  onEncounter?: (encounter: Encounter) => void;
   onLocal?: (cue: SceneCue) => void;
   locked?: boolean;
   tapDisabled?: boolean;
@@ -111,13 +115,14 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, hasOpponent, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
+export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, encounters = [], selectedEncounter, onEncounter, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
   const cell = worldCell(cellId);
   const [moving, setMoving] = useState(false);
   const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
   const ask = asking?.from === cell.id ? neighborCell(cell.id, asking.direction) : null;
   const map = cell.theme;
-  const sceneScale = SCENE_SCALE * (map === "church" ? .85 : 1) * (petId === 2 ? .8 / PETS[2].scale : 1);
+  const occupied = encounters.length > 0;
+  const sceneScale = SCENE_SCALE * (occupied ? .5 : 1) * (map === "church" ? .85 : 1) * (petId === 2 ? .8 / PETS[2].scale : 1);
   const shadowId = useId();
   const [animated, setS] = useState<ScenePose>({ ...restingPose(map) });
   const [idlePose, setIdlePose] = useState<ScenePose | null>(null);
@@ -155,7 +160,12 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
   const autonomous = !locked && !tapDisabled && !paused && !travel && !contact && !ask && !reduced;
   const base = contact && contactPose.current ? contactPose.current : autonomous && idlePose ? idlePose : cue && !paused && !travel ? animated : restingPose(map);
   const still = reduced ? { ...base, x: restingPose(map).x, y: restingPose(map).y, dir: 1 as const } : base;
-  const s = reacting && !reduced ? { ...still, motion: seated && reacting.kind === "yawn" ? "pet-sit" : "pet-tap-still" } : still;
+  const pose = reacting && !reduced ? { ...still, motion: seated && reacting.kind === "yawn" ? "pet-sit" : "pet-tap-still" } : still;
+  const leftX = (x: number) => occupied ? Math.max(16, Math.min(66, x)) : x;
+  const s = occupied ? { ...pose, x: leftX(pose.x), bowl: pose.bowl === null ? null : leftX(pose.bowl),
+    ball: pose.ball ? { ...pose.ball, x: leftX(pose.ball.x) } : null,
+    item: pose.item ? { ...pose.item, x: leftX(pose.item.x) } : null,
+    hand: pose.hand ? { ...pose.hand, x: leftX(pose.hand.x) } : null } : pose;
   useLayoutEffect(() => { if (!travel) departure.current = s; });
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -259,7 +269,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
   });
 
   return (
-    <div className="pet-scene relative h-full w-full" data-paused={paused} data-travel={travel?.phase} data-reduced={travel?.reduced}>
+    <div className="pet-scene relative h-full w-full" data-paused={paused} data-occupied={occupied} data-travel={travel?.phase} data-reduced={travel?.reduced}>
     <div className="pet-scene-picture">
     <svg
       viewBox="0 6 160 90"
@@ -429,7 +439,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
         ) : null}
       </g>
 
-      {!travel && toy && !s.ball && !s.carry && <g transform={`translate(${map === "home" ? 106 : 124} 81)`}><Ball scale={sceneScale} toy={toy} /></g>}
+      {!travel && toy && !s.ball && !s.carry && <g transform={`translate(${occupied ? 44 : map === "home" ? 106 : 124} 81)`}><Ball scale={sceneScale} toy={toy} /></g>}
       {/* 도구·공·손 */}
       <g style={{ filter: `brightness(${light}) drop-shadow(0 0.5px 0.5px #17231d40)` }}>
       {s.ball ? (
@@ -453,7 +463,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
     </svg>
     {church && <button type="button" className={`absolute min-h-11 w-[12%] min-w-11 rounded-xl focus-visible:outline-2 ${church ? "left-[4%] top-[25%] h-[50%]" : "left-[15%] top-[30%] h-[50%]"}`}
       aria-label="신부님께 인사하기" disabled={locked} onClick={() => onLocal?.({ action: "priest", id: Date.now() })} />}
-    {cell.id === "F6" && SHOPS.map((shop, index) => <button key={shop.name} type="button"
+    {!occupied && cell.id === "F6" && SHOPS.map((shop, index) => <button key={shop.name} type="button"
       className="absolute flex min-h-11 w-[23%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded text-[clamp(11px,3vw,16px)] font-semibold text-[#30271e] focus-visible:outline-2 disabled:opacity-60"
       style={{ left: `${shop.x}%`, top: `${shop.y}%` }} aria-label={`${shop.name} 앞으로 가기`} disabled={locked}
       onClick={() => onLocal?.({ action: "shop", shop: index, id: Date.now() })}>{shop.name}</button>)}
@@ -462,11 +472,17 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
       y={speaker === "priest" ? 31 : s.y - h * sc - 4} duration={s.dur} />}
     </div>
     <div className="pet-scene-picture pet-scene-ui">
+      {!travel && encounters.map((foe, index) => <button type="button" key={foe.id} className="pet-scene-foe" data-selected={foe.id === selectedEncounter}
+        style={{ left: `${[58, 74, 88][index]}%`, width: `${Math.min(13.4, w / 160 * 100 * [.8, .83, .86][index])}%`, "--foe-delay": `${index * -2.3}s` } as React.CSSProperties}
+        disabled={locked || battleDisabled || paused || moving || !!ask} aria-label={`${foe.name} Lv.${foe.level}, ${GROUP_LABEL[foe.individual.group]}, 확인하기`} onClick={() => onEncounter?.(foe)}>
+        <span className="pet-scene-foe-art">{failed[foe.art] ? <span role="img" aria-label={foe.name}>🐾</span> : <NextImage src={foe.art} alt="" width={160} height={160} sizes="16vw" unoptimized onError={() => setFailed(previous => ({ ...previous, [foe.art]: true }))} />}</span>
+        <span className="pet-scene-foe-label"><strong title={foe.name}>{foe.given}</strong><small data-danger={foe.levelDifference >= 5}><i data-group={foe.individual.group} aria-label={GROUP_LABEL[foe.individual.group]} />Lv.{foe.level}</small></span>
+      </button>)}
       {busyText && <div className="pet-busy" role="status">{busyText}</div>}
       <div key={arrivalId ?? 0} className={`pet-location${arrivalId && !travel ? " pet-location-arrived" : ""}`} aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
-      {cellShops(cell.id).length > 0 && <ul className="pet-shop-plates" aria-label="이 칸의 가게">{cellShops(cell.id).map((name) => <li key={name}>{name}</li>)}</ul>}
+      {cellShops(cell.id).length > 0 && <ul className="pet-shop-plates" aria-label="이 칸의 가게">{cellShops(cell.id).slice(0, occupied ? 1 : undefined).map((name) => <li key={name}>{name}</li>)}</ul>}
       <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기"><span>MAP</span></button>
-      {onBattle && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled || moving || !!ask} onClick={onBattle} aria-label={`겨루기${hasOpponent ? ", 동물 있음" : ""}`}>⚔️ 겨루기{hasOpponent && <i className="pet-encounter-dot" aria-hidden="true" />}</button>}
+      {onBattle && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled || moving || !!ask} onClick={onBattle} aria-label={`겨루기, ${encounters.length}마리`}>⚔️<span className="pet-battle-encounter-label"> 겨루기</span> <b>{encounters.length}</b></button>}
       <button type="button" className="pet-move-toggle" aria-pressed={moving} disabled={locked} onClick={() => { setMoving(!moving); setAsking(null); }}><span>{moving ? "닫기" : "이동"}</span></button>
       {moving && DIRECTIONS.map((direction) => {
         const destination = neighborCell(cell.id, direction);

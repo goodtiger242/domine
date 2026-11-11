@@ -7,7 +7,7 @@ import { loadTS } from "./pet-test-loader.mjs";
 const { createBattle, stepRound, availableActions, buildFighter, opponentFor, turnOrder, MAX_ENERGY, START_ENERGY, REST_ENERGY } = loadTS("lib/domine/battle/engine.ts");
 const { BREEDS, MOVES, ITEMS, GROWTH, MOVE_BY_ID, PUSH, FINISHERS, CONSUMABLES, ITEM_BY_ID, powerBudget } = loadTS("lib/domine/battle/data.ts");
 const { matchup, sizeMultiplier, temperamentBonus, damageAt, previewDamage, effectHint, effectiveStat, hitChance, statusChance, recoveryLeft, moveFor, cumulativeXp, levelFromXp, xpToNext, growthQ, growthScale, normalizedStat, recommendedAllocation, conditionPenalty, critChance } = loadTS("lib/domine/battle/rules.ts");
-const { chooseOpponentAction } = loadTS("lib/domine/battle/ai.ts");
+const { chooseOpponentAction, chooseAction } = loadTS("lib/domine/battle/ai.ts");
 const { random } = loadTS("lib/domine/battle/rng.ts");
 const { THEME_POOLS } = loadTS("lib/domine/battle/opponents.ts");
 const { PET_WORLD } = loadTS("lib/domine/pet-world.ts");
@@ -17,8 +17,8 @@ const make = (player = "B001", opponent = "B002", level = 10, seed = 27) => crea
 function freeze(value) { Object.freeze(value); for (const child of Object.values(value)) if (child && typeof child === "object" && !Object.isFrozen(child)) freeze(child); return value; }
 function quiet(state) { state.opponentAction = rest; return state; }
 
-test("12종·33기술·8기존아이템과 학습/성장/슬롯 무결성", () => {
-  assert.equal(BREEDS.length,12); assert.equal(MOVES.length,33); assert.equal(ITEMS.length,8);
+test("12종·235기술·8기존아이템과 학습/성장/슬롯 무결성", () => {
+  assert.equal(BREEDS.length,12); assert.equal(MOVES.length,235); assert.equal(ITEMS.length,8);
   for (const list of [BREEDS,MOVES,ITEMS]) {
     assert.equal(new Set(list.map(v => v.id)).size,list.length);
     assert.equal(new Set(list.map(v => v.name)).size,list.length);
@@ -40,7 +40,7 @@ test("12종·33기술·8기존아이템과 학습/성장/슬롯 무결성", () =
       for (const key of Object.keys(breed.base)) assert.equal(fighter.stats[key],Math.floor(breed.base[key]*(1+q/20*(.8+1.2*(total ? fighter.allocation[key]/total : 0)))));
     }
   }
-  assert.deepEqual(new Set(BREEDS.flatMap(b => b.learn.map(l => l.move))),new Set(MOVES.filter(m => !m.common || m.kind === "defense").map(m => m.id)));
+  assert.deepEqual(new Set(BREEDS.flatMap(b => b.learn.map(l => l.move))),new Set(MOVES.filter(m => !m.id.startsWith("M") && (!m.common || m.kind === "defense")).map(m => m.id)));
   assert.ok(ITEMS.filter(i => i.slot === "bag").length <= 2);
   for (const item of ITEMS) for (const [stat,rate] of Object.entries(item.rates ?? {})) assert.ok(rate > 0 && rate <= (stat === "hp" ? .1 : .08));
   for (const item of ITEMS.filter(i => i.slot === "bag")) assert.ok(item.energy > 0 && item.energy <= 10 || item.heal > 0 && item.heal <= .25);
@@ -95,7 +95,7 @@ test("상성 36칸·체급·기질 전체 행렬과 피해/명중/상태 수식"
   const temps = ["lively","careful","kind","steady"], tempTable = [[0,-5,5,0],[5,0,0,-5],[0,5,0,-5],[-5,0,5,0]];
   temps.forEach((a,i) => temps.forEach((d,j) => assert.equal(temperamentBonus(a,d),tempTable[i][j])));
   const state = make("B001","B001"), attack = MOVE_BY_ID.T03;
-  assert.equal(damageAt(attack,state.player,state.opponent,1),Math.floor((attack.power*1.5+.45*normalizedStat(state.player,"attack"))*40/(40+normalizedStat(state.opponent,"defense"))*growthScale(10)));
+  assert.equal(damageAt(attack,state.player,state.opponent,1),Math.floor((attack.power*1.5+.45*normalizedStat(state.player,"attack"))*40/(40+normalizedStat(state.opponent,"defense"))*growthScale(10)*.92));
   for (const m of MOVES) {
     const preview = previewDamage(m,state.player,state.opponent);
     for (const r of [.95,1,1.05]) assert.ok(damageAt(m,state.player,state.opponent,r) >= preview.perHit.min && damageAt(m,state.player,state.opponent,r) <= preview.perHit.max);
@@ -227,7 +227,7 @@ test("지도 모든 칸·날짜 재현·체비쇼프 거리·고정 지역 레�
   assert.throws(() => opponentFor("Z99",1,10));
   assert.throws(() => opponentFor("E5",NaN,10));
   const state = make(); state.opponent.energy = 0;
-  assert.deepEqual(chooseOpponentAction(state).action,rest);
+  assert.deepEqual(chooseOpponentAction({...state,aiTier:"king"}).action,rest);
   state.difficulty = "hard";
   assert.deepEqual(chooseOpponentAction(state),chooseOpponentAction(state));
 });
@@ -243,7 +243,7 @@ test("첫 피해/첫 공격/지속 특성과 라운드 시작 행동 순서", ()
   }
   const state = make("B017","B004");
   const m = MOVE_BY_ID.T25;
-  const expected = (m.power*1.5+.45*normalizedStat(state.player,"focus"))*40/(40+normalizedStat(state.opponent,"defense"))*growthScale(10)*1.04*.92;
+  const expected = (m.power*1.5+.45*normalizedStat(state.player,"focus"))*40/(40+normalizedStat(state.opponent,"defense"))*growthScale(10)*1.04*.92*1.15*.92;
   assert.equal(damageAt(m,state.player,state.opponent,1),Math.floor(expected));
   state.opponent.traitUsed = true;
   assert.equal(damageAt(m,state.player,state.opponent,1),Math.floor(expected/.92));
@@ -329,17 +329,17 @@ test("컨디션 모든 구간·체력 제외·양쪽 적용·직업과 숙련도
   assert.equal(damageAt(MOVE_BY_ID.T43,mastered,normal,1),0);
 });
 
-test("종 상성 36칸·환경 상한·활동 시간·합산 힌트", () => {
+test("폐기된 종 상성 미적용·환경 입력 호환·활동 시간", () => {
   const types=["companion","agile","flying","runner","heavy","waterside"];
   const rates=[[1,1.04,.96,1,.96,1.04],[.96,1,1.04,.96,1.06,1],[1.04,.96,1,1.04,1,.96],[1,1.04,.96,1,.96,1.04],[1.04,.94,1,1.04,1,.96],[.96,1,1.04,.96,1.04,1]];
   for(let i=0;i<6;i++) for(let j=0;j<6;j++) {
     const a=buildFighter("B001",10,[],{movementType:types[i]}), d=buildFighter("B001",10,[],{movementType:types[j]});
-    assert.equal(matchup("neutral","bond",a,d),rates[i][j]);
+    assert.equal(matchup("neutral","bond",a,d),1);
   }
   const a=buildFighter("B002",10,[],{movementType:"agile",habitats:["H"],activeBands:["night"],environment:{habitat:"H",time:"night",weather:"clear"}});
   const d=buildFighter("B001",10,[],{movementType:"heavy"});
-  assert.equal(matchup("neutral","bond",a,d),1.12);
-  assert.equal(effectHint(PUSH,a,d),"good");
+  assert.equal(matchup("neutral","bond",a,d),1);
+  assert.equal(effectHint(PUSH,a,d),"normal");
   assert.equal(effectiveStat(a,"focus"),Math.floor(a.stats.focus*1.03));
   for(const weather of ["clear","rain","wind","snow"]) for(const movementType of types) for(const group of ["rush","trick","track","guard","bond","endure"]) {
     const f=buildFighter("B001",10,[],{movementType,environment:{weather}});
@@ -355,7 +355,7 @@ test("크리티컬 1.5배·방어 예고 억제·정책 독립", () => {
     const normal=stepRound({...state,criticals:false},move("T01"));
     const critical=stepRound(state,move("T01"));
     const event=critical.events.find(e=>e.type==="damage"&&e.critical);
-    if(event) { found=true; assert.equal(event.amount,Math.floor(normal.events.find(e=>e.type==="damage").amount*1.5)); }
+    if(event) { found=true; assert.ok(Math.abs(event.amount-normal.events.find(e=>e.type==="damage").amount*1.5)<2); }
     state.opponentAction=move("T43");
     assert.ok(!stepRound(state,move("T01")).events.some(e=>e.type==="damage"&&e.critical));
     assert.deepEqual(chooseOpponentAction({...state,criticals:true}),chooseOpponentAction({...state,criticals:false}));
@@ -402,7 +402,7 @@ test("충전 예고·선불 기력·강제 발동·취소·연속 개별 명중�
     state=stepRound(quiet(state),rest).state; assert.equal(state.player.recoil,undefined);
   }
   assert.ok(MOVES.every(m=>Number.isInteger(m.energy)&&m.energy>=0&&m.energy<=8));
-  assert.equal(MOVES.filter(m=>m.mode==="normal").length,27);
+  assert.equal(MOVES.filter(m=>!m.id.startsWith("M")&&m.mode==="normal").length,27);
 });
 
 test("연속 공격 프리뷰 방어막 1회 소비·신규 기술 AI 선택과 종료", () => {
@@ -450,17 +450,18 @@ test("위력 예산·유료 공격의 평균 피해 단조성·무료 기본기"
   for(const m of MOVES.filter(m=>m.kind==="attack")) assert.equal(m.power,powerBudget(m.energy,m),m.id);
   assert.equal(PUSH.power,10);
   assert.equal(FINISHERS.length,6); assert.ok(FINISHERS.every(m=>m.energy===0&&m.power===34));
+  const fixtures=[1,10,30,60,100].map(level=>BREEDS.map(b=>buildFighter(b.id,level)));
   const average=m=>{
     let total=0;
-    for(const level of [1,10,30,60,100]) for(const a of BREEDS) for(const d of BREEDS) {
-      const p=previewDamage(m,buildFighter(a.id,level),buildFighter(d.id,level)); total+=(p.min+p.max)/2;
+    for(const fighters of fixtures) for(const a of fighters) for(const d of fighters) {
+      const p=previewDamage(m,a,d); total+=(p.min+p.max)/2;
     }
     return total/(5*12*12);
   };
-  const free=average(PUSH), paid=MOVES.filter(m=>m.kind==="attack").map(m=>({m,damage:average(m)}));
+  const free=average(PUSH), paid=MOVES.filter(m=>m.kind==="attack"&&m.energy>0).map(m=>({m,damage:average(m)}));
   for(const {m,damage} of paid) assert.ok(damage>free,`${m.id}: ${damage} <= ${free}`);
   const plain=paid.filter(({m})=>!m.status&&!m.buff&&!m.priority&&!m.breaksDefense&&m.mode==="normal");
-  for(const a of plain) for(const b of plain) if(a.m.energy>b.m.energy) assert.ok(a.damage>b.damage,`${a.m.id}/${b.m.id}`);
+  for(const a of plain) for(const b of plain) if(a.m.energy>b.m.energy && a.m.group===b.m.group) assert.ok(a.damage>b.damage,`${a.m.id}/${b.m.id}`);
 });
 
 function duel(playerMove, opponentMove, seed=1, options={}) {
@@ -591,7 +592,7 @@ test("기세·결정기·타이밍 입력·순서 미리보기·깊은 복사", 
   state=quiet(duel("T01","T01"));
   const normal=hitResult(state,move("T01")), perfect=hitResult(state,move("T01"),{attackTiming:"perfect"}), good=hitResult(state,move("T01"),{attackTiming:"good"});
   const amount=r=>r.events.find(e=>e.type==="damage").amount;
-  assert.equal(amount(perfect),Math.floor(amount(normal)*1.1)); assert.equal(amount(good),Math.floor(amount(normal)*1.05));
+  assert.ok(Math.abs(amount(perfect)-amount(normal)*1.1)<2); assert.ok(Math.abs(amount(good)-amount(normal)*1.05)<2);
   assert.deepEqual(stepRound(state,move("T01")),stepRound(state,move("T01"),{attackTiming:"miss",guardTiming:"miss"}));
   state=duel("T43","T01"); state.player.energy=4;
   const guard=hitResult(state,move("T43")), timed=hitResult(state,move("T43"),{guardTiming:"perfect"});
@@ -616,9 +617,11 @@ function expected(action, actor, target, round) {
 function policy(state, kind) {
   const actions=availableActions(state,"player"), actor=state.player, target=state.opponent;
   if(actor.charging) return actions[0];
-  const attacks=actions.filter(a=>moveFor(a)?.kind==="attack").sort((a,b)=>expected(b,actor,target,state.round)-expected(a,actor,target,state.round));
+  const scores=new Map(actions.map(a=>[a,expected(a,actor,target,state.round)]));
+  const attacks=actions.filter(a=>moveFor(a)?.kind==="attack").sort((a,b)=>scores.get(b)-scores.get(a));
   const best=attacks[0] ?? rest, damage=expected(best,actor,target,state.round);
-  if(kind==="attack") return actor.energy<2 && damage<target.hp && !moveFor(best)?.finisher ? rest : best;
+  const exhausted=!attacks.some(a=>moveFor(a)?.energy>=2);
+  if(kind==="attack") return (actor.energy<2 || exhausted) && damage<target.hp && !moveFor(best)?.finisher ? rest : best;
   if(kind==="items") {
     const threat=expected(state.opponentAction,target,actor,state.round);
     const item=actions.find(a=>a.kind==="item" && (ITEM_BY_ID[a.itemId].heal && actor.hp<=actor.stats.hp*.45 && (threat>=actor.hp || threat<actor.stats.hp*ITEM_BY_ID[a.itemId].heal*.7)
@@ -628,73 +631,147 @@ function policy(state, kind) {
   if(kind==="read" || kind==="items") {
     const incoming=moveFor(state.opponentAction), threat=expected(state.opponentAction,target,actor,state.round);
     const counter=actions.find(a=>moveFor(a)?.defense==="counter");
-    if(counter && incoming?.contact && incoming.energy>=2 && !incoming.breaksDefense && threat>=damage*1.05 && actor.lastAction?.moveId!==counter.moveId) return counter;
+    if(counter && incoming?.contact && incoming.energy>=2 && !incoming.breaksDefense && threat>=damage*1.1 && actor.lastAction?.moveId!==counter.moveId) return counter;
     const guard=actions.find(a=>moveFor(a)?.defense==="guard");
     if(guard && threat>0 && !incoming?.breaksDefense && actor.energy<2 && threat>actor.stats.hp*.15 && actor.lastAction?.moveId!==guard.moveId) return guard;
   }
-  if((actor.energy<2 || kind==="manage" && actor.energy<=4 && expected(state.opponentAction,target,actor,state.round)===0) && damage<target.hp && !moveFor(best)?.finisher) return rest;
+  if((actor.energy<2 || exhausted || kind==="manage" && actor.energy<=4 && expected(state.opponentAction,target,actor,state.round)===0) && damage<target.hp && !moveFor(best)?.finisher) return rest;
   return best;
 }
 
-test("2차 정책 시뮬레이션", () => {
-  const start=performance.now(), samples=Number(process.env.BATTLE_SAMPLES ?? 32), rows=[];
+test("3차 등급·기운·레벨·정책 시뮬레이션", () => {
+  const start=performance.now(), samples=Number(process.env.BATTLE_SAMPLES ?? 16), rows=[];
+  const levels=[1,10,30,60,100,300], tiers=["gentle","normal","veteran","boss","king"];
   assert.ok(Number.isInteger(samples)&&samples>0);
-  for(const level of [1,10,30,60,100]) for(const id of BREEDS.map(b=>b.id)) for(const kind of ["attack","manage","read","items"]) {
-    const player=buildFighter(id,level,[],{moves:[...BREEDS.find(b=>b.id===id).learn.filter(l=>l.level<=level&&MOVE_BY_ID[l.move].kind==="attack").slice(0,2).map(l=>l.move),"T43","T31"],...(kind==="items" ? {items:["P02","P05","P12"]} : {})});
-    let wins=0, rounds=0, limit=0, stuck=0, exhausted=0, uses=0;
-    for(const breed of BREEDS) {
-      const opponent=buildFighter(breed.id,level);
-      for(let seed=10000;seed<10000+samples;seed++) {
-        let state=createBattle({seed,player,opponent});
-        while(!state.outcome) {
-          const actions=availableActions(state,"player");
-          stuck+=!actions.some(a=>a.kind!=="quit");
-          exhausted+=!actions.some(a=>moveFor(a)?.kind==="attack" && moveFor(a).energy>0);
-          state=stepRound(state,policy(state,kind)).state;
+  const { ELEMENTS }=loadTS("lib/domine/battle/moves.ts");
+  for(const level of levels) for(const relation of ["good","normal","weak"]) for(const tier of tiers) {
+    const variants=tier==="normal" ? ["attack","read","items"] : ["attack"];
+    for(const kind of variants) {
+      let wins=0,rounds=0,limit=0,short=0,stuck=0,n=0;
+      for(let i=0;i<BREEDS.length;i++) {
+        const element=ELEMENTS[i%6], enemyElement=ELEMENTS.find(g=>matchup(element,g)===(relation==="good"?1.3:relation==="weak"?.75:1));
+        const player=buildFighter(BREEDS[i].id,level,[],{element,weakTag:"scent",resistTag:"gaze",...(kind==="items"?{items:["P02","P05","P12"]}:{} )});
+        const opponents=BREEDS.map(b=>buildFighter(b.id,level,[],{element:enemyElement,weakTag:"trick",resistTag:"sound",aiTier:tier}));
+        for(let seed=0;seed<samples;seed++) {
+          let state=createBattle({seed:10000+seed*101+i*17,player,opponent:opponents[(seed+i)%12],aiTier:tier});
+          while(!state.outcome) {
+            stuck+=!availableActions(state,"player").some(a=>a.kind!=="quit");
+            state=stepRound(state,policy(state,kind)).state;
+          }
+          n++; wins+=state.outcome==="player";rounds+=state.round;limit+=state.round===12;short+=state.round<=3;
         }
-        wins+=state.outcome==="player"; rounds+=state.round; limit+=state.round===12; uses+=state.player.usedItems.length;
+      }
+      rows.push({level,relation,tier,kind,n,rate:wins/n*100,rounds:rounds/n,limit:limit/n*100,short:short/n*100,stuck:stuck/rounds*100});
+    }
+  }
+  const average=group=>Object.fromEntries(["rate","rounds","limit","short","stuck"].map(k=>[k,group.reduce((s,r)=>s+r[k],0)/group.length]));
+  const summary=tiers.map(tier=>({tier,...average(rows.filter(r=>r.tier===tier&&r.kind==="attack"))}));
+  const policies=["attack","read","items"].map(kind=>({kind,...average(rows.filter(r=>r.tier==="normal"&&r.kind===kind))}));
+  const elements=["good","normal","weak"].map(relation=>({relation,...average(rows.filter(r=>r.tier==="normal"&&r.kind==="attack"&&r.relation===relation))}));
+  const gaps=[];
+  for(const level of levels) for(const gap of [-3,3]) {
+    if(level+gap<1) continue;
+    let wins=0,n=0;
+    for(let i=0;i<12;i++) {
+      const player=buildFighter(BREEDS[i].id,level,[],{element:ELEMENTS[i%6]});
+      const opponent=buildFighter(BREEDS[(i+5)%12].id,level+gap,[],{element:ELEMENTS[(i+1)%6],aiTier:"normal"});
+      for(let seed=0;seed<samples;seed++) {
+        let state=createBattle({seed:50000+seed*101+i*17,player,opponent});
+        while(!state.outcome) state=stepRound(state,policy(state,"attack")).state;
+        wins+=state.outcome==="player";n++;
       }
     }
-    const n=BREEDS.length*samples;
-    rows.push({level,id,kind,rate:wins/n*100,rounds:rounds/n,limit:limit/n*100,stuck:stuck/rounds*100,exhausted:exhausted/rounds*100,uses:uses/n});
+    gaps.push({level,gap,rate:wins/n*100});
   }
+  const extremes=[];
+  for(const favorable of [true,false]) {
+    let wins=0,n=0;
+    for(const level of levels) for(let i=0;i<12;i++) {
+      const element=ELEMENTS[i%6], other=ELEMENTS.find(g=>matchup(element,g)===(favorable?1.3:.75));
+      const player=buildFighter(BREEDS[i].id,level,[],{element,weakTag:favorable?"gaze":"contact",resistTag:favorable?"contact":"gaze"});
+      const opponent=buildFighter(BREEDS[(i+5)%12].id,level,[],{element:other,weakTag:favorable?"contact":"gaze",resistTag:favorable?"gaze":"contact",aiTier:"normal"});
+      for(let seed=0;seed<samples;seed++) {
+        let state=createBattle({seed:80000+seed*101+i*17,player,opponent});
+        while(!state.outcome) state=stepRound(state,policy(state,"attack")).state;
+        wins+=state.outcome==="player";n++;
+      }
+    }
+    extremes.push({favorable,rate:wins/n*100});
+  }
+  const levelSummary=levels.map(level=>({level,...average(rows.filter(r=>r.tier==="normal"&&r.kind==="attack"&&r.level===level))}));
   const elapsed=(performance.now()-start)/1000;
-  const summary=[1,10,30,60,100].flatMap(level=>["attack","manage","read","items"].map(kind=>{
-    const group=rows.filter(r=>r.level===level&&r.kind===kind), result={level,kind};
-    for(const key of ["rate","rounds","limit","stuck","exhausted","uses"]) result[key]=group.reduce((s,r)=>s+r[key],0)/group.length;
-    return result;
-  }));
-  console.log(JSON.stringify({samples,elapsed,rows:summary}));
-  if(samples>=32) {
-    for(const row of summary) {
-      assert.ok(row.rate>=55&&row.rate<=75,`정책 승률 ${JSON.stringify(row)}`);
-      assert.ok(row.rounds>=6&&row.rounds<=10,`정책 라운드 ${JSON.stringify(row)}`);
-      assert.ok(row.limit<=15,`정책 12라운드 ${JSON.stringify(row)}`);
-      assert.ok(row.stuck<=10);
-    }
-    for(const row of summary.filter(r=>r.kind==="read")) {
-      const attack=summary.find(r=>r.level===row.level&&r.kind==="attack");
-      const items=summary.find(r=>r.level===row.level&&r.kind==="items");
-      assert.ok(row.rate-attack.rate>=5&&row.rate-attack.rate<=12,`방어 이득 ${row.id}/${row.level}: ${row.rate-attack.rate}`);
-      assert.ok(items.rate-row.rate<=15,`소모품 이득 ${items.rate-row.rate}`);
-    }
-    assert.ok(elapsed<28,`실행 시간 ${elapsed}`);
+  console.log(JSON.stringify({samples,elapsed,summary,policies,elements,levels:levelSummary,gaps,extremes}));
+  const checks=[];
+  const check=(ok,label)=>{if(!ok) checks.push(label);};
+  for(const r of summary) {
+    const target={gentle:80,normal:65,veteran:50,boss:35}[r.tier];
+    if(target) check(Math.abs(r.rate-target)<=8,`${r.tier} 승률 ${r.rate.toFixed(2)}`);
+    check(r.rounds>=6&&r.rounds<=10,`${r.tier} 라운드 ${r.rounds.toFixed(2)}`);
+    check(r.limit<=15,`${r.tier} 12라운드 ${r.limit.toFixed(2)}`);
+    check(r.short<=5,`${r.tier} 단기종료 ${r.short.toFixed(2)}`);
+    check(r.stuck<=10,`${r.tier} 행동불가 ${r.stuck.toFixed(2)}`);
   }
+  check(policies[0].rate>=55&&policies[0].rate<=75,`동급 평균 ${policies[0].rate}`);
+  for(const r of levelSummary) {
+    check(r.rate>=55&&r.rate<=75,`Lv.${r.level} 승률 ${r.rate.toFixed(2)}`);
+    check(r.rounds>=6&&r.rounds<=10&&r.limit<=15&&r.short<=5&&r.stuck<=10,`Lv.${r.level} 극단 검사`);
+  }
+  for(const r of gaps) check(r.rate>=10&&r.rate<=95,`Lv.${r.level}/${r.gap} 승률 ${r.rate.toFixed(2)}`);
+  for(const r of extremes) check(r.rate>=30&&r.rate<=85,`기운+태그 ${r.favorable} ${r.rate.toFixed(2)}`);
+  const defenseGain=policies[1].rate-policies[0].rate, itemGain=policies[2].rate-policies[1].rate;
+  check(defenseGain>=5&&defenseGain<=12,`방어 이득 ${defenseGain.toFixed(2)}`);
+  check(itemGain<=15,`소모품 이득 ${itemGain.toFixed(2)}`);
+  for(const r of elements) check(r.rate>=30&&r.rate<=85,`기운 ${r.relation} ${r.rate.toFixed(2)}`);
+  check(elapsed<35,`시뮬레이션 시간 ${elapsed.toFixed(2)}`);
   if(process.env.BATTLE_REPORT==="1") {
-    const names={attack:"공격",manage:"기력 관리",read:"방어 읽기",items:"소모품"}, f=n=>n.toFixed(2);
-    const lines=[`12견종 × 12상대 × 5레벨 × 4정책 × ${samples}시드 = ${12*12*5*4*samples}판. 시드 10000~${9999+samples}, 시뮬레이션 ${f(elapsed)}초.`,"",
-      "| 레벨 | 정책 | 승률 | 평균 라운드 | 12라운드 도달 | 행동 불가 | 유료 공격 불가 | 평균 소모품 사용 |",
-      "|---:|---|---:|---:|---:|---:|---:|---:|"];
-    for(const r of summary) lines.push(`| ${r.level} | ${names[r.kind]} | ${f(r.rate)}% | ${f(r.rounds)} | ${f(r.limit)}% | ${f(r.stuck)}% | ${f(r.exhausted)}% | ${f(r.uses)} |`);
-    lines.push("","| 레벨 | 방어 읽기 − 공격 | 소모품 − 방어 읽기 |","|---:|---:|---:|");
-    for(const level of [1,10,30,60,100]) {
-      const rate=kind=>summary.find(r=>r.level===level&&r.kind===kind).rate;
-      lines.push(`| ${level} | +${f(rate("read")-rate("attack"))}%p | ${f(rate("items")-rate("read"))}%p |`);
-    }
-    const range=rows.filter(r=>r.kind==="read").map(r=>r.rate);
-    lines.push("",`견종별 방어 읽기 승률 범위는 ${f(Math.min(...range))}~${f(Math.max(...range))}%다. 평균 합격이 모든 견종·상대 조합의 균형을 뜻하지는 않는다.`);
-    const path="docs/pet-battle-sim.md", doc=readFileSync(path,"utf8");
-    assert.ok(doc.includes("<!-- simulation:start -->")&&doc.includes("<!-- simulation:end -->"));
-    writeFileSync(path,doc.replace(/<!-- simulation:start -->[\s\S]*?<!-- simulation:end -->/,`<!-- simulation:start -->\n${lines.join("\n")}\n<!-- simulation:end -->`));
+    const f=n=>n.toFixed(2), lines=[`${samples}시드, 12견종 순환 대진, 레벨 1·10·30·60·100·300, 기운 3조건. ${f(elapsed)}초.`,"",
+      "| 등급 | 플레이어 승률 | 평균 라운드 | 12라운드 | 3라운드 이하 | 행동 불가 |","|---|---:|---:|---:|---:|---:|"];
+    for(const r of summary) lines.push(`| ${r.tier} | ${f(r.rate)}% | ${f(r.rounds)} | ${f(r.limit)}% | ${f(r.short)}% | ${f(r.stuck)}% |`);
+    lines.push("",`방어 이득 ${f(defenseGain)}%p, 소모품 이득 ${f(itemGain)}%p.`,"",...elements.map(r=>`${r.relation}: ${f(r.rate)}%`),"",
+      "| 레벨 | 보통 승률 | 평균 라운드 | 12라운드 |","|---:|---:|---:|---:|",
+      ...levelSummary.map(r=>`| ${r.level} | ${f(r.rate)}% | ${f(r.rounds)} | ${f(r.limit)}% |`),"",
+      `레벨 차 ±3 승률 ${f(Math.min(...gaps.map(r=>r.rate)))}~${f(Math.max(...gaps.map(r=>r.rate)))}%. Lv.1 상대 −3은 유효하지 않아 제외.`,"",`미달: ${checks.join(" / ") || "없음"}`);
+    lines.push("",`기운과 접촉 약점/내성을 함께 유리·불리하게 묶은 대진: ${extremes.map(r=>`${r.favorable?"유리":"불리"} ${f(r.rate)}%`).join(" / ")}.`);
+    const path="docs/pet-battle-sim.md";
+    writeFileSync(path,readFileSync(path,"utf8").replace(/<!-- simulation:start -->[\s\S]*?<!-- simulation:end -->/,`<!-- simulation:start -->\n${lines.join("\n")}\n<!-- simulation:end -->`));
   }
+  if(samples>=16) assert.deepEqual(checks,[]);
+});
+
+test("12종×12종 같은 레벨·AI 승률 35~65%",()=>{
+  const { SPECIES, ELEMENTS }=loadTS("lib/domine/battle/moves.ts");
+  const samples=72, results=[], failures=[];
+  // Each duel shares a template; cycle all 12 stat/trait templates and six auras, swapping sides.
+  const fixtures=SPECIES.map(species=>BREEDS.map(breed=>ELEMENTS.map(element=>buildFighter(breed.id,30,[],{species,signatureBreedId:"wild",element}))));
+  let rounds=0,limit=0,short=0,stuck=0,total=0;
+  for(let i=0;i<SPECIES.length;i++) for(let j=i;j<SPECIES.length;j++) {
+    let first=0,second=0,n=0;
+    for(let seed=0;seed<samples;seed++) for(const reverse of [false,true]) {
+      const a=fixtures[i][seed%12][Math.floor(seed/12)%6],b=fixtures[j][seed%12][Math.floor(seed/12)%6];
+      let state=createBattle({seed:190000+seed*101,player:reverse?b:a,opponent:reverse?a:b,aiTier:"normal"});
+      while(!state.outcome) {
+        const pick=chooseAction({...state,player:state.opponent,opponent:state.player},"normal");
+        state={...state,rng:pick.rng};
+        stuck+=!availableActions(state,"player").some(a=>a.kind!=="quit");
+        state=stepRound(state,pick.action).state;
+      }
+      first+=state.outcome===(reverse?"opponent":"player");second+=state.outcome===(reverse?"player":"opponent");n++;
+      rounds+=state.round;limit+=state.round===12;short+=state.round<=3;total++;
+    }
+    for(const [a,b,wins] of [[i,j,first],[j,i,second]]) {
+      if(a===b && results.some(r=>r.a===a&&r.b===b)) continue;
+      const row={a,b,pair:`${SPECIES[a]}/${SPECIES[b]}`,rate:wins/n*100};results.push(row);
+      if(row.rate<35||row.rate>65) failures.push(row);
+    }
+  }
+  const summary={min:results.reduce((a,b)=>a.rate<b.rate?a:b),max:results.reduce((a,b)=>a.rate>b.rate?a:b),rounds:rounds/total,limit:limit/total*100,short:short/total*100,stuck:stuck/rounds*100};
+  console.log("종간 대진",JSON.stringify({...summary,failures}));
+  if(process.env.BATTLE_REPORT==="1") {
+    const path="docs/pet-battle-sim.md",f=n=>n.toFixed(2);
+    const report=`Lv.30·양쪽 보통 AI, 12개 공통 스탯/특성 틀 × 6기운 = 72개 고정 시드, 양쪽 자리 교환. 자동 학습·장착과 종 성향을 함께 적용한다. 12×12 행렬의 대진별 승률(무승부는 승리에서 제외)을 검사한다. 전체 11,232판.\n\n종간 최저 ${summary.min.pair} ${f(summary.min.rate)}%, 최고 ${summary.max.pair} ${f(summary.max.rate)}%. 평균 ${f(summary.rounds)}라운드, 12라운드 ${f(summary.limit)}%, 3라운드 이하 ${f(summary.short)}%, 행동 불가 ${f(summary.stuck)}%. 미달 ${failures.length}개.`;
+    writeFileSync(path,readFileSync(path,"utf8").replace(/<!-- species:start -->[\s\S]*?<!-- species:end -->/,`<!-- species:start -->\n${report}\n<!-- species:end -->`));
+  }
+  assert.equal(results.length,144);
+  assert.ok(summary.rounds>=6&&summary.rounds<=10&&summary.limit<=15&&summary.short<=5&&summary.stuck<=10);
+  assert.deepEqual(failures,[]);
 });

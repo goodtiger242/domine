@@ -23,6 +23,37 @@ const { NAMED } = load("lib/domine/king/named.ts");
 const { pickSpawns, GUEST_RATE } = load("lib/domine/king/spawn.ts");
 const { PET_WORLD } = load("lib/domine/pet-world.ts");
 const engine = load("lib/domine/battle/data.ts");
+const { BATTLE_PROFILES, BREED_PROFILE_BONUSES, DEFAULT_PROFILE, profileFor } = load("lib/domine/battle/profiles.ts");
+
+test("종 성향 점수 0±1·품종 한 가지 ±1점·체급 연결·기운 독립", () => {
+  // Status dealt uses the same 15% step as status taken, with the opposite sign.
+  const score = p => p.critBonus / 2 + (p.critMultiplier - 1.5) / .08 + (p.momentumRate - 1) / .1
+    + p.evade / 2 + (p.restEnergy - 5) * 2 + (1 - p.statusTaken) / .15 + (p.statusDealt - 1) / .15
+    + Object.values(p.statTilt).reduce((sum,value) => sum + value / .06,0);
+  assert.equal(Object.keys(BATTLE_PROFILES).length,14);
+  for (const [id,p] of Object.entries(BATTLE_PROFILES)) {
+    assert.ok(Math.abs(score(p)) <= 1 + 1e-9,`${id}: ${score(p)}`);
+    assert.ok(p.critBonus >= -2 && p.critBonus <= 4 && p.critMultiplier >= 1.4 && p.critMultiplier <= 1.65);
+    assert.ok(p.momentumRate >= .85 && p.momentumRate <= 1.25 && p.evade >= 0 && p.evade <= 4);
+    assert.ok([5,6].includes(p.restEnergy) && p.statusTaken >= .7 && p.statusTaken <= 1.2);
+    assert.ok(Object.values(p.statTilt).every(value => Math.abs(value) <= .12));
+  }
+  for (const { bonus } of Object.values(BREED_PROFILE_BONUSES)) {
+    assert.equal(Object.keys(bonus).length,1);
+    if (bonus.statTilt) assert.equal(Object.keys(bonus.statTilt).length,1);
+    assert.ok(Math.abs(score({ ...DEFAULT_PROFILE, ...bonus })) <= 1 + 1e-9);
+  }
+  for (const b of BREEDS) {
+    const species = b.species === "waterdeer" ? "deer" : b.species;
+    assert.deepEqual(b.battleProfile,profileFor(species,b.id));
+    if (species === "dog" && !BREED_PROFILE_BONUSES[b.id]) assert.deepEqual(b.battleProfile,BATTLE_PROFILES[`dog_${b.size}`]);
+    for (const group of GROUPS) assert.deepEqual(asBattleBreed(b.id,group).battleProfile,b.battleProfile);
+  }
+  assert.deepEqual(profileFor("cat","B003"),BATTLE_PROFILES.cat);
+  assert.throws(() => profileFor("__proto__"));
+  const copy = profileFor("cat"); copy.statTilt.hp = 0;
+  assert.equal(profileFor("cat").statTilt.hp,-.06);
+});
 
 test("12종·64형과 비활성 손님 3종: 기존 품종 보존, 신규 체급 예산, 모든 그림·변형 존재", () => {
   assert.equal(SPECIES.filter(s => s.active).length, 12);
