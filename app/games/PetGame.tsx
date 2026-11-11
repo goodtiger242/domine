@@ -25,7 +25,7 @@ const PetHistorySheet = dynamic(() => import("./PetHistorySheet"));
 const PetAchievementSheet = dynamic(() => import("./PetAchievementSheet"));
 const PetWorldSheet = dynamic(() => import("./PetWorldSheet"));
 const PetSheet = dynamic(() => import("./PetSheet"));
-const PetBattleSheet = dynamic(() => import("./PetBattleSheet"));
+const PetBattleSheet = dynamic(() => import("./PetBattleSheet"), { ssr: false });
 type Sheet = "map" | "shop" | "bag" | "album" | "achievements" | "history" | "record" | "notice" | "battle" | null;
 const BUSY_ACTION: Record<string, string> = { feed: "밥 주는", treat: "간식 주는", pet: "쓰다듬는", play: "공놀이하는", walk: "산책하는", brush: "빗질하는", bath: "목욕시키는", train: "훈련하는" };
 
@@ -106,7 +106,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   }, [game.active, sheet]);
   function open(next: Sheet) { game.pause(next === "battle"); setSheet(next); }
   function startBattle() {
-    if (locked || machine.command !== "idle" || game.busy) return;
+    if (sheet || locked || machine.command !== "idle" || game.busy) return;
     const next = encounterFor(cell.id, personal?.levels?.[game.petId] ?? personal?.player?.level ?? 1);
     if (next) { setEncounter(next); open("battle"); }
   }
@@ -159,7 +159,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       </button>)}
     </div>)}
     <nav className="pet-menu" aria-label="진행과 기록"><button type="button" onClick={() => open("shop")}><span aria-hidden="true">🛍️</span>상점</button><button type="button" onClick={() => open("bag")}><span aria-hidden="true">🎒</span>가방</button><button type="button" onClick={() => open("album")}><span aria-hidden="true">📖</span>도감</button><button type="button" onClick={() => open("achievements")}><span aria-hidden="true">🏅</span>업적</button><button type="button" onClick={() => open("history")}><span aria-hidden="true">🕘</span>이력</button></nav>
-    {sheet === "battle" && encounter && <PetBattleSheet encounter={encounter} petId={game.petId} stage={stage} onClose={close} />}
+    {sheet === "battle" && encounter && <PetBattleSheet key={`${encounter.cellId}:${game.petId}`} encounter={encounter} petId={game.petId} stage={stage} hour={hour} onClose={close} />}
     {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
     {(sheet === "shop" || sheet === "bag") && <PetShopSheet bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={game.execute} onClose={close} onSelectPet={game.selectPet} multiPet={game.multiPet} onShop={() => setSheet("shop")} />}
