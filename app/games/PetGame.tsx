@@ -3,6 +3,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ACTION_ICON, ACTION_LABEL, availableActionGroups, collarToday, faceOf, LOCAL_ACTIONS, PET_ACTIONS, stageOf, type PetCategory, type PetState } from "@/lib/domine/pet";
 import { line } from "@/lib/domine/pet-lines";
+import { routinePeriod } from "@/lib/domine/pet-idle";
+import { CATALOG } from "@/lib/domine/pet-catalog";
 import { fallingNeeds } from "@/lib/domine/pet-signals";
 import { queueSpeech, type Speech } from "@/lib/domine/pet-bubble";
 import { actionsForMap } from "@/lib/domine/pet-maps";
@@ -45,7 +47,7 @@ function Mini({ label, icon, value, color }: { label: string; icon: string; valu
 
 export function PetGame({ api }: { api?: PetApi } = {}) {
   const game = usePetController(api);
-  const { machine, shared: pet, personal } = game;
+  const { machine, shared: pet, personal, care } = game;
   const [sheet, setSheet] = useState<Sheet>(null), [category, setCategory] = useState<PetCategory>("먹이");
   const [nameSearch, setNameSearch] = useState(""), [connecting, setConnecting] = useState(false);
   const query = nameSearch.normalize("NFC").trim();
@@ -62,10 +64,18 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   const notice = game.capability === "missing" ? "우리 강아지 준비 중 · 돌보기는 계속할 수 있어요."
     : game.capability === "error" ? "우리 강아지 연결을 확인하지 못했어요. 잠시 후 다시 열어 주세요."
     : !game.registered ? "내 이름을 입력하면 함께 키울 수 있어요" : "";
-  const status = (game.busy ? `${game.busy.nickname}님이 ${PETS[game.petId].name}에게 ${BUSY_ACTION[game.busy.action]} 중이에요` : "")
-    || game.message || (game.canRetry ? "응답을 확인하지 못했어요. 결과 확인을 눌러 주세요." : "") || notice;
+  const busyText = game.busy ? `${game.busy.nickname}님이 ${PETS[game.petId].name}에게 ${BUSY_ACTION[game.busy.action]} 중이에요` : "";
+  const status = game.message || (game.canRetry ? "응답을 확인하지 못했어요. 결과 확인을 눌러 주세요." : "") || notice;
   const careLocked = locked || !!game.busy || (!!game.features?.busyLock && machine.command !== "idle");
   const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeeches((queue) => queueSpeech(queue, { text, speaker })), []);
+  const strokePet = useCallback(() => care("pet", true), [care]);
+  const greetings = useRef(new Set<string>());
+  useEffect(() => {
+    if (careLocked || !game.active || sheet) return;
+    const period = routinePeriod(hour), key = `${game.petId}:${period}`;
+    if (greetings.current.has(key)) return;
+    greetings.current.add(key); say(line(`greeting_${period}`));
+  }, [careLocked, game.active, game.petId, sheet, hour, say]);
   const needs = useRef<Record<number, { previous: PetState; seen: Set<string>; pending: string[] }>>({});
   useEffect(() => {
     if (!pet) return;
@@ -113,7 +123,9 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     </div>
     {status && <PetNotice key={`${game.petId}-${status}`} parts={[status]} onOpen={() => open(game.registered ? "notice" : "record")} />}
     <div className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
-      {game.worldReady ? <PetScene key={game.petId} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => open("map")} onLocal={game.localScene} locked={locked}
+      {game.worldReady ? <PetScene key={game.petId} busyText={busyText} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => open("map")} onLocal={game.localScene} locked={locked}
+        tapDisabled={careLocked || machine.command !== "idle"} onPet={strokePet}
+        bagToy={personal?.inventory?.find((id) => CATALOG.some((item) => item.id === id && item.slot === "toy"))}
         paused={!game.active || !!sheet || machine.visual === "paused"} stage={stage} face={face} hour={hour}
         light={hour >= 21 || hour < 5 ? .8 : hour < 7 || hour >= 17 ? .9 : 1} collar={collarToday().hex}
         cue={game.cue} onSay={say} onDone={game.done} speaker={speech?.speaker} needs={pet ?? undefined}

@@ -1,5 +1,6 @@
 import type { PetMap, SceneCue } from "./pet-maps";
 import { actorBounds, clampActor, clampBall, SAFE_ZONES, START_POINTS } from "./pet-geometry";
+import type { IdleAction } from "./pet-idle";
 export type ScenePose = {
   x: number; y: number; dir: 1 | -1; dur: number; motion: string | null;
   ball: { x: number; y: number; dur: number } | null;
@@ -76,4 +77,33 @@ export function sampleScenePlan(plan: ScenePlan, elapsedMs: number): ScenePose {
   let pose = plan.keyframes[0]?.pose ?? plan.finalPose;
   for (const frame of plan.keyframes) { if (frame.at > elapsedMs) break; pose = frame.pose; }
   return pose;
+}
+
+export function buildIdlePlan(action: IdleAction, context: { map: PetMap; width: number }): ScenePlan {
+  const { map, width: w } = context;
+  const origin = restingPose(map), zone = SAFE_ZONES[map];
+  const target = clampActor({ x: origin.x + 18, y: origin.y }, actorBounds(w), zone);
+  const bowl = clampBall({ x: target.x + w * .65, y: target.y }).x;
+  let pose = origin;
+  const keyframes: SceneKeyframe[] = [];
+  const add = (at: number, patch: Partial<ScenePose>, say?: string) => {
+    pose = { ...pose, ...patch }; keyframes.push({ at, pose, say });
+  };
+  if (action === "food" || action === "snack") {
+    add(0, { ...target, bowl, dur: 650, motion: "pet-trot" });
+    add(650, { motion: "pet-idle-tilt" }, action === "food" ? "idle_hungry" : "routine_snack");
+  } else if (action === "fetch") {
+    add(0, { ...target, ball: { x: target.x + w * .45, y: 79, dur: 0 }, motion: "pet-trot", dur: 650 });
+    add(650, { ball: null, carry: "mouth", x: origin.x, dir: -1, dur: 750 }, "routine_fetch");
+    add(1400, { motion: "pet-idle-wag" });
+  } else if (action === "roll") {
+    add(0, { motion: "pet-hop", ball: { x: origin.x + w * .5, y: 79, dur: 0 } });
+    add(350, { ball: { x: target.x + w * .5, y: 79, dur: 1000 }, motion: "pet-idle-tilt" });
+  } else {
+    const motions = { scratch: "pet-idle-scratch", shake: "pet-shake", company: "pet-idle-company", hop: "pet-hop", wag: "pet-idle-wag", tilt: "pet-idle-tilt", stretch: "pet-idle-stretch", yawn: "pet-idle-yawn", nap: "pet-lie", sleepwalk: "pet-idle-sleepwalk", dream: "pet-lie" };
+    const speech: Partial<Record<IdleAction, string>> = { scratch: "idle_dirty", shake: "idle_dirty", company: "routine_company", stretch: "routine_stretch", yawn: "idle_sleepy", nap: "routine_nap", sleepwalk: "routine_dream", dream: "routine_dream" };
+    add(0, { motion: motions[action] }, speech[action]);
+  }
+  add(2100, { ...origin, dur: 500 });
+  return { durationMs: 2700, keyframes, finalPose: origin };
 }

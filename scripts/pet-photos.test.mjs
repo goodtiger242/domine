@@ -59,7 +59,9 @@ const dogSource = ts.transpileModule(readFileSync(new URL("../app/games/PetDog.t
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 new Function("require", "exports", dogSource)(
-  (name) => name === "@/lib/domine/pet-photos" ? { PETS, poseAt } : require(name), dogModule.exports,
+  (name) => name === "@/lib/domine/pet-photos" ? { PETS, poseAt }
+    : name.startsWith("@/") ? loadTS(`${name.slice(2)}.ts`)
+    : name === "./usePetStroke" ? loadTS("app/games/usePetStroke.ts") : require(name), dogModule.exports,
 );
 for (const stage of ["baby", "young", "adult"]) {
   for (const [motion, face, pose] of [["pet-sit", "happy", "sit"], ["pet-lie", "happy", "lie"], [null, "sleepy", "sleep"]]) {

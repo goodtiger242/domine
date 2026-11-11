@@ -134,7 +134,7 @@ export function usePetController(injectedApi?: PetApi) {
     } catch { if (current(g, i, selected)) setMessage("연결을 확인해 주세요. 놀이는 계속할 수 있어요."); }
   }, [api, apply, current]);
 
-  const execute = useCallback(async (command: PetCommand, retry = false) => {
+  const execute = useCallback(async (command: PetCommand, retry = false, presented = false) => {
     const i = identityRef.current;
     if (!i || !registeredRef.current || capabilityRef.current !== "ready") return;
     if (pending.current && !retry) return;
@@ -175,7 +175,7 @@ export function usePetController(injectedApi?: PetApi) {
       ++readSequence.current;
       if (retry || (result.pet !== undefined && result.pet !== petRef.current)) void refresh();
       if (result.shared && (command.kind === "action" || command.kind === "equip") && command.pet === petRef.current) setShared(result.shared.pet);
-      if (!retry && result.ok && command.kind === "action" && featuresRef.current?.busyLock && command.pet === petRef.current && !visualLocked(machineRef.current)) {
+      if (!presented && !retry && result.ok && command.kind === "action" && featuresRef.current?.busyLock && command.pet === petRef.current && !visualLocked(machineRef.current)) {
         const duration = Math.min(command.durationMs ?? SCENE_DURATION[command.action], (busyRef.current[command.pet]?.until ?? Date.now()) - Date.now());
         if (duration > 0) {
           const id = ++idCounter.current;
@@ -288,16 +288,16 @@ export function usePetController(injectedApi?: PetApi) {
       setCue({ ...next, id });
     }
   }, [dispatch, startExploration, visit, worldReady]);
-  const care = useCallback((action: PetAction | "sleep") => {
+  const care = useCallback((action: PetAction | "sleep", presented = false) => {
     if (!worldReady || visualLocked(machineRef.current) || (busyRef.current[petRef.current]?.until ?? 0) > Date.now()) return;
     const waitForServer = featuresRef.current?.busyLock && registeredRef.current && action !== "sleep";
     if (waitForServer && pending.current) return;
-    if (!waitForServer) void localScene({ action, id: 0 });
+    if (!waitForServer && !presented) void localScene({ action, id: 0 });
     if (!registeredRef.current) setMessage("내 이름을 입력하면 함께 키울 수 있어요");
     if (action === "sleep") return;
     const i = identityRef.current;
     if (i && registeredRef.current && capabilityRef.current === "ready") {
-      void execute({ kind: "action", pet: petRef.current, action, durationMs: SCENE_DURATION[action], requestId: crypto.randomUUID() });
+      void execute({ kind: "action", pet: petRef.current, action, durationMs: SCENE_DURATION[action], requestId: crypto.randomUUID() }, false, presented);
     } else if (nickRef.current && capabilityRef.current === "missing") {
       const selected = petRef.current, g = generation.current;
       void api.legacy(selected, nickRef.current, action, legacy.current)

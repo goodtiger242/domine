@@ -16,6 +16,11 @@ export const TAP_REACTIONS = {
 export type TapReaction = keyof typeof TAP_REACTIONS;
 export type TapPoint = { x: number; y: number };
 export type TapNeeds = { fullness: number; mood: number; clean: number };
+export const PRESS_MS = { start: 250, hold: 400, care: 2000, release: 250 } as const;
+export function pressAt(elapsed: number, sent = false) {
+  return { phase: elapsed < PRESS_MS.start ? "tap" : elapsed < PRESS_MS.hold ? "start" : "hold",
+    care: elapsed >= PRESS_MS.care && !sent } as const;
+}
 export const tapRegion = ({ x, y }: TapPoint) => y < 1 / 3 ? "head" : x < 1 / 3 ? "tail" : "body";
 export const tapCount = (previous: { at: number; count: number }, now: number) => now - previous.at <= 2000 ? previous.count + 1 : 1;
 

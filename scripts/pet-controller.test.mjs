@@ -293,6 +293,20 @@ h.game.care("pet");await h.flush();assert.equal(h.game.machine.visual,"idle");as
 await h.advance(500);assert.equal(h.game.busy,undefined);h.close();
 console.log("Pet recovery/busy: 1.5/3/6s retries, restored pending, exhaustion, in-flight pet switching, server-first scenes and expiry passed.");
 
+for (const busyLock of [false,true]) {
+  mock=createPetMock({busyLock});h=mount(mock.api,savedToken);await h.flush();
+  h.game.care("pet",true);await h.flush();
+  assert.ok(mock.calls.includes("action"));assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.cue,null,"direct strokes already present their own animation");
+  if(busyLock) {
+    assert.equal(h.game.busy.action,"pet");const count=mock.calls.length;
+    h.game.care("pet",true);await h.flush();assert.equal(mock.calls.length,count,"direct strokes respect existing BUSY lock");
+  }
+  h.close();
+}
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+await mock.api.execute(identity,{...command,requestId:"stroke-racer",durationMs:500});
+h.game.care("pet",true);await h.flush();assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy.action,"feed");assert.equal(h.game.cue,null);h.close();
+
 mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
 h.game.care("walk");await h.flush();
 await h.advance(4000);assert.ok(mock.calls.includes("explore_begin"),"lock expiry still completes the walk exploration");h.close();

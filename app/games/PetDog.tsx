@@ -2,6 +2,8 @@ import type { PetFace, PetStage } from "@/lib/domine/pet";
 import { useState } from "react";
 import { PETS, poseAt, type PetId } from "@/lib/domine/pet-photos";
 import type { TapPoint } from "@/lib/domine/pet-tap";
+import { ART } from "@/lib/domine/pet-art";
+import { usePetStroke } from "./usePetStroke";
 
 /**
  * 도미(공동 반려견). 발바닥이 (0,0)이고 오른쪽을 본다.
@@ -25,10 +27,14 @@ type Props = {
   photos: Record<string, boolean>;
   onTap?: (point: TapPoint) => void;
   disabled?: boolean;
+  cancelled?: boolean;
+  onContact?: (active: boolean) => void;
+  onPet?: () => void;
+  onRelease?: () => void;
   wearable?: string | null;
 };
 
-export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, collar, photos, onTap, wearable, disabled = false }: Props) {
+export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, collar, photos, onTap, wearable, disabled = false, cancelled = false, onContact, onPet, onRelease }: Props) {
   const config = PETS[petId];
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const pose = poseAt(motion, face);
@@ -36,6 +42,7 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
   const src = photo?.src ?? config.standing[stage];
   const width = DOG_W[stage] * config.scale * scale * (photo?.width ?? 1);
   const height = width * (photo?.ratio ?? config.ratio);
+  const { stroke, handlers } = usePetStroke({ disabled, cancelled, width, height, scale, onTap, onContact, onPet, onRelease });
   const garment = wearable && /^0(6[1-9]|7[0-2])$/.test(wearable) ? `/pet/catalog/${wearable}.webp` : null;
   const bodyWear = wearable && ["066", "067", "068", "071", "072"].includes(wearable);
   const hat = wearable === "070";
@@ -47,17 +54,18 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
     photo && (!motion || ["pet-sit", "pet-lie", "pet-sleep"].includes(motion)) ? "pet-bob" : motion === "pet-sleep" ? "pet-lie" : motion ?? (face === "sleepy" ? "pet-lie" : sad ? "pet-sag" : "pet-bob");
   return (
     <g
-      className={cls}
+      className="pet-dog-touch"
       style={{ ["--oy" as string]: `${-height * 0.5}px`, cursor: "pointer" }}
+      {...handlers}
       onClick={disabled ? undefined : (event) => {
-        const matrix = event.currentTarget.getScreenCTM();
-        const point = matrix && event.detail ? new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()) : null;
-        onTap?.(point ? { x: point.x / width + .5, y: (point.y + height - 1.5 * scale) / height } : { x: .5, y: .5 });
+        if (event.detail === 0) onTap?.({ x: .5, y: .5 });
       }} aria-disabled={disabled}
       role="button" tabIndex={0} aria-label={`${config.name} 쓰다듬어 인사하기`}
       onKeyDown={(event) => { if (!disabled && !event.repeat && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onTap?.({ x: .5, y: .5 }); } }}
     >
-      <g className={!motion || ["pet-sit", "pet-lie", "pet-sleep"].includes(motion) ? "pet-breath" : undefined}>
+      <g className={stroke ? `pet-stroking pet-stroking-${stroke.phase}` : cls}
+        style={stroke ? { "--stroke-turn": `${stroke.point.x < 0 ? -4 : 4}deg` } as React.CSSProperties : undefined}>
+      <g className={!stroke && (!motion || ["pet-sit", "pet-lie", "pet-sleep"].includes(motion)) ? "pet-breath" : undefined}>
       {failed[src] ? <text y={-height / 3} textAnchor="middle" fontSize={width * 0.6}>🐕</text> : <image
         href={src}
         x={-width / 2}
@@ -81,6 +89,15 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
         width={garmentWidth} height={height * (bodyWear ? .66 : .4)}
         preserveAspectRatio="xMidYMid meet" style={{ filter }} />}
       </g>
+      </g>
+      {stroke && <g pointerEvents="none" aria-hidden="true">
+        {stroke.phase === "release" ? <text className="pet-stroke-heart" x={width * .4} y={-height - 2} fontSize="7">♥</text> :
+          <g style={{ transform: `translate(${stroke.point.x}px, ${stroke.point.y}px)` }}>
+            <g className={stroke.phase === "hold" ? "pet-stroking-hand" : undefined}>
+              <image href={ART["🤚"]} x={-9 * scale} y={-11 * scale} width={18 * scale} height={18 * scale} />
+            </g>
+          </g>}
+      </g>}
     </g>
   );
 }

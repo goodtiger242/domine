@@ -208,6 +208,26 @@
 .pet-current-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pet-current-name button { text-decoration: underline; font-size: 13px; }
 .pet-tap-motion { transform-box: view-box; transform-origin: 0 0; animation-timing-function: ease-in-out; animation-fill-mode: both; }
+.pet-dog-touch { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.pet-dog-touch:focus-visible { outline: 1px solid var(--lit-ring); }
+.pet-stroking, .pet-idle-stretch, .pet-idle-yawn, .pet-idle-scratch, .pet-idle-company, .pet-idle-sleepwalk { transform-box: view-box; transform-origin: 0 0; }
+.pet-stroking-start { animation: pet-stroking-start 150ms ease-out both; }
+.pet-stroking-hold { animation: pet-stroking-hold 1050ms ease-in-out infinite; }
+.pet-stroking-release { animation: pet-stroking-release 250ms ease-out both; }
+.pet-stroking-hand { animation: pet-stroking-hand 1050ms ease-in-out infinite; }
+.pet-stroke-heart { fill: #ef5b7b; animation: pet-tap-float 250ms ease-out both; }
+.pet-idle-stretch { animation: pet-idle-stretch 1800ms ease-in-out; }
+.pet-idle-yawn { animation: pet-tap-yawn 1800ms ease-in-out; }
+.pet-idle-scratch { animation: pet-idle-scratch 350ms ease-in-out 5; }
+.pet-idle-company { animation: pet-idle-company 1800ms ease-in-out; }
+.pet-idle-sleepwalk { animation: pet-idle-step 2000ms ease-in-out; }
+@keyframes pet-stroking-start { from { transform: none; } to { transform: rotate(var(--stroke-turn)) scaleY(.97); } }
+@keyframes pet-stroking-hold { 0%,100% { transform: rotate(var(--stroke-turn)) scaleY(.97); } 50% { transform: translateY(.6px) rotate(var(--stroke-turn)) scale(1.015,.95); } }
+@keyframes pet-stroking-release { 0% { transform: rotate(var(--stroke-turn)) scaleY(.97); } 35% { transform: rotate(-3deg); } 65% { transform: rotate(3deg); } 100% { transform: none; } }
+@keyframes pet-stroking-hand { 0%,100% { transform: translateX(-1.5px) rotate(-4deg); } 50% { transform: translateX(1.5px) rotate(4deg); } }
+@keyframes pet-idle-stretch { 0%,100% { transform: none; } 40%,65% { transform: scale(1.12,.88) rotate(3deg); } }
+@keyframes pet-idle-scratch { 0%,100% { transform: rotate(-3deg); } 50% { transform: translateY(-1px) rotate(4deg); } }
+@keyframes pet-idle-company { 0%,100% { transform: none; } 30%,70% { transform: translateY(1.5px) scale(1.07) rotate(-5deg); } }
 .pet-tap-hop { animation-name: pet-tap-hop; }
 .pet-tap-tilt { animation-name: pet-tap-tilt; }
 .pet-tap-spin, .pet-tap-tickle { animation-name: pet-tap-spin; }
@@ -231,6 +251,10 @@
 @keyframes pet-tap-hungry { 0%,100% { transform: none; } 35%,70% { transform: translateX(2px) rotate(10deg); } }
 @keyframes pet-tap-float { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
 @media (prefers-reduced-motion: reduce) {
+  .pet-game .pet-stroking, .pet-game .pet-stroking-hand, .pet-game .pet-stroke-heart,
+  .pet-game .pet-idle-stretch, .pet-game .pet-idle-yawn, .pet-game .pet-idle-scratch,
+  .pet-game .pet-idle-company, .pet-game .pet-idle-sleepwalk { animation: none !important; transform: none; }
   .pet-game .pet-tap-motion { animation: none !important; transform: none !important; }
   .pet-game .pet-tap-effect { animation-name: pet-notice !important; }
 }
+.pet-busy { position: absolute; top: 40px; left: 50%; z-index: 2; max-width: 86%; transform: translateX(-50%); padding: 5px 12px; border-radius: 14px; background: #15221cd9; color: #fff; font-size: 13px; font-weight: 700; line-height: 1.35; text-align: center; word-break: keep-all; pointer-events: none; animation: pet-notice 200ms; }

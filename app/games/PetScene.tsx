@@ -12,7 +12,8 @@ import { DEFAULT_CELL, DIRECTIONS, neighborCell, worldCell, type MapTravel } fro
 import { travelEdge } from "@/lib/domine/pet-geometry";
 import { DOG_W, PetDog } from "./PetDog";
 
-import { buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
+import { buildIdlePlan, buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
+import { chooseIdleAction, chooseNeedGoal, type IdleGoal } from "@/lib/domine/pet-idle";
 import { itemAsset } from "@/lib/domine/pet-assets";
 import { chooseTap, tapCount, type TapNeeds, type TapPoint, type TapReaction } from "@/lib/domine/pet-tap";
 const depth = (y: number) => 0.84 + ((y - 76) / 13) * 0.2;
@@ -36,6 +37,7 @@ function Ball({ scale = 1, toy }: { scale?: number; toy?: string | null }) {
 }
 
 type Props = {
+  busyText?: string;
   travel?: MapTravel | null;
   arrivalId?: number;
   stage: PetStage;
@@ -50,6 +52,8 @@ type Props = {
   onMap?: () => void;
   onLocal?: (cue: SceneCue) => void;
   locked?: boolean;
+  tapDisabled?: boolean;
+  onPet?: () => void;
   speaker?: "dog" | "priest";
   onSay: (text: string, speaker?: "dog" | "priest") => void;
   /** 연출이 끝났을 때 */
@@ -57,6 +61,7 @@ type Props = {
   paused?: boolean;
   wearable?: string | null;
   toy?: string | null;
+  bagToy?: string;
   bubble?: string;
   needs?: TapNeeds;
 };
@@ -101,30 +106,33 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onLocal, locked = false, speaker = "dog", paused = false, wearable, toy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
+export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
   const cell = worldCell(cellId);
   const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
   const ask = asking?.from === cell.id ? neighborCell(cell.id, asking.direction) : null;
   const map = cell.theme;
   const shadowId = useId();
   const [animated, setS] = useState<ScenePose>({ ...restingPose(map) });
-  const [idleMotion, setIdleMotion] = useState<string | null>(null);
+  const [idlePose, setIdlePose] = useState<ScenePose | null>(null);
+  const [contact, setContact] = useState(false);
+  const contactPose = useRef<ScenePose | null>(null);
+  const idleGoals = useRef<IdleGoal[]>([]);
   const [reduced, setReduced] = useState(false);
   const [tap, setTap] = useState<(ReturnType<typeof chooseTap> & { id: number }) | null>(null);
   const [seated, setSeated] = useState(false);
   const tapActor = useRef<SVGGElement>(null);
   const taps = useRef({ at: -Infinity, count: 0, recent: [] as TapReaction[], line: "", id: 0 });
-  const reacting = !locked && !paused && !travel ? tap : null;
+  const reacting = !locked && !tapDisabled && !paused && !travel && !contact ? tap : null;
   useLayoutEffect(() => {
     if (reacting) tapActor.current?.getAnimations().forEach((animation) => { animation.currentTime = 0; animation.play(); });
   }, [reacting]);
   function tapDog(point: TapPoint) {
-    if (locked || paused || travel) return;
+    if (locked || tapDisabled || paused || travel) return;
     const now = performance.now(), previous = taps.current;
     const count = tapCount(previous, now);
     const reaction = chooseTap({ point, needs, count, recent: previous.recent, previousLine: previous.line, seed: Math.floor(Math.random() * 0x100000000) });
     taps.current = { at: now, count, recent: [...previous.recent, reaction.kind].slice(-2), line: reaction.text, id: previous.id + 1 };
-    setSeated(false); setIdleMotion(null); setTap({ ...reaction, id: taps.current.id });
+    setSeated(false); setIdlePose(null); setTap({ ...reaction, id: taps.current.id });
     onSay(reaction.text);
   }
   useEffect(() => {
@@ -134,34 +142,46 @@ export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face,
     return () => { clearTimeout(end); clearTimeout(sit); };
   }, [tap]);
   useEffect(() => {
-    if (locked || paused || travel) { setTap(null); taps.current.at = -Infinity; taps.current.count = 0; }
-  }, [locked, paused, travel]);
+    if (locked || tapDisabled || paused || travel) { setTap(null); taps.current.at = -Infinity; taps.current.count = 0; }
+  }, [locked, tapDisabled, paused, travel]);
   const departure = useRef(restingPose(map));
-  const base = cue && !paused && !travel ? animated : restingPose(map);
+  const autonomous = !locked && !tapDisabled && !paused && !travel && !contact && !ask && !reduced;
+  const base = contact && contactPose.current ? contactPose.current : autonomous && idlePose ? idlePose : cue && !paused && !travel ? animated : restingPose(map);
   const still = reduced ? { ...base, x: restingPose(map).x, y: restingPose(map).y, dir: 1 as const } : base;
-  const s = reacting && !reduced ? { ...still, motion: seated && reacting.kind === "yawn" ? "pet-sit" : "pet-tap-still" }
-    : !locked && !paused && idleMotion ? { ...still, motion: idleMotion } : still;
-  useLayoutEffect(() => { if (!travel) departure.current = s; }, [s, travel]);
+  const s = reacting && !reduced ? { ...still, motion: seated && reacting.kind === "yawn" ? "pet-sit" : "pet-tap-still" } : still;
+  useLayoutEffect(() => { if (!travel) departure.current = s; });
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     let timer: ReturnType<typeof setTimeout>;
     let first = true;
     const schedule = (event?: Event) => {
       if (event) first = true;
-      clearTimeout(timer); setIdleMotion(null); setReduced(media.matches);
-      if (locked || paused || tap || media.matches || document.hidden) return;
+      clearTimeout(timer); setIdlePose(null); setReduced(media.matches);
+      if (locked || tapDisabled || paused || travel || contact || ask || tap || media.matches || document.hidden) return;
       timer = setTimeout(() => {
-        const motions = ["pet-idle-wag", "pet-idle-tilt", "pet-hop", "pet-idle-step", "pet-sit", "pet-lie"];
-        setIdleMotion(motions[Math.floor(Math.random() * motions.length)]);
+        const { needs, hour } = idleInputs.current;
+        const goal = chooseNeedGoal(needs, idleGoals.current, Array.from({ length: 5 }, () => Math.random()));
+        idleGoals.current = [...idleGoals.current, goal].slice(-2);
+        const plan = buildIdlePlan(chooseIdleAction(hour, goal, Math.random()), { map, width: DOG_W[stage] * PETS[petId].scale * (map === "church" ? .85 : 1) });
         first = false;
-        timer = setTimeout(schedule, 1200);
-      }, 6000 + Math.random() * 8000 - (first ? 0 : 1200));
+        let index = 0;
+        const next = () => {
+          const frame = plan.keyframes[index];
+          setIdlePose(frame.pose);
+          if (frame.say) latest.current.onSay(line(frame.say));
+          index++;
+          timer = setTimeout(index < plan.keyframes.length ? next : schedule, (plan.keyframes[index]?.at ?? plan.durationMs) - frame.at);
+        };
+        next();
+      }, 6000 + Math.random() * 8000 - (first ? 0 : 2700));
     };
     schedule();
     media.addEventListener("change", schedule);
     document.addEventListener("visibilitychange", schedule);
     return () => { clearTimeout(timer); media.removeEventListener("change", schedule); document.removeEventListener("visibilitychange", schedule); };
-  }, [locked, paused, tap]);
+  }, [locked, tapDisabled, paused, travel, contact, ask, tap, map, stage, petId]);
+  const idleInputs = useRef({ needs, hour });
+  useLayoutEffect(() => { idleInputs.current = { needs, hour }; }, [needs, hour]);
   const latest = useRef({ onSay, onDone });
   useLayoutEffect(() => { latest.current = { onSay, onDone }; }, [onSay, onDone]);
   const period = backgroundAt(hour);
@@ -226,6 +246,7 @@ export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face,
   const sc = depth(s.y);
   const w = DOG_W[stage] * PETS[petId].scale * sceneScale;
   const h = w * PETS[petId].ratio;
+  const sceneToy = autonomous && idlePose ? toy ?? bagToy : toy;
   const move = (x: number, y: number, dur: number, extra = "") => ({
     transform: `translate(${x}px, ${y}px)${extra}`,
     transition: `transform ${dur}ms ease-in-out`,
@@ -318,7 +339,7 @@ export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face,
           <g
             transform={`translate(${{ mouth: w * 0.47, back: 0, tail: -w * 0.47, head: w * 0.34 }[s.carry]} ${{ mouth: -h * 0.76, back: -h * 0.8, tail: -h * 0.33, head: -h * 1.0 }[s.carry]})`}
           >
-            <Ball scale={sceneScale} toy={toy} />
+            <Ball scale={sceneScale} toy={sceneToy} />
           </g>
         ) : null}
         <g ref={tapActor} className={reacting ? `pet-tap-motion pet-tap-${reacting.kind}` : undefined}
@@ -329,7 +350,14 @@ export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face,
           stage={stage}
           face={face}
           motion={travel ? "pet-trot" : s.motion}
-          disabled={locked || paused || !!travel}
+          disabled={locked || tapDisabled || paused || !!travel || !!ask}
+          cancelled={locked || paused || !!travel || !!ask}
+          onContact={(active) => {
+            if (active) { contactPose.current = { ...s, motion: "pet-tap-still", ball: null, carry: null, bowl: null }; setTap(null); setIdlePose(null); }
+            setContact(active);
+          }}
+          onPet={onPet}
+          onRelease={() => onSay(line("pet_release"))}
           light={light}
           collar={collar}
           photos={photos}
@@ -400,7 +428,7 @@ export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face,
       <g style={{ filter: `brightness(${light}) drop-shadow(0 0.5px 0.5px #17231d40)` }}>
       {s.ball ? (
         <g style={move(s.ball.x, s.ball.y, s.ball.dur)}>
-          <Ball scale={sceneScale} toy={toy} />
+          <Ball scale={sceneScale} toy={sceneToy} />
         </g>
       ) : null}
       {s.item ? (
@@ -428,6 +456,7 @@ export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face,
       y={speaker === "priest" ? 31 : s.y - h * sc} duration={s.dur} />}
     </div>
     <div className="pet-scene-picture pet-scene-ui">
+      {busyText && <div className="pet-busy" role="status">{busyText}</div>}
       <div key={arrivalId ?? 0} className={`pet-location${arrivalId && !travel ? " pet-location-arrived" : ""}`} aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
       <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기"><span>MAP</span></button>
       {DIRECTIONS.map((direction) => {
