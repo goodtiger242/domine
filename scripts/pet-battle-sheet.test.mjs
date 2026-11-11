@@ -7,7 +7,9 @@ import { loadTS } from "./pet-test-loader.mjs";
 
 const require = createRequire(import.meta.url);
 const engine = loadTS("lib/domine/battle/engine.ts");
-const { encounterFor, showBattleEvent, actionLabel, battleCues, hpColor, HINT_ICON } = loadTS("lib/domine/pet-battle-view.ts");
+const { encounterFor, showBattleEvent, actionLabel, battleCues, hpColor, HINT_ICON, MOVE_KIND, moveEffect } = loadTS("lib/domine/pet-battle-view.ts");
+const { MOVES, PUSH } = loadTS("lib/domine/battle/data.ts");
+const { BATTLE_MOVE_FX } = loadTS("lib/domine/pet-battle-fx.ts");
 const { seedFor } = loadTS("lib/domine/battle/rng.ts");
 const { moveFor, sameAction } = loadTS("lib/domine/battle/rules.ts");
 const { PET_WORLD } = loadTS("lib/domine/pet-world.ts");
@@ -24,6 +26,12 @@ function mount(t, props, initial, reduced = false) {
   const slots = [], effects = [], timers = new Map(), vibration = [], listeners = new Map();
   let cursor = 0, tree, now = 0, id = 0, dirty = false, focusRestored = false;
   const body = { style: { overflow: "auto", position: "", top: "", width: "" } };
+  const arenaVars = {};
+  const field = {
+    style: { setProperty: (key, value) => { arenaVars[key] = value; } },
+    getBoundingClientRect: () => ({ left: 0, top: 0 }),
+    querySelector: selector => ({ getBoundingClientRect: () => selector.includes('"player"') ? { left: 8, top: 450, width: 168, height: 168 } : { left: 234, top: 203, width: 140, height: 140 } }),
+  };
   const globals = {
     document: { body, activeElement: { focus() { focusRestored = true; } } },
     window: { scrollY: 120, scrollTo() {}, matchMedia: () => ({ matches: reduced, addEventListener() {}, removeEventListener() {} }), addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) },
@@ -48,16 +56,17 @@ function mount(t, props, initial, reduced = false) {
   new Function("require", "exports", source)(name => name === "react" ? hooks
     : name === "next/image" ? { default: "img" } : name === "@/lib/domine/battle/engine" && initial ? { ...engine, createBattle: () => structuredClone(initial) }
     : name.startsWith("@/") ? loadTS(`${name.slice(2)}.ts`) : require(name), exports);
-  function render() { do { dirty = false; cursor = 0; tree = exports.default({ hour: 12, ...props }); while (effects.length) effects.shift()(); } while (dirty); }
+  function render() { do { dirty = false; cursor = 0; tree = exports.default({ hour: 12, ...props }); const arena = nodes(tree, n => n.props.className === "pet-battle-arena")[0]; if (arena?.props.ref) arena.props.ref.current = field; while (effects.length) effects.shift()(); } while (dirty); }
   const button = label => nodes(tree, n => n.type === "button" && (n.props["aria-label"] === label || text(n).trim() === label || text(n.props.children?.[0]) === label || text(n).includes(label)))[0];
   render();
   const h = {
-    get tree() { return tree; }, get timerCount() { return timers.size; }, render, button, vibration, listeners, body,
+    get tree() { return tree; }, get timerCount() { return timers.size; }, render, button, vibration, listeners, body, arenaVars,
     get phase() { return nodes(tree, n => !!n.props["data-phase"])[0].props["data-phase"]; },
     get hp() { return nodes(tree, n => n.props.role === "progressbar").map(b => b.props["aria-valuenow"]); },
     actions() { return nodes(tree, n => n.type === "button" && n.props["data-group"]); },
     click(label) { const b = button(label); assert.ok(b, `button ${label}`); assert.ok(!b.props.disabled, `${label} enabled`); b.props.onClick({ stopPropagation() {} }); render(); },
     advance(ms) { const end = now + ms; let count = 0; for (;;) { const entry = [...timers].filter(([,v]) => v.at <= end).sort((a,b) => a[1].at - b[1].at)[0]; if (!entry) break; assert.ok(count++ < 20000, "timer queue must terminate"); now = entry[1].at; timers.delete(entry[0]); entry[1].fn(); render(); } now = end; },
+    nextTimer() { assert.ok(timers.size); h.advance(Math.min(...[...timers.values()].map(t => t.at)) - now); },
     settle() { for (let i = 0; i < 2000 && ["intro", "playback"].includes(h.phase); i++) h.advance(100); assert.ok(["command", "result"].includes(h.phase), "playback must reach commands or result"); },
     unmount() { slots.forEach(s => s?.cleanup?.()); assert.equal(focusRestored, true); assert.equal(body.style.overflow, "auto"); assert.equal(listeners.size, 0); assert.equal(timers.size, 0); },
   };
@@ -91,7 +100,7 @@ test("등장 2.4초, 18ms 타이핑, 탭 완성·진행, 기술↔뒤로, 가방
   h.click("대사 모두 보기"); assert.match(visible(), /함께 나왔어요/);
   h.advance(899); assert.equal(h.phase, "playback"); h.advance(1); assert.equal(h.phase, "command");
   h.click("기술"); assert.equal(h.actions().length, 5);
-  for (const b of h.actions()) assert.ok(text(b).includes(HINT_ICON[b.props["data-hint"]]));
+  for (const b of h.actions()) if (b.props["data-kind"] === "attack") assert.ok(text(b).includes(HINT_ICON[b.props["data-hint"]]));
   h.click("뒤로"); assert.equal(h.actions().length, 0);
   h.click("가방"); assert.equal(h.phase, "playback"); h.click("대사 모두 보기"); assert.match(visible(), /가방이 비었어요/); h.click("다음 대사"); assert.equal(h.phase, "command");
   h.unmount();
@@ -136,8 +145,8 @@ test("연출 순서: 대사→돌진→피격→HP→상성, 기력 점은 하�
     { type: "energy", side: "player", amount: 2, energy: 8, reason: "round", round: 1 },
   ];
   const before = structuredClone(events), cues = battleCues(events, { player: "미네", opponent: "삽살개" });
-  assert.equal(cues[0].text, "미네의 가볍게 밀기!");
-  assert.equal(cues[1].motion, "attack"); assert.equal(cues[1].duration, 450);
+  assert.equal(cues[0].text, `미네의 가볍게 밀기! ${BATTLE_MOVE_FX.push.suffix}`);
+  assert.equal(cues[1].motion, "skill"); assert.equal(cues[1].duration, BATTLE_MOVE_FX.push.duration);
   assert.equal(cues[2].motion, "hit"); assert.equal(cues[2].event, undefined);
   assert.equal(cues[3].event.type, "damage"); assert.equal(cues[3].duration, 900);
   assert.equal(cues[4].text, "효과가 좋아요!"); assert.equal(cues[4].motion, "effective");
@@ -168,6 +177,66 @@ test("기력이 충분해도 회복 불가능한 기술은 비활성", t => {
   state.player.moves = ["T60"]; state.player.energy = 10;
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
   h.settle(); h.click("기술"); assert.equal(h.button(actionLabel({ kind: "move", moveId: "T60" })).props.disabled, true); h.unmount();
+});
+
+test("기술 버튼은 종류 배지·효과·예상 피해가 즉시 보이고 공격→방어→보조 순서", t => {
+  const e = encounter("F5", 30), state = initialFor(e, 1);
+  state.player.moves = MOVES.map(m => m.id).reverse(); state.player.energy = 0;
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
+  h.settle();
+  assert.equal(h.button("숨 고르기").props["data-kind"], "support");
+  assert.match(text(h.button("숨 고르기")), /기력 \+4/);
+  h.click("기술");
+  const orders = h.actions().map(b => MOVE_KIND[b.props["data-kind"]].order);
+  assert.deepEqual(orders, [...orders].sort());
+  for (const move of [...MOVES, PUSH]) {
+    const button = h.button(move.name), kind = MOVE_KIND[move.kind];
+    assert.equal(text(nodes(button, n => n.props.className === "pet-battle-kind")[0]), kind.icon + kind.label);
+    assert.equal(text(nodes(button, n => n.props.className === "pet-battle-effect")[0]), moveEffect(move, state));
+    assert.equal(nodes(button, n => n.props.className === "pet-battle-matchup").length, move.kind === "attack" ? 1 : 0);
+    if (move.energy) { assert.equal(button.props.disabled, true); assert.match(text(button), /기력 부족/); }
+    if (move.kind === "attack") {
+      const damage = engine.previewDamage(move, state.player, state.opponent, state.round);
+      assert.ok(text(button).includes(`상대에게 피해 약 ${damage.min}~${damage.max}`));
+    }
+  }
+  h.unmount();
+});
+
+for (const move of [...MOVES, PUSH, { id: "rest", name: "숨 고르기" }]) test(`${move.name}: 양쪽 연출은 지정 길이를 기다리고 한 라운드를 완료`, t => {
+  const e = encounter("F5", 30), state = initialFor(e, 1);
+  const action = ["rest", "push"].includes(move.id) ? { kind: move.id } : { kind: "move", moveId: move.id };
+  for (const side of ["player", "opponent"]) { state[side].moves = MOVES.map(m => m.id); state[side].energy = 10; state[side].hp -= 45; }
+  state.opponentAction = action;
+  const next = engine.stepRound(state, action);
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
+  h.settle(); if (move.id !== "rest") h.click("기술"); h.click(move.name);
+  const fx = () => nodes(h.tree, n => n.props.className === "pet-battle-move-fx")[0];
+  const sides = new Set();
+  for (let i = 0; i < 1500 && h.phase === "playback"; i++) {
+    if (fx()) {
+      const current = fx(); sides.add(current.props["data-side"]);
+      assert.equal(current.props["data-trail"], BATTLE_MOVE_FX[move.id].trail);
+      assert.equal(current.props.style["--fx-duration"], `${BATTLE_MOVE_FX[move.id].duration}ms`);
+      assert.deepEqual(h.arenaVars, { "--reach-x": "212px", "--reach-y": "-261px", "--trail-left": "92px", "--trail-top": "273px", "--trail-width": "212px", "--trail-height": "261px" });
+      h.advance(BATTLE_MOVE_FX[move.id].duration - 1);
+      assert.equal(fx().key, current.key, "animation must not be cut short");
+      h.advance(1); assert.notEqual(fx()?.key, current.key, "animation completes at its own duration");
+    } else h.nextTimer();
+  }
+  assert.deepEqual([...sides].sort(), ["opponent", "player"]);
+  assert.equal(h.phase, "command"); assert.deepEqual(h.hp, [next.state.opponent.hp, next.state.player.hp]);
+  h.unmount();
+});
+
+test("이동 줄이기에도 기술 아이콘과 대사를 읽을 시간이 남는다", t => {
+  const h = mount(t, { encounter: encounter(), petId: 1, stage: "adult", onClose() {} }, undefined, true);
+  h.settle(); h.click("숨 고르기");
+  const fx = () => nodes(h.tree, n => n.props["data-trail"] === "energy-dots")[0];
+  for (let i = 0; i < 1500 && !fx(); i++) h.nextTimer();
+  assert.ok(fx()); assert.match(text(h.tree), /천천히 숨 쉬며 기력을 채워요/);
+  const key = fx().key; h.advance(1099); assert.equal(fx().key, key);
+  h.advance(1); assert.notEqual(fx()?.key, key); h.settle(); h.unmount();
 });
 
 test("배운 기술만 표시, 속성 이미지 실패 대체, 미리보기는 길게 누르는 동안만", t => {

@@ -2,6 +2,8 @@ import { getTodayISO } from "../date/local";
 import { opponentFor } from "./battle/engine";
 import { ITEM_BY_ID, MOVE_BY_ID } from "./battle/data";
 import { seedFor } from "./battle/rng";
+import { previewDamage } from "./battle/rules";
+import { BATTLE_MOVE_FX, battleFxId } from "./pet-battle-fx";
 import type { Action, BattleEvent, BattleState, Move, Outcome, Side, Status } from "./battle/types";
 
 export function encounterFor(cellId: string, careLevel: number, day = getTodayISO()) {
@@ -14,6 +16,20 @@ export type Encounter = NonNullable<ReturnType<typeof encounterFor>>;
 export const HINT_LABEL = { good: "좋아요", normal: "평범", weak: "잘 안 통해요" };
 export const HINT_ICON = { good: "▲", normal: "■", weak: "▼" };
 export const GROUP_LABEL: Record<Move["group"], string> = { rush: "돌진", trick: "기교", track: "추적", guard: "수호", bond: "교감", endure: "지구", neutral: "중립" };
+export const MOVE_KIND = {
+  attack: { label: "공격", icon: "⚔", order: 0 },
+  defense: { label: "방어", icon: "🛡", order: 1 },
+  support: { label: "보조", icon: "✨", order: 2 },
+};
+export function moveEffect(move: Move, state: BattleState) {
+  if (move.kind === "attack") {
+    const damage = previewDamage(move, state.player, state.opponent, state.round);
+    const extra = move.status ? ` · ${Math.round(damage.statusChance)}% ${STATUS_LABEL[move.status].split(" ")[1]}` : move.buff ? ` · ${STAT_LABEL[move.buff]}↑` : "";
+    return `상대에게 피해 약 ${damage.min}~${damage.max}${extra}`;
+  }
+  if (move.kind === "defense") return `이번 라운드 받는 피해를 줄여요${move.buff ? ` · ${STAT_LABEL[move.buff]}↑` : ""}`;
+  return move.heal ? `버틸 힘 ${Math.round(move.heal * 100)}% 회복` : `${move.buff ? STAT_LABEL[move.buff] : "집중"}이 올라가요`;
+}
 export function hpColor(hp: number, max: number) {
   const ratio = max > 0 ? hp / max : 0;
   return ratio <= .2 ? "red" : ratio <= .5 ? "yellow" : "green";
@@ -50,7 +66,8 @@ export function showBattleEvent(state: BattleState, event: BattleEvent): BattleS
 
 export type BattleCue = {
   text?: string; duration?: number; event?: BattleEvent;
-  motion?: "intro" | "attack" | "hit" | "heal" | "effective" | "finish";
+  motion?: "intro" | "skill" | "hit" | "weak-hit" | "heal" | "effective" | "finish";
+  moveFx?: string; target?: Side; missed?: boolean;
   fx?: "hit" | "hit-good" | "heal" | "buff" | "debuff" | "dizzy" | "sleepy" | "shield";
   side?: Side; amount?: number; outcome?: Outcome;
 };
@@ -62,16 +79,21 @@ export function battleCues(events: readonly BattleEvent[], names: Record<Side, s
   for (const event of events) {
     const who = "side" in event ? names[event.side] : "";
     switch (event.type) {
-      case "action":
-        cues.push({ text: event.action.kind === "rest" ? `${who}, 잠깐 숨을 골라요.` : event.action.kind === "quit" ? `${who}, 친구에게 인사하고 돌아가요.` : `${who}의 ${actionLabel(event.action)}!` });
+      case "action": {
+        const id = battleFxId(event.action), fx = id ? BATTLE_MOVE_FX[id] : undefined;
+        cues.push({ text: event.action.kind === "quit" ? `${who}, 친구에게 인사하고 돌아가요.` : `${who}의 ${actionLabel(event.action)}!${fx ? ` ${fx.suffix}` : ""}` });
+        if (fx && (event.action.kind === "rest" || event.action.kind === "move" && MOVE_BY_ID[event.action.moveId].kind !== "attack")) {
+          cues.push({ motion: "skill", moveFx: id, side: event.side, duration: fx.duration });
+        }
         break;
+      }
       case "hit": case "miss":
-        cues.push({ motion: "attack", side: event.side, duration: 450 });
+        cues.push({ motion: "skill", moveFx: event.moveId, side: event.side, target: event.target, missed: event.type === "miss", duration: BATTLE_MOVE_FX[event.moveId].duration });
         if (event.type === "miss") cues.push({ text: `${names[event.target]}, 가볍게 피했어요!` });
         break;
       case "effectiveness": effectiveness = event; break;
       case "damage":
-        cues.push({ motion: "hit", fx: effectiveness?.hint === "good" ? "hit-good" : "hit", side: event.target, amount: event.amount, duration: 500 });
+        cues.push({ motion: effectiveness?.hint === "weak" ? "weak-hit" : "hit", fx: effectiveness?.hint === "good" ? "hit-good" : "hit", side: event.target, amount: event.amount, duration: 500 });
         cues.push({ event, duration: 900 });
         if (effectiveness) {
           if (effectiveness.hint !== "normal") cues.push({ text: effectiveness.hint === "good" ? "효과가 좋아요!" : "잘 안 통해요…", motion: effectiveness.hint === "good" ? "effective" : undefined });

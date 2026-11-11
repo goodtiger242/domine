@@ -110,13 +110,14 @@
 .pet-battle-actions strong { display: block; font-size: 15px; line-height: 20px; white-space: nowrap; }
 .pet-battle-actions small { display: block; margin-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; }
 .pet-battle-actions small > span { white-space: nowrap; }
-.pet-battle-actions [data-group] { display: flex; align-items: center; gap: 5px; border-left: 3px solid var(--group-color, #b3bac1); padding: 5px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.pet-battle-actions [data-group=rush] { --group-color: #f18e75; }
-.pet-battle-actions [data-group=trick] { --group-color: #c5a4f3; }
-.pet-battle-actions [data-group=track] { --group-color: #65cbb6; }
-.pet-battle-actions [data-group=guard] { --group-color: #84bafa; }
-.pet-battle-actions [data-group=bond] { --group-color: #ed9cc1; }
-.pet-battle-actions [data-group=endure] { --group-color: #e3c46e; }
+.pet-battle-actions[data-menu=moves] { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; gap: 8px; max-height: 42vh; max-height: 42dvh; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 5px; }
+.pet-battle-actions [data-group] { display: flex; align-items: center; gap: 8px; height: auto; min-height: 76px; padding: 6px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.pet-battle-actions [data-kind=attack] { background: linear-gradient(#733f47, #492833); border-color: #d68f92; }
+.pet-battle-actions [data-kind=defense] { background: linear-gradient(#315d83, #213b5d); border-color: #83bce9; }
+.pet-battle-actions [data-kind=support] { background: linear-gradient(#326b51, #214735); border-color: #87c7a2; }
+.pet-battle-kind { flex: 0 0 42px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 0; border-radius: 10px; background: #ffffff18; font-size: 12px; line-height: 16px; }
+.pet-battle-kind > span { font-size: 25px; line-height: 26px; }
+.pet-battle-move-copy .pet-battle-effect { display: block; font-size: 12px; line-height: 18px; font-weight: 500; word-break: keep-all; overflow-wrap: anywhere; }
 .pet-battle-preview { position: absolute; bottom: calc(100% + 10px); left: 0; right: 0; z-index: 4; margin: 0; padding: 10px 12px; border: 1px solid #c9b77b; border-radius: 14px; background: #102035; color: #ffe9b0; font-size: 12px; line-height: 1.5; box-shadow: 0 4px 18px #0008; word-break: keep-all; }
 .pet-battle-npc { position: absolute; top: 39%; right: 12px; z-index: 5; width: 88%; padding: 17px 22px; border: 1px solid #e0c780; border-radius: 18px; background: linear-gradient(110deg, #142237ed, #203951f5); animation: pet-battle-npc 1.5s .6s both; }
 .pet-battle-npc small { display: block; font-size: 12px; color: #d9c181; }
@@ -161,7 +162,7 @@
 .pet-battle-message::after { content: ""; position: absolute; left: 22px; bottom: -6px; width: 10px; height: 10px; border-right: 1px solid #c9b77b99; border-bottom: 1px solid #c9b77b99; border-radius: 0 0 4px 0; background: #15263e; transform: rotate(45deg); }
 .pet-battle-back { flex-shrink: 0; min-width: 60px; height: 44px; padding: 6px 10px; border: 1px solid #b6cce26b; border-radius: 14px; background: linear-gradient(#324a65, #1b3049); box-shadow: 0 3px #07111f; color: #ffe9b0; font-size: 12px; font-weight: 700; }
 .pet-battle-back:active { transform: translateY(2px); box-shadow: 0 1px #07111f; }
-.pet-battle-type { flex-shrink: 0; width: 34px; height: 34px; object-fit: contain; }
+.pet-battle-type { display: inline-block; margin-left: 5px; width: 18px; height: 18px; vertical-align: middle; object-fit: contain; }
 .pet-battle-move-copy { min-width: 0; flex: 1; }
 .pet-battle-move-copy small { display: flex; align-items: center; justify-content: space-between; gap: 2px; }
 .pet-battle-cost { color: #ffe9b0; }
@@ -181,6 +182,94 @@
 @keyframes pet-battle-hud-in { from { opacity: 0; transform: translateY(var(--hud-entry)); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pet-battle-command-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pet-battle-fx { from { opacity: 0; transform: translateY(10px) scale(.6); } 30% { opacity: 1; } to { opacity: 0; transform: translateY(-25px) scale(1.2); } }
+.pet-battle-fighter[data-side=player] { --facing: 1; --target-x: var(--reach-x, 180px); --target-y: var(--reach-y, -180px); }
+.pet-battle-fighter[data-side=opponent] { --facing: -1; --target-x: calc(var(--reach-x, 180px) * -1); --target-y: calc(var(--reach-y, -180px) * -1); }
+.pet-battle-fx[data-weak=true] { width: 48%; left: 26%; }
+.pet-battle-portrait[data-motion=weak-hit] { animation: pet-react-tap .3s; }
+.pet-battle-scene[data-heavy=true] .pet-battle-arena { animation: pet-heavy-arena 1s ease-in-out; }
+.pet-battle-move-fx { position: absolute; z-index: 3; pointer-events: none; left: var(--trail-left, 23%); top: var(--trail-top, 40%); width: var(--trail-width, 54%); height: var(--trail-height, 34%); --direction: 1; transform: scale(var(--direction)); }
+.pet-battle-move-fx[data-side=opponent] { --direction: -1; }
+.pet-battle-fx-part { position: absolute; inset: 0; transform-origin: 0 100%; animation-duration: calc(var(--fx-duration) - var(--part) * 100ms); animation-delay: calc(var(--part) * 100ms); animation-timing-function: ease-in-out; animation-fill-mode: both; }
+.pet-battle-fx-glyph { position: absolute; left: 0; bottom: 0; display: grid; place-items: center; width: 52px; height: 52px; font-size: 34px; line-height: 1; color: #baffd6; filter: drop-shadow(0 0 5px #dcffb9); transform: translate(-50%, 50%) scale(var(--direction)); }
+.pet-battle-fx-glyph img { width: 80px; height: 80px; max-width: none; }
+.pet-battle-fx-glyph[data-shape=ring] { border: 3px solid #a6edcf; border-radius: 50%; }
+.pet-battle-fx-glyph[data-shape=wave] { width: 75px; height: 22px; border-top: 4px solid #87efb1; border-bottom: 3px solid #5bca8a; border-radius: 50%; }
+.pet-battle-fx-glyph[data-shape=streak] { width: 70px; height: 5px; border-radius: 50%; background: linear-gradient(90deg, transparent, #fff6c0); }
+.pet-battle-move-fx[data-trail=slip-ghost], .pet-battle-move-fx[data-trail=half-orbit] { opacity: .6; }
+.pet-battle-move-fx[data-trail=yard-shield] .pet-battle-fx-glyph { transform: translate(-50%, 100%) scale(var(--direction)); }
+.pet-battle-move-fx[data-trail=attention-tail] .pet-battle-fx-part:last-child,
+.pet-battle-move-fx[data-trail=zigzag-question] .pet-battle-fx-part:last-child,
+.pet-battle-move-fx[data-trail=eye-link] .pet-battle-fx-part:last-child { animation-name: pet-trail-target-mark !important; }
+.pet-battle-move-fx[data-trail=return-paws] .pet-battle-fx-part:last-child { animation-name: pet-trail-target-mark !important; }
+.pet-battle-move-fx[data-missed=true] .pet-battle-fx-part { opacity: .5; }
+@keyframes pet-heavy-arena { 60% { transform: scaleY(.975) translateY(3px); } }
+@keyframes pet-move-paw-push { 25% { transform: rotate(calc(-5deg * var(--facing))); } 55% { transform: translate(var(--lunge-x), var(--lunge-y)); } }
+@keyframes pet-move-shoulder-bump { 25% { transform: scale(1.08,.8); } 60% { transform: translate(calc(var(--lunge-x) * 2), var(--lunge-y)) rotate(calc(9deg * var(--facing))); } }
+@keyframes pet-move-side-step { 20% { transform: translateX(calc(-14px * var(--facing))); } 40% { transform: translateX(calc(14px * var(--facing))); } 65% { transform: translate(var(--lunge-x), var(--lunge-y)); } }
+@keyframes pet-move-tail-circle { 25% { transform: translate(calc(var(--target-x) * .4), calc(var(--target-y) * .2)) rotate(calc(-15deg * var(--facing))); opacity: .6; } 55% { transform: translate(calc(var(--target-x) * 1.15), calc(var(--target-y) * .75)) rotate(calc(15deg * var(--facing))); } 75% { transform: translate(calc(var(--target-x) * 1.1), var(--target-y)); } }
+@keyframes pet-move-toe-zigzag { 20% { transform: translate(var(--lunge-x), calc(var(--lunge-y) * -1)); } 40% { transform: translate(calc(var(--lunge-x) * .5), calc(var(--lunge-y) * 1.5)); } 65% { transform: translate(calc(var(--lunge-x) * 2), var(--lunge-y)); } }
+@keyframes pet-move-half-spin { 25% { transform: rotate(calc(-25deg * var(--facing))); } 65% { transform: translate(calc(var(--target-x) * .85), calc(var(--target-y) * .85)) rotate(calc(180deg * var(--facing))); } }
+@keyframes pet-move-side-slip { 35%, 70% { transform: translate(calc(var(--lunge-x) * -1), calc(var(--lunge-y) * -.4)); opacity: .5; } }
+@keyframes pet-move-tail-balance { 20%, 65% { transform: rotate(calc(-8deg * var(--facing))) scaleY(1.04); } 40%, 80% { transform: rotate(calc(8deg * var(--facing))); } }
+@keyframes pet-move-scent-follow { 25% { transform: rotate(calc(8deg * var(--facing))) scaleY(.9); } 70% { transform: translate(calc(var(--target-x) * .8), calc(var(--target-y) * .8)); } }
+@keyframes pet-move-paw-follow { 20% { transform: translate(calc(var(--target-x) * .2), calc(var(--target-y) * .2)); } 40% { transform: translate(calc(var(--target-x) * .4), calc(var(--target-y) * .4)); } 60% { transform: translate(calc(var(--target-x) * .6), calc(var(--target-y) * .6)); } 80% { transform: translate(calc(var(--target-x) * .8), calc(var(--target-y) * .8)); } }
+@keyframes pet-move-return-track { 30% { transform: translate(calc(var(--target-x) * 1.15), calc(var(--target-y) * 1.1)); opacity: .5; } 65% { transform: translate(calc(var(--target-x) * .8), calc(var(--target-y) * .8)); opacity: 1; } }
+@keyframes pet-move-ear-scout { 20%, 55% { transform: scale(.95,1.1); } 40% { transform: rotate(calc(-4deg * var(--facing))); } 75% { transform: rotate(calc(4deg * var(--facing))); } }
+@keyframes pet-move-nose-focus { 45% { transform: rotate(calc(-6deg * var(--facing))); filter: brightness(1.25); } 75% { transform: scale(1.04); filter: brightness(1.4); } }
+@keyframes pet-move-threshold-push { 20% { transform: scaleY(.8); } 45% { transform: translate(calc(var(--target-x) * .6), calc(var(--target-y) * .6)) scaleY(.8); } 80% { transform: translate(calc(var(--target-x) * .85), calc(var(--target-y) * .85)) scaleY(.85); } }
+@keyframes pet-move-yard-guard { 30% { transform: scale(1.12,.88); } 65% { transform: scale(1.05); filter: brightness(1.3); } }
+@keyframes pet-move-eye-sway { 25%, 65% { transform: rotate(calc(6deg * var(--facing))); filter: brightness(1.15); } 45% { transform: rotate(calc(-6deg * var(--facing))); } }
+@keyframes pet-move-happy-call { 25%, 60% { transform: scale(1.06,1.1) translateY(-5px); } 40% { transform: scale(1,.96); } }
+@keyframes pet-move-tail-wag { 15%, 45%, 75% { transform: rotate(calc(7deg * var(--facing))); } 30%, 60% { transform: rotate(calc(-7deg * var(--facing))); } }
+@keyframes pet-move-kind-breath { 45% { transform: scale(1.07,1.04); filter: brightness(1.15); } 85% { transform: scale(.98); } }
+@keyframes pet-move-sit-rest { 25%, 85% { transform: translateY(9px) scale(1.04,.82); } 55% { transform: translateY(7px) scale(1.06,.86); filter: brightness(1.2); } }
+@keyframes pet-move-steady-steps { 20%, 45%, 70% { transform: translate(var(--lunge-x), var(--lunge-y)); } 32%, 57%, 85% { transform: translate(calc(var(--lunge-x) * .4), calc(var(--lunge-y) * .4)); } }
+@keyframes pet-move-heavy-stride { 35% { transform: translateY(-10px) rotate(calc(-8deg * var(--facing))); } 60%, 75% { transform: translate(calc(var(--lunge-x) * 1.8), var(--lunge-y)) scale(1.14,.85); } }
+@keyframes pet-move-double-chase { 30% { transform: translate(calc(var(--target-x) * .65), calc(var(--target-y) * .65)); } 45% { transform: translate(calc(var(--target-x) * .5), calc(var(--target-y) * .5)); } 75% { transform: translate(var(--target-x), var(--target-y)); } }
+@keyframes pet-move-short-brace { 30% { transform: scale(1.12,.75); } 60%, 85% { transform: scale(1.08,.82); filter: brightness(1.4) saturate(.7); } }
+@keyframes pet-move-light-nudge { 50% { transform: translate(calc(var(--lunge-x) * .55), calc(var(--lunge-y) * .55)); } }
+@keyframes pet-move-energy-breath { 35% { transform: scale(1.05,1.08); } 70% { transform: scale(1,.96); } }
+@keyframes pet-react-tap { 55% { transform: translate(calc(var(--lunge-x) * -.2), calc(var(--lunge-y) * -.2)); } }
+@keyframes pet-react-recoil { 60% { transform: translate(calc(var(--lunge-x) * -.8), calc(var(--lunge-y) * -.8)) rotate(calc(-8deg * var(--facing))); } }
+@keyframes pet-react-tilt { 65% { transform: rotate(calc(-12deg * var(--facing))); } }
+@keyframes pet-react-turn { 60% { transform: scaleX(.7) rotate(calc(9deg * var(--facing))); } }
+@keyframes pet-react-wobble { 45%, 75% { transform: rotate(-8deg); } 60% { transform: rotate(8deg); } }
+@keyframes pet-react-drag { 50%, 85% { transform: translate(calc(var(--lunge-x) * -.4), calc(var(--lunge-y) * -.4)) scaleY(.9); } }
+@keyframes pet-react-slide { 35% { transform: translate(calc(var(--lunge-x) * -.2), calc(var(--lunge-y) * -.2)); } 80% { transform: translate(calc(var(--lunge-x) * -1.2), calc(var(--lunge-y) * -1.2)); } }
+@keyframes pet-react-dizzy { 40% { transform: rotate(-12deg); } 60% { transform: rotate(12deg); } 80% { transform: rotate(-6deg); } }
+@keyframes pet-react-bounce { 45%, 75% { transform: translateY(-7px); } }
+@keyframes pet-react-startle { 60% { transform: translateY(-15px) scale(.95,1.08); } }
+@keyframes pet-react-triple { 23%, 48%, 73% { transform: translate(calc(var(--lunge-x) * -.3), calc(var(--lunge-y) * -.3)); } 35%, 60%, 85% { transform: none; } }
+@keyframes pet-react-squash { 60%, 75% { transform: scale(1.15,.8); } }
+@keyframes pet-react-retreat { 30% { transform: translate(calc(var(--lunge-x) * -.5), calc(var(--lunge-y) * -.5)); } 75% { transform: translate(calc(var(--lunge-x) * -1), calc(var(--lunge-y) * -1)); } }
+@keyframes pet-react-dodge { 30%, 75% { transform: translate(calc(var(--lunge-x) * -.7), var(--lunge-y)); opacity: .5; } }
+@keyframes pet-trail-paw-pop { 0% { opacity: 0; transform: scale(.4); } 35% { opacity: 1; } 75%, 100% { opacity: 0; transform: translate(85%,-85%) scale(1.2); } }
+@keyframes pet-trail-dust-cloud { 0%, 25% { opacity: 0; } 45% { opacity: .8; transform: translate(65%,-55%) scale(.6); } 100% { opacity: 0; transform: translate(90%,-75%) scale(1.8); } }
+@keyframes pet-trail-side-tap { 0% { opacity: 0; } 25% { opacity: 1; transform: translate(-15%,15%); } 50% { transform: translate(25%,20%); } 80%, 100% { opacity: 0; transform: translate(95%,-85%); } }
+@keyframes pet-trail-half-orbit { 0% { opacity: 0; } 25% { opacity: .6; transform: translate(30%,25%); } 60% { transform: translate(110%,-50%) scale(.8); } 100% { opacity: 0; transform: translate(100%,-110%); } }
+@keyframes pet-trail-zigzag-question { 0% { opacity: 0; } 25% { opacity: 1; transform: translate(25%,-50%); } 45% { transform: translate(50%,-20%); } 75% { transform: translate(85%,-85%); } 100% { opacity: 0; } }
+@keyframes pet-trail-spin-streak { 0% { opacity: 0; } 40% { opacity: 1; transform: translate(40%,-40%) rotate(-90deg); } 80%, 100% { opacity: 0; transform: translate(100%,-100%) rotate(180deg); } }
+@keyframes pet-trail-slip-ghost { 0% { opacity: .6; } 60% { opacity: .3; transform: translate(-20%,10%); } 100% { opacity: 0; transform: translate(-35%,15%); } }
+@keyframes pet-trail-balance-spark { 0% { opacity: 0; } 25% { opacity: 1; transform: translate(-10%,-15%) rotate(-12deg); } 55% { transform: translate(15%,-35%) rotate(12deg); } 100% { opacity: 0; transform: translate(0,-45%); } }
+@keyframes pet-trail-scent-wave { 0% { opacity: 0; transform: scale(.3); } 25% { opacity: 1; transform: translate(25%,-35%); } 50% { transform: translate(55%,-40%); } 100% { opacity: 0; transform: translate(100%,-100%); } }
+@keyframes pet-trail-four-paws { 0% { opacity: 0; transform: translate(calc(var(--part) * 25%), calc(var(--part) * -25%)) scale(.5); } 30%, 75% { opacity: 1; transform: translate(calc(var(--part) * 25%), calc(var(--part) * -25%)); } 100% { opacity: 0; transform: translate(calc(var(--part) * 25%), calc(var(--part) * -25%)); } }
+@keyframes pet-trail-return-paws { 0% { opacity: 0; transform: translate(120%,-115%); } 30% { opacity: 1; } 80%, 100% { opacity: 0; transform: translate(65%,-60%); } }
+@keyframes pet-trail-radar-rings { 0% { opacity: 0; transform: scale(.3); } 25% { opacity: .9; } 100% { opacity: 0; transform: scale(2.5); } }
+@keyframes pet-trail-nose-light { 0% { opacity: 0; transform: translate(35%,-50%) scale(1.5); } 60% { opacity: 1; transform: translate(15%,-20%) scale(.4); } 100% { opacity: 0; transform: translate(15%,-20%) scale(.8); } }
+@keyframes pet-trail-low-pressure { 0% { opacity: 0; transform: scaleY(.5); } 30% { opacity: .7; transform: translate(30%,-20%) scaleY(.5); } 85% { opacity: 1; transform: translate(100%,-75%) scaleY(.5); } 100% { opacity: 0; } }
+@keyframes pet-trail-yard-shield { 0% { opacity: 0; transform: scale(.1,.1); } 45%, 80% { opacity: 1; transform: scale(1.8,.65); } 100% { opacity: 0; transform: scale(2,.7); } }
+@keyframes pet-trail-eye-link { 0% { opacity: 0; } 30% { opacity: 1; transform: translate(25%,-45%) rotate(-25deg); } 65% { transform: translate(75%,-85%) rotate(-25deg); filter: brightness(1.5); } 100% { opacity: 0; } }
+@keyframes pet-trail-music-wave { 0% { opacity: 0; transform: scale(.3); } 25% { opacity: 1; } 65% { transform: translate(65%,-80%) scale(1.3); } 100% { opacity: 0; transform: translate(100%,-100%) scale(1.7); } }
+@keyframes pet-trail-attention-tail { 0% { opacity: 0; } 20%, 60% { opacity: 1; transform: translate(-10%,0) rotate(-20deg); } 40%, 80% { transform: translate(10%,-10%) rotate(20deg); } 100% { opacity: 0; } }
+@keyframes pet-trail-breath-ring { 0% { opacity: 0; transform: scale(.6); } 45% { opacity: .9; transform: scale(1.7); } 100% { opacity: 0; transform: scale(.7); } }
+@keyframes pet-trail-heart-heal { 0% { opacity: 0; transform: translate(0,10%) scale(.5); } 35% { opacity: 1; transform: translate(10%,-10%); } 100% { opacity: 0; transform: translate(-5%,-55%) scale(1.3); } }
+@keyframes pet-trail-triple-tap { 0% { opacity: 0; transform: translate(85%,-85%) scale(.2); } 20%, 50% { opacity: 1; transform: translate(90%,-90%) scale(.7); } 70%, 100% { opacity: 0; transform: translate(95%,-95%); } }
+@keyframes pet-trail-heavy-stamp { 0%, 30% { opacity: 0; transform: translate(70%,-120%) scale(1.5); } 55%, 70% { opacity: 1; transform: translate(85%,-80%) scale(1.7,.6); } 100% { opacity: 0; transform: translate(85%,-80%) scale(2.4,.8); } }
+@keyframes pet-trail-chase-streak { 0% { opacity: 0; } 30% { opacity: 1; transform: translate(45%,-45%); } 45% { transform: translate(30%,-30%); } 75% { transform: translate(110%,-105%); } 100% { opacity: 0; } }
+@keyframes pet-trail-brace-glow { 0% { opacity: 0; transform: scale(1.5); } 40%, 80% { opacity: 1; transform: scale(.8,.7); filter: brightness(1.5); } 100% { opacity: 0; transform: scale(1); } }
+@keyframes pet-trail-little-pop { 0%, 30% { opacity: 0; } 55% { opacity: 1; transform: translate(80%,-80%) scale(.5); } 100% { opacity: 0; transform: translate(90%,-90%) scale(.7); } }
+@keyframes pet-trail-energy-dots { 0% { opacity: 0; transform: translate(calc(var(--part) * 12% - 18%),15%) scale(.2); } 40%, 85% { opacity: 1; transform: translate(calc(var(--part) * 12% - 18%),-10%) scale(.4); } 100% { opacity: 0; transform: translate(calc(var(--part) * 12% - 18%),-20%) scale(.4); } }
+@keyframes pet-trail-target-mark { 0%, 35% { opacity: 0; transform: translate(100%,-135%) scale(.5); } 60%, 85% { opacity: 1; transform: translate(100%,-135%); } 100% { opacity: 0; transform: translate(100%,-145%); } }
 @media (max-height: 650px) {
   .pet-battle-hud { padding: 7px 9px; }
   .pet-battle-hud[data-side=player] { bottom: 100px; }
@@ -189,7 +278,11 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .pet-battle-screen *, .pet-battle-screen *::before, .pet-battle-screen *::after { animation: none !important; transition: none !important; }
-  .pet-battle-stripes, .pet-battle-sparkles, .pet-battle-npc, .pet-battle-fx { display: none; }
+  .pet-battle-stripes, .pet-battle-sparkles, .pet-battle-npc { display: none; }
+  .pet-battle-fx { opacity: 1; }
+  .pet-battle-move-fx .pet-battle-fx-part { transform: translate(50%,-50%); opacity: 1; }
+  .pet-battle-move-fx[data-local=true] .pet-battle-fx-part { transform: none; }
+  .pet-battle-move-fx .pet-battle-fx-part:not(:first-child) { display: none; }
   .pet-battle-portrait[data-motion=tired] { opacity: .35; }
 }
 
