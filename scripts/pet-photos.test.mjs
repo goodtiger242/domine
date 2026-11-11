@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
+import { loadTS } from "./pet-test-loader.mjs";
 import { backgroundAt, BACKGROUNDS, CHURCH_BACKGROUNDS, poseAt, POSES, PETS, PRIEST, DOGHOUSE, petText } from "../lib/domine/pet-photos.ts";
 import { DEFAULT_MAP, PET_MAPS, petMap, neighborMap, actionsForMap, SHOPS } from "../lib/domine/pet-maps.ts";
 import { petRequest } from "../lib/domine/pet-rpc.ts";
@@ -79,7 +80,7 @@ const sceneSource = ts.transpileModule(readFileSync(new URL("../app/games/PetSce
 }).outputText;
 new Function("require", "exports", sceneSource)((name) => {
   if (name === "./PetDog") return dogModule.exports;
-  if (name.startsWith("@/lib/domine/")) return require(`../lib/domine/${name.split("/").pop()}.ts`);
+  if (name.startsWith("@/lib/domine/")) return loadTS(`lib/domine/${name.split("/").pop()}.ts`);
   if (name === "react") return {
     ...require("react"),
     useState: (initial) => require("react").useState(initial?.fx ? { ...initial, ...sceneState } : initial),
@@ -88,7 +89,7 @@ new Function("require", "exports", sceneSource)((name) => {
   return require(name);
 }, sceneModule.exports);
 const renderScene = (props = {}) => renderToStaticMarkup(createElement(sceneModule.exports.PetScene, {
-  stage: "adult", face: "happy", light: 0.8, hour: 22, collar: "purple", cue: null, onSay() {}, bubble: "반가워요!",
+  stage: "adult", face: "happy", light: 0.8, hour: 22, collar: "purple", cue: Object.keys(sceneState).length ? { action: "feed", id: 1 } : null, onSay() {}, bubble: "반가워요!",
   ...props,
 }));
 assert.ok(!renderScene().includes("/pet/art/bowl.webp"));
@@ -99,7 +100,7 @@ for (const map of PET_MAPS) {
   assert.equal(html.includes('aria-label="개집"'), map.id === "home");
   assert.equal(html.includes('aria-label="맥도날드 앞으로 가기"'), map.id === "street");
   assert.ok(html.includes('aria-label="미네의 말"'));
-  assert.ok(html.includes('aria-label="신부님께 인사하기" disabled=""'));
+  assert.equal(html.includes('aria-label="신부님께 인사하기" disabled=""'), map.id === "church");
   for (const direction of [-1, 1]) assert.ok(html.includes(`aria-label="${neighborMap(map.id, direction).name}(으)로 이동" disabled=""`));
 }
 assert.ok(renderScene({ speaker: "priest" }).includes('aria-label="신부님의 말"'));
@@ -118,11 +119,11 @@ assert.ok(scales[1] > scales[0], "Foreground bowl is larger than distant bowl");
 const churchScene = renderScene({ map: "church" });
 const churchBowl = churchScene.match(/translate\(110 89\) scale\(([\d.]+)\)/);
 assert.ok(Number(churchBowl[1]) < scales[1], "Church props match the smaller dogs");
-assert.ok(churchScene.includes('transform="translate(12 21) scale(0.68)"'), "Priest feet stay on courtyard paving");
+assert.ok(churchScene.includes('transform="translate(-19 0)"'), "Priest stays outside the dog safe zone");
 sceneState = {};
 for (const petId of [1, 2]) {
   const imageWidth = (map) => Number(renderScene({ map, petId }).match(new RegExp(`href="${PETS[petId].standing.adult}"[^>]*width="([\\d.]+)"`))[1]);
-  assert.ok(Math.abs(imageWidth("church") / imageWidth("field") - 0.58) < 1e-9);
+  assert.ok(Math.abs(imageWidth("church") / imageWidth("field") - 0.85) < 1e-9);
 }
 
 // Exercise mount loaders with a fake browser: no network or DB calls.
@@ -135,10 +136,12 @@ try {
   for (const map of PET_MAPS) for (const hour of [6, 12, 18, 22]) {
     sceneEffects = [];
     requested.length = 0;
-    renderScene({ map: map.id, hour });
+    const rendered = renderScene({ map: map.id, hour });
     const cleanups = sceneEffects.map((effect) => effect());
     const expected = map.background ?? (map.id === "church" ? CHURCH_BACKGROUNDS : BACKGROUNDS)[backgroundAt(hour)];
-    assert.deepEqual(requested.filter((src) => src.startsWith("/pet/bg/")), [expected], "Only the current map/time photo loads, even during idle preload");
+    assert.ok(rendered.includes(`href="${expected}"`), "Only committed background renders");
+    assert.deepEqual(requested.filter((src) => src.startsWith("/pet/bg/")), [], "No background preloading outside map preparation");
+    assert.ok(!requested.some((src) => src.includes("/mine/")), "Other dog's photos are not preloaded");
     cleanups.forEach((cleanup) => cleanup?.());
   }
 } finally {

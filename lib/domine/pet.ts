@@ -106,48 +106,6 @@ export function saysText(face: string): string {
   return line(`idle_${face}`) || line("idle_happy");
 }
 
-/** 이 기기에서 연속으로 돌본 날 수 (localStorage) */
-export function bumpStreak(petId: 1 | 2 = 1): number {
-  const key = petId === 1 ? "domine-pet-streak" : "domine-pet-streak-2";
-  const today = localISO(new Date());
-  const y = new Date();
-  y.setDate(y.getDate() - 1);
-  let n = 1;
-  try {
-    const s = JSON.parse(localStorage.getItem(key) ?? "{}") as { last?: string; n?: number };
-    if (s.last === today) n = s.n ?? 1;
-    else if (s.last === localISO(y)) n = (s.n ?? 0) + 1;
-    localStorage.setItem(key, JSON.stringify({ last: today, n }));
-  } catch {
-    /* 저장 못 해도 진행에는 영향 없음 */
-  }
-  return n;
-}
-
-/** 짧은 효과음 (사용자가 켰을 때만) */
-export function blip(kind: PetAction) {
-  try {
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new Ctx();
-    const notes = kind === "feed" || kind === "treat" || kind === "train" ? [523, 659] : kind === "pet" || kind === "brush" ? [659, 784] : kind === "bath" ? [784, 659, 523] : [440, 554, 659];
-    notes.forEach((f, i) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "sine";
-      o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.12);
-      g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + i * 0.12 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.12 + 0.18);
-      o.connect(g).connect(ctx.destination);
-      o.start(ctx.currentTime + i * 0.12);
-      o.stop(ctx.currentTime + i * 0.12 + 0.2);
-    });
-    window.setTimeout(() => ctx.close(), 800);
-  } catch {
-    /* 소리를 못 내도 무시 */
-  }
-}
-
 export type PetFace = "happy" | "hungry" | "sad" | "dirty" | "sleepy";
 
 export function faceOf(p: Pick<PetState, "fullness" | "mood" | "clean">, isNight: boolean): PetFace {

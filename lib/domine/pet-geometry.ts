@@ -1,0 +1,28 @@
+import type { PetMap } from "./pet-maps";
+export type Point = { x: number; y: number };
+export type SafeZone = { left: number; right: number; top: number; bottom: number };
+export const SAFE_ZONES: Record<PetMap, SafeZone> = {
+  church: { left: 46, right: 140, top: 77, bottom: 84 },
+  field: { left: 20, right: 140, top: 76, bottom: 84 },
+  street: { left: 20, right: 140, top: 77, bottom: 84 },
+  park: { left: 22, right: 138, top: 77, bottom: 84 },
+  home: { left: 22, right: 98, top: 78, bottom: 84 },
+};
+export const START_POINTS: Record<PetMap, Point> = { church: { x: 85, y: 82 }, field: { x: 80, y: 82 }, street: { x: 80, y: 82 }, park: { x: 80, y: 82 }, home: { x: 66, y: 82 } };
+export const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+// Photo poses, tail, outfit and carried toy share a conservative union envelope.
+export function actorBounds(width: number) { return { left: -width * .8 - 4, right: width * .8 + 4, top: -width * 1.15 - 5, bottom: 2 }; }
+export function clampActor(p: Point, bounds: SafeZone, zone: SafeZone): Point {
+  return { x: clamp(p.x, zone.left - bounds.left, zone.right - bounds.right), y: clamp(p.y, zone.top, zone.bottom - bounds.bottom) };
+}
+export function clampBall(p: Point, radius = 3.2): Point {
+  return { x: clamp(p.x, radius + 3, 160 - radius - 3), y: clamp(p.y, 18, 84 - radius) };
+}
+export function buildBallPath(from: Point, to: Point, radius = 3.2) {
+  const start = clampBall(from, radius), end = clampBall(to, radius);
+  return { start, control: clampBall({ x: (start.x + end.x) / 2, y: Math.min(start.y, end.y) - 28 }, radius), end };
+}
+export function sampleBall(path: ReturnType<typeof buildBallPath>, t: number): Point {
+  const u = clamp(t, 0, 1), v = 1 - u;
+  return { x: v*v*path.start.x + 2*v*u*path.control.x + u*u*path.end.x, y: v*v*path.start.y + 2*v*u*path.control.y + u*u*path.end.y };
+}

@@ -2,371 +2,17 @@
 
 import { memo, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { bubblePosition } from "@/lib/domine/pet-bubble";
-import type { PetAction, PetFace, PetStage } from "@/lib/domine/pet";
+import type { PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
-import { ART, BALL, BOWL, preloadArt } from "@/lib/domine/pet-art";
+import { ART, BALL, BOWL } from "@/lib/domine/pet-art";
 import { line, PRIEST_LINES } from "@/lib/domine/pet-lines";
 import { BACKGROUNDS, CHURCH_BACKGROUNDS, backgroundAt, PETS, PRIEST, DOGHOUSE, type PetId } from "@/lib/domine/pet-photos";
-import { DEFAULT_MAP, PET_MAPS, petMap, neighborMap, SHOPS, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
-import { DOG_W, PetDog, RATIO } from "./PetDog";
+import { DEFAULT_MAP, petMap, neighborMap, SHOPS, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
+import { DOG_W, PetDog } from "./PetDog";
 
-/**
- * 도미가 노는 장면. 행동마다 여러 가지 연출(대본)이 있고 그중 하나를 무작위로 고른다.
- * 대본은 [시작 ms, 바뀔 값] 목록이며, 위치는 CSS transition 으로 부드럽게 움직인다.
- * 결과(수치)는 서버가 정하고, 여기서는 보이는 연출만 다룬다.
- */
-type Dir = 1 | -1;
-type Ball = { x: number; y: number; dur: number };
-type Hand = { x: number; y: number; dur: number; rot: number; stroke: boolean; e: string };
-type Item = { e: string; x: number; y: number; dur: number; size: number };
-type Carry = "mouth" | "back" | "tail" | "head";
-type Fx = "hearts" | "sparkle" | "drops" | "bubbles" | "spray";
-type S = {
-  x: number;
-  y: number;
-  dir: Dir;
-  dur: number;
-  motion: string | null;
-  ball: Ball | null;
-  hand: Hand | null;
-  item: Item | null;
-  bowl: number | null;
-  fx: Fx[];
-  scroll: boolean;
-  carry: Carry | null;
-};
-type Patch = Partial<S> & { say?: string; map?: PetMap; asleep?: boolean };
-type Plan = { steps: [number, Patch][]; end: number };
-
-const HOME: S = {
-  x: 78, y: 82, dir: 1, dur: 600, motion: null,
-  ball: null, hand: null, item: null, bowl: null, fx: [], scroll: false, carry: null,
-};
-
-/** 연출 전체의 속도 배율 (클수록 느리다) */
-const SLOW = 1.6;
-const rnd = (a: number, b: number) => a + Math.random() * (b - a);
-const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
-const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+import { buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
+import { itemAsset } from "@/lib/domine/pet-assets";
 const depth = (y: number) => 0.84 + ((y - 76) / 13) * 0.2;
-
-function makePlan(action: PetAction | "tap", w: number, ratio = RATIO): Plan {
-  const h = w * ratio;
-
-  if (action === "tap") {
-    return {
-      steps: pick<[number, Patch][]>([
-        [[0, { motion: "pet-flip", say: line("tap_flip") }]],
-        [[0, { motion: "pet-hop", say: line("tap_hop") }]],
-        [[0, { say: line("tap_spin"), dir: -1, dur: 260 }], [280, { dir: 1, dur: 260 }], [560, { dir: -1, dur: 260 }], [840, { dir: 1, dur: 260 }]],
-      ]),
-      end: 1100,
-    };
-  }
-
-  // 매번 도미가 무대의 무작위 자리로 가서(방향도 무작위) 시작한다
-  const L = { x: rnd(30, 126), y: rnd(77, 88), d: pick<Dir>([1, -1]) };
-  const k = depth(L.y);
-  const T0 = 800;
-  const P = (lx: number, ly: number) => ({ x: L.x + L.d * lx * k, y: L.y + ly * k });
-  const lead: [number, Patch][] = [
-    [0, { x: L.x, y: L.y, dir: L.d, dur: 700, motion: "pet-trot" }],
-    [T0 - 60, { motion: null }],
-  ];
-  const mk = (steps: [number, Patch][], end: number): Plan => ({
-    steps: [...lead, ...steps.map(([t, p]) => [t + T0, p] as [number, Patch])],
-    end: end + T0,
-  });
-  const runMs = (dx: number) => Math.round(clamp(Math.abs(dx) * 18 + 300, 600, 1700));
-  const sgn = (v: number): Dir => (v >= 0 ? 1 : -1);
-
-  if (action === "play") {
-    let tx = rnd(16, 144);
-    for (let i = 0; i < 6 && Math.abs(tx - L.x) < 26; i++) tx = rnd(16, 144);
-    const d = sgn(tx - L.x);
-    const ty = rnd(76, 89);
-    const apex = L.y - h - rnd(8, 34);
-    const fly = Math.round(350 + Math.abs(tx - L.x) * 4);
-    const roll = d * rnd(4, 12);
-    const bounce = Math.random() < 0.5;
-    const steps: [number, Patch][] = [
-      [0, { dir: d, dur: 250, motion: "pet-hop", ball: { x: L.x + d * 8, y: L.y - h * 0.7, dur: 0 }, say: line("throw") }],
-      [140, { ball: { x: (L.x + tx) / 2, y: apex, dur: fly / 2 } }],
-      [140 + fly / 2, { ball: { x: tx, y: ty - 2, dur: fly / 2 } }],
-    ];
-    let t = 140 + fly + 80;
-    if (bounce) {
-      steps.push([t, { ball: { x: tx + roll, y: ty - 2, dur: 300 } }]);
-      t += 320;
-    }
-    const bx = bounce ? tx + roll : tx;
-    const gx = clamp(bx - d * w * 0.4 * depth(ty), 12, 148);
-
-    const bring = (from: number, mode: Carry, atX: number, atY: number): [number, Patch][] => {
-      const out: [number, Patch][] = [];
-      let u = from;
-      out.push([u, { ball: null, carry: mode, motion: "pet-hop", say: line(`carry_${mode}`) }]);
-      u += 500;
-      const rx = clamp(L.x + rnd(-16, 16), 14, 146);
-      const ry = rnd(77, 88);
-      const bd = sgn(rx - atX);
-      const m = runMs(rx - atX);
-      out.push([u, { x: rx, y: ry, dir: bd, dur: m, motion: "pet-trot" }]);
-      u += m + 60;
-      if (mode === "mouth") {
-        out.push([u, { carry: null, ball: { x: rx + bd * w * 0.5, y: ry - 2, dur: 0 }, motion: "pet-hop", say: line("drop_mouth") }]);
-        u += 900;
-      } else if (mode === "back") {
-        out.push([u, { motion: "pet-shake", say: line("shake") }]);
-        out.push([u + 450, { carry: null, ball: { x: rx - bd * 5, y: ry - h * 0.9, dur: 0 } }]);
-        out.push([u + 500, { ball: { x: rx - bd * 12, y: ry - 2, dur: 380 }, motion: "pet-hop", say: line("drop_back") }]);
-        u += 1300;
-      } else if (mode === "tail") {
-        out.push([u, { motion: "pet-wiggle", say: line("drop_tail") }]);
-        out.push([u + 550, { carry: null, ball: { x: rx - bd * w * 0.47, y: ry - h * 0.33, dur: 0 } }]);
-        out.push([u + 570, { ball: { x: rx - bd * (w * 0.47 + rnd(14, 28)), y: ry - 2, dur: 520 }, motion: "pet-hop", say: line("drop_tail_end") }]);
-        u += 1500;
-      } else {
-        out.push([u, { motion: "pet-nuzzle", say: line("drop_head") }]);
-        out.push([u + 650, { carry: null, ball: { x: rx + bd * w * 0.3, y: ry - h * 0.98, dur: 0 } }]);
-        out.push([u + 700, { ball: { x: rx + bd * w * 0.62, y: ry - 2, dur: 400 }, motion: "pet-hop", say: line("drop_mouth") }]);
-        u += 1500;
-      }
-      out.push([u, { motion: null }]);
-      return out;
-    };
-    const mode = pick<Carry>(["mouth", "mouth", "mouth", "back", "tail", "head"]);
-    const r = Math.random();
-    if (r < 0.7) {
-      steps.push([t, { x: gx, y: ty, dir: d, dur: runMs(gx - L.x), motion: "pet-trot", say: line("run") }]);
-      const arrive = t + runMs(gx - L.x) + 60;
-      const got = bring(arrive, mode, gx, ty);
-      steps.push(...got);
-      return mk(steps, got[got.length - 1][0] + 400);
-    }
-    if (r < 0.8) {
-      steps.push([t, { dir: (-d) as Dir, dur: 400, say: line("ignore") }]);
-      steps.push([t + 700, { motion: "pet-lie" }]);
-      steps.push([t + 2000, { ball: null, motion: null }]);
-      return mk(steps, t + 2500);
-    }
-    if (r < 0.9) {
-      const edge = d > 0 ? 154 : 6;
-      steps.push([t, { x: gx, y: ty, dir: d, dur: runMs(gx - L.x), motion: "pet-trot" }]);
-      const a = t + runMs(gx - L.x) + 60;
-      steps.push([a, { ball: null, say: line("steal") }]);
-      steps.push([a + 50, { x: edge, dur: 800 }]);
-      steps.push([a + 950, { dir: (-d) as Dir, x: clamp(L.x + rnd(-20, 20), 14, 146), y: rnd(77, 88), dur: 1100, say: line("steal_end") }]);
-      return mk(steps, a + 2400);
-    }
-    const t2 = clamp(bx + d * rnd(18, 32), 16, 144);
-    steps.push([t, { x: gx, y: ty, dir: d, dur: runMs(gx - L.x), motion: "pet-trot", say: line("run") }]);
-    const a2 = t + runMs(gx - L.x);
-    steps.push([a2 - 200, { ball: { x: t2, y: ty - 2, dur: 450 }, say: line("fumble") }]);
-    const g2 = clamp(t2 - d * w * 0.4, 12, 148);
-    steps.push([a2 + 50, { x: g2, dur: 600 }]);
-    const got = bring(a2 + 700, mode, g2, ty);
-    steps.push(...got);
-    return mk(steps, got[got.length - 1][0] + 400);
-  }
-
-  if (action === "pet") {
-    const spots = {
-      head: { lx: 0.36, ly: -0.95, m: "pet-nuzzle", say: "pet_head" },
-      back: { lx: 0, ly: -0.66, m: "pet-wiggle", say: "pet_back" },
-      rump: { lx: -0.38, ly: -0.6, m: "pet-wiggle", say: "pet_rump" },
-      chin: { lx: 0.44, ly: -0.45, m: "pet-nuzzle", say: "pet_chin" },
-      belly: { lx: 0, ly: -0.18, m: "pet-roll", say: "pet_belly" },
-    };
-    const order = (["head", "back", "rump", "chin", "belly"] as const).slice().sort(() => Math.random() - 0.5);
-    const count = Math.random() < 0.45 ? 2 : 1;
-    const emoji = pick(["🤚", "✋", "🖐️"]);
-    const steps: [number, Patch][] = [];
-    let t = 0;
-    for (const key of order.slice(0, count)) {
-      const sp = spots[key];
-      const p = P(w * sp.lx, h * sp.ly);
-      const hand = (x: number, y: number, dur: number, stroke: boolean): Hand => ({ x, y, dur, rot: 0, stroke, e: emoji });
-      const lead2 = key === "belly" ? 900 : 120;
-      if (key === "belly") steps.push([t, { motion: sp.m }]);
-      steps.push([t + lead2 - 100, { hand: hand(p.x + 8, p.y - 26, 0, false) }]);
-      steps.push([t + lead2, { hand: hand(p.x, p.y - 4, 380, false) }]);
-      steps.push([t + lead2 + 400, { hand: hand(p.x, p.y - 4, 0, true), motion: sp.m, fx: ["hearts"], say: line(sp.say) }]);
-      steps.push([t + lead2 + 1500, { hand: hand(p.x + 8, p.y - 26, 400, false), fx: [] }]);
-      t += lead2 + 1800;
-    }
-    steps.push([t, { hand: null, motion: null }]);
-    return mk(steps, t + 250);
-  }
-
-  if (action === "feed") {
-    const food = pick(["🍖", "🍗", "🥩", "🥓", "🍚", "🥕", "🐟"]);
-    const variant = pick(["near", "near", "far", "picky", "spill"] as const);
-    const bx = variant === "far" ? clamp(L.x + L.d * rnd(34, 58), 14, 146) : clamp(L.x + L.d * w * 0.62 * k, 14, 146);
-    const gx = variant === "far" ? clamp(bx - L.d * w * 0.4 * k, 12, 148) : L.x;
-    const run = variant === "far" ? runMs(gx - L.x) : 0;
-    const fall: [number, Patch][] =
-      variant === "spill"
-        ? [
-            [0, { item: { e: food, x: bx, y: L.y - 40, dur: 0, size: 10 }, say: line("feed_spill") }],
-            [120, { item: { e: food, x: bx, y: L.y - 2, dur: 420, size: 10 } }],
-          ]
-        : [
-            [0, { bowl: bx, item: { e: food, x: bx, y: L.y - 34, dur: 0, size: 10 }, say: line("feed_start") }],
-            [150, { item: { e: food, x: bx, y: L.y - 9, dur: 380, size: 10 } }],
-          ];
-    const go: [number, Patch][] = run ? [[650, { x: gx, dir: L.d, dur: run, motion: "pet-trot" }]] : [];
-    const e0 = 650 + run + (run ? 60 : 0);
-    if (variant === "picky") {
-      return mk([...fall,
-        [e0, { dir: (-L.d) as Dir, dur: 300, motion: "pet-shake", say: line("feed_picky1") }],
-        [e0 + 800, { dir: L.d, dur: 300, motion: "pet-eatnod", say: line("feed_picky2") }],
-        [e0 + 2400, { item: null, bowl: null, motion: null, say: line("feed_done") }]], e0 + 2800);
-    }
-    return mk([...fall, ...go,
-      [e0, { motion: "pet-eatnod" }],
-      [e0 + 1700, { item: null, bowl: null, motion: null, say: line("feed_done") }]], e0 + 2200);
-  }
-
-  if (action === "treat") {
-    const e = pick(["🦴", "🍪", "🥓", "🍩", "🧀"]);
-    const variant = pick(["catch", "sit", "tease", "fetch"] as const);
-    const ix = P(w * 0.3, 0).x;
-    if (variant === "catch") {
-      return mk([
-        [0, { item: { e, x: ix, y: L.y - h - 22, dur: 0, size: 10 }, say: line("treat_start") }],
-        [100, { item: { e, x: ix, y: L.y - h * 0.75, dur: 450, size: 10 }, motion: "pet-hop" }],
-        [650, { item: null, say: line("treat_catch") }],
-        [1300, { motion: null }]], 1700);
-    }
-    if (variant === "sit") {
-      return mk([
-        [0, { item: { e, x: ix, y: L.y - h - 22, dur: 0, size: 10 }, say: line("treat_start") }],
-        [100, { item: { e, x: ix, y: L.y - 3, dur: 520, size: 10 } }],
-        [700, { motion: "pet-sit", say: line("treat_sit") }],
-        [1500, { item: null, motion: "pet-eatnod", say: line("treat_eat") }],
-        [2500, { motion: null }]], 2800);
-    }
-    if (variant === "tease") {
-      const hy = L.y - h - 14;
-      return mk([
-        [0, { item: { e, x: ix, y: hy, dur: 0, size: 10 }, say: line("treat_tease") }],
-        [200, { item: { e, x: ix, y: hy - 6, dur: 300, size: 10 }, motion: "pet-hop", say: line("treat_jump") }],
-        [900, { item: { e, x: ix, y: hy + 2, dur: 300, size: 10 }, say: line("treat_miss") }],
-        [1500, { item: { e, x: ix, y: L.y - h * 0.75, dur: 300, size: 10 }, say: line("treat_again") }],
-        [1900, { item: null, say: line("treat_catch") }],
-        [2500, { motion: null }]], 2800);
-    }
-    const tx = clamp(L.x + L.d * rnd(26, 56), 14, 146);
-    const ty = rnd(77, 88);
-    const gx = clamp(tx - L.d * w * 0.4, 12, 148);
-    const m = runMs(gx - L.x);
-    return mk([
-      [0, { item: { e, x: L.x + L.d * 6, y: L.y - h * 0.7, dur: 0, size: 10 }, say: line("treat_throw") }],
-      [100, { item: { e, x: (L.x + tx) / 2, y: L.y - h - 14, dur: 350, size: 10 } }],
-      [450, { item: { e, x: tx, y: ty - 2, dur: 350, size: 10 } }],
-      [850, { x: gx, y: ty, dur: m, motion: "pet-trot", say: line("treat_fetch") }],
-      [850 + m + 60, { item: null, motion: "pet-eatnod", say: line("treat_eat") }],
-      [850 + m + 1500, { motion: null }]], 850 + m + 1800);
-  }
-
-  if (action === "brush") {
-    const ly = h * -0.68;
-    const base = [-0.38, -0.12, 0.14, 0.36];
-    const passes = 2 + Math.floor(Math.random() * 3);
-    const flip = Math.random() < 0.5;
-    const xs: number[] = [];
-    for (let i = 0; i < passes; i++) {
-      const seq = (i % 2 === 0) !== flip ? base : [...base].reverse();
-      xs.push(...seq);
-    }
-    const steps: [number, Patch][] = [[0, { motion: "pet-wiggle", say: line("brush_start") }]];
-    xs.forEach((lx, i) => {
-      const p = P(w * lx, ly);
-      steps.push([300 + i * 240, { item: { e: "🪮", x: p.x, y: p.y - 3, dur: i === 0 ? 0 : 220, size: 12 } }]);
-    });
-    const end = 300 + xs.length * 240;
-    steps.push([end, { item: null, fx: ["sparkle"], motion: null, say: line("brush_end") }]);
-    return mk(steps, end + 900);
-  }
-
-  if (action === "bath") {
-    const variant = pick(["shower", "bucket", "soap"] as const);
-    const top = L.y - h - 8;
-    if (variant === "soap") {
-      return mk([
-        [0, { item: { e: "🧴", x: P(0, 0).x, y: top, dur: 0, size: 13 }, say: line("bath_soap") }],
-        [500, { item: { e: "sponge", x: P(-w * 0.2, 0).x, y: L.y - h * 0.62, dur: 0, size: 9 }, fx: ["bubbles"], motion: "pet-wiggle", say: line("bath_foam") }],
-        [900, { item: { e: "sponge", x: P(w * 0.2, 0).x, y: L.y - h * 0.62, dur: 380, size: 9 } }],
-        [1300, { item: { e: "sponge", x: P(-w * 0.15, 0).x, y: L.y - h * 0.6, dur: 380, size: 9 } }],
-        [1700, { item: { e: "🚿", x: P(0, 0).x, y: top - 2, dur: 0, size: 15 }, fx: ["drops", "bubbles"], motion: null, say: line("bath_rinse") }],
-        [2800, { item: null, fx: ["spray"], motion: "pet-shake", say: line("bath_shake") }],
-        [3700, { fx: [], motion: "pet-wiggle", item: { e: "towel", x: P(0, 0).x, y: L.y - h * 0.72, dur: 0, size: 12 }, say: line("bath_done") }],
-        [4500, { item: null, motion: null }]], 4800);
-    }
-    const bucket = variant === "bucket";
-    return mk([
-      [0, { item: { e: bucket ? "🪣" : "🚿", x: P(0, 0).x - L.d * 6, y: top - 2, dur: 0, size: 15 }, say: line(bucket ? "bath_bucket" : "bath_shower") }],
-      [500, { fx: ["drops"] }],
-      [1500, { fx: ["drops", "bubbles"], say: line("bath_foam") }],
-      [2400, { item: null, fx: ["spray"], motion: "pet-shake", say: line("bath_shake") }],
-      [3300, { fx: [], motion: "pet-wiggle", item: { e: "towel", x: P(0, 0).x, y: L.y - h * 0.72, dur: 0, size: 12 }, say: line("bath_done") }],
-      [4100, { item: null, motion: null }]], 4400);
-  }
-
-  if (action === "train") {
-    const k2 = pick(["sit", "paw", "spin", "roll", "jump", "bow", "dead"] as const);
-    const top = L.y - h - 8;
-    const bone = (t: number): [number, Patch] => [t, { hand: null, item: { e: "🦴", x: P(w * 0.4, 0).x, y: L.y - h * 0.6, dur: 0, size: 9 }, say: line("train_reward") }];
-    if (k2 === "sit") {
-      return mk([
-        [0, { hand: { x: P(w * 0.3, 0).x, y: top, dur: 0, rot: 0, stroke: false, e: "☝️" }, say: line("train_sit") }],
-        [400, { motion: "pet-sit" }], bone(1500), [2100, { item: null, motion: null }]], 2600);
-    }
-    if (k2 === "paw") {
-      const p = P(w * 0.66, h * -0.3);
-      return mk([
-        [0, { hand: { x: p.x + L.d * 14, y: p.y, dur: 0, rot: 0, stroke: false, e: "✋" }, say: line("train_paw") }],
-        [300, { hand: { x: p.x, y: p.y, dur: 300, rot: 0, stroke: false, e: "✋" }, motion: "pet-hop" }],
-        [900, { hand: { x: p.x, y: p.y, dur: 0, rot: 0, stroke: true, e: "✋" }, motion: "pet-wiggle" }],
-        bone(1900), [2500, { item: null, motion: null }]], 3000);
-    }
-    if (k2 === "spin") {
-      return mk([
-        [0, { say: line("train_spin") }],
-        [150, { dir: (-L.d) as Dir, dur: 280 }], [550, { dir: L.d, dur: 280 }],
-        [950, { dir: (-L.d) as Dir, dur: 280 }], [1350, { dir: L.d, dur: 280 }],
-        bone(1750), [2350, { item: null }]], 2800);
-    }
-    if (k2 === "roll") {
-      return mk([[0, { say: line("train_roll") }], [300, { motion: "pet-flip" }], [1300, { motion: null }], bone(1500), [2100, { item: null }]], 2600);
-    }
-    if (k2 === "jump") {
-      return mk([[0, { say: line("train_jump") }], [250, { motion: "pet-hop" }], [1500, { motion: null }], bone(1700), [2300, { item: null }]], 2700);
-    }
-    if (k2 === "bow") {
-      return mk([[0, { say: line("train_bow") }], [250, { motion: "pet-eatnod" }], [1700, { motion: null }], bone(1900), [2500, { item: null }]], 2900);
-    }
-    return mk([[0, { say: line("train_dead") }], [300, { motion: "pet-roll" }], [2800, { motion: null, say: line("train_alive") }], bone(3100), [3700, { item: null }]], 4100);
-  }
-
-  // walk: 가끔 나비나 새를 만난다
-  const bug = pick(["🦋", "🐦", null, null]);
-  const steps: [number, Patch][] = [
-    [0, { scroll: true, motion: "pet-trot", say: line("walk_start") }],
-    [1400, { say: line("walk_mid1") }],
-    [2700, { say: line("walk_mid2") }],
-  ];
-  if (bug) {
-    const by = rnd(44, 66);
-    steps.push([700, { item: { e: bug, x: -8, y: by, dur: 0, size: 9 } }]);
-    steps.push([760, { item: { e: bug, x: 168, y: by - 8, dur: 3000, size: 9 } }]);
-    steps.push([1200, { motion: "pet-hop", say: line(bug === "🦋" ? "walk_butterfly" : "walk_bird") }]);
-    steps.push([1900, { motion: "pet-trot" }]);
-    steps.push([3800, { item: null }]);
-  }
-  return mk(steps, 4100);
-}
 
 /** 소품: 사진이 있으면 사진(가운데 기준), 없으면 이모지 */
 function Prop({ e, size, className }: { e: string; size: number; className?: string }) {
@@ -382,8 +28,8 @@ function Prop({ e, size, className }: { e: string; size: number; className?: str
   );
 }
 
-function Ball({ scale = 1 }: { scale?: number }) {
-  return <image href={BALL} x={-3.2 * scale} y={-3.2 * scale} width={6.4 * scale} height={6.4 * scale} />;
+function Ball({ scale = 1, toy }: { scale?: number; toy?: string | null }) {
+  return <image href={itemAsset(toy) ?? BALL} x={-3.2 * scale} y={-3.2 * scale} width={6.4 * scale} height={6.4 * scale} />;
 }
 
 type Props = {
@@ -396,13 +42,15 @@ type Props = {
   cue: SceneCue | null;
   petId?: PetId;
   map?: PetMap;
-  onMap?: (map: PetMap) => void;
   onLocal?: (cue: SceneCue) => void;
   locked?: boolean;
   speaker?: "dog" | "priest";
   onSay: (text: string, speaker?: "dog" | "priest") => void;
   /** 연출이 끝났을 때 */
-  onDone?: () => void;
+  onDone?: (id: number, sleep?: boolean) => void;
+  paused?: boolean;
+  wearable?: string | null;
+  toy?: string | null;
   bubble?: string;
 };
 
@@ -446,113 +94,61 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, map = DEFAULT_MAP, onMap, onLocal, locked = false, speaker = "dog" }: Props) {
+export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, map = DEFAULT_MAP, onLocal, locked = false, speaker = "dog", paused = false, wearable, toy }: Props) {
   const shadowId = useId();
-  const [s, setS] = useState<S>(HOME);
-  const timers = useRef<number[]>([]);
-  const latest = useRef({ stage, onSay, onDone, onMap, map, petId });
-  latest.current = { stage, onSay, onDone, onMap, map, petId };
-  const running = useRef(false);
+  const [animated, setS] = useState<ScenePose>({ ...restingPose(map) });
+  const s = cue && !paused ? animated : restingPose(map);
+  const latest = useRef({ onSay, onDone });
+  useLayoutEffect(() => { latest.current = { onSay, onDone }; }, [onSay, onDone]);
   const period = backgroundAt(hour);
   const church = map === "church";
-  const sceneScale = church ? 0.58 : 1;
+  const sceneScale = church ? 0.85 : 1;
   const background = petMap(map).background ?? (church ? CHURCH_BACKGROUNDS : BACKGROUNDS)[period];
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
-  const [shown, setShown] = useState<string | null>(null);
-
   useEffect(() => {
     let cancelled = false;
-    const images: HTMLImageElement[] = [];
-    const load = (src: string, current = false) => {
+    const config = PETS[petId];
+    const pose = s.motion === "pet-sleep" || (!s.motion && face === "sleepy") ? "sleep" : s.motion === "pet-sit" ? "sit" : s.motion === "pet-lie" ? "lie" : null;
+    const urls = [config.standing[stage], ...(pose ? [config.poses[pose].src] : []), ...(map === "home" ? [DOGHOUSE] : [])];
+    const images = urls.map((src) => {
       const img = new Image();
-      images.push(img);
-      img.decoding = "async";
-      img.onload = () => {
-        if (cancelled) return;
-        setPhotos((prev) => ({ ...prev, [src]: true }));
-        if (current) window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-          if (!cancelled) setShown(src);
-        }));
-      };
-      img.onerror = () => { if (current && !cancelled) setShown(null); };
+      img.onload = () => { if (!cancelled) setPhotos((prev) => ({ ...prev, [src]: true })); };
       img.src = src;
-    };
-    load(background, true);
-    return () => {
-      cancelled = true;
-      images.forEach((img) => { img.onload = null; img.onerror = null; });
-    };
-  }, [background]);
-
-  useEffect(() => preloadArt([
-    ...Object.values(PETS).flatMap((pet) => [...Object.values(pet.standing), ...Object.values(pet.poses).map((p) => p.src)]),
-    DOGHOUSE,
-  ], (src) => setPhotos((prev) => ({ ...prev, [src]: true }))), []);
-
-  function run(plan: Plan) {
-    timers.current.forEach(window.clearTimeout);
-    timers.current = [];
-    running.current = true;
-    plan.steps.forEach(([t, patch]) => {
-      timers.current.push(
-        window.setTimeout(() => {
-          const { say, map: nextMap, asleep, ...rest } = patch;
-          if (say) latest.current.onSay(say, cue?.action === "priest" ? "priest" : "dog");
-          if (nextMap) latest.current.onMap?.(nextMap);
-          if (asleep) { running.current = false; latest.current.onDone?.(); }
-          setS((prev) => ({ ...prev, ...rest }));
-        }, t * SLOW)
-      );
+      return img;
     });
-    timers.current.push(
-      window.setTimeout(() => {
-        setS((prev) => ({ ...HOME, x: prev.x, y: prev.y, dir: prev.dir, dur: 400 }));
-        running.current = false;
-        latest.current.onDone?.();
-      }, plan.end * SLOW)
-    );
-  }
+    return () => { cancelled = true; images.forEach((img) => { img.onload = null; img.onerror = null; }); };
+  }, [petId, stage, map, s.motion, face]);
 
   useEffect(() => {
-    if (!cue) return;
-    const travel = (from: PetMap, direction: Dir, offset = 0): [number, Patch][] => [
-      [offset, { x: direction > 0 ? 205 : -45, y: 84, dir: direction, dur: 900, motion: "pet-trot" }],
-      [offset + 650, { map: neighborMap(from, direction).id, x: direction > 0 ? -45 : 205, dur: 0 }],
-      [offset + 1450, { x: 80, dur: 1000 }],
-      [offset + 2150, { motion: null }],
-    ];
-    if (cue.action === "map") {
-      run({ steps: travel(latest.current.map, cue.direction), end: 2300 });
-    } else if (cue.action === "sleep") {
-      if (latest.current.map !== "home") { latest.current.onDone?.(); return; }
-      run({ steps: [[0, { ...HOME, x: 115, y: 86, dir: 1, dur: 1000, motion: "pet-trot" }],
-        [750, { motion: "pet-sleep", asleep: true, say: "잠시 눈을 붙일게요…" }]], end: 5500 });
-    } else if (cue.action === "shop") {
-      const shop = SHOPS[cue.shop];
-      if (latest.current.map !== "street" || !shop) { latest.current.onDone?.(); return; }
-      const x = clamp(shop.x * 1.6, 27, 133);
-      run({ steps: [[0, { ...HOME, x, y: 80, dir: x >= s.x ? 1 : -1, dur: 1000, motion: "pet-trot" }],
-        [750, { motion: null, say: line(shop.line) }]], end: 2600 });
-    } else if (cue.action === "priest") {
-      run({ steps: [[0, { say: pick([...PRIEST_LINES]) }]], end: 2000 });
-    } else {
-      const config = PETS[latest.current.petId];
-      const plan = makePlan(cue.action, DOG_W[latest.current.stage] * config.scale * sceneScale, config.ratio);
-      if (cue.action === "walk" && Math.random() < 0.8) {
-        const direction = pick<Dir>([-1, 1]);
-        const from = latest.current.map;
-        plan.steps.push(...travel(from, direction, plan.end),
-          ...travel(neighborMap(from, direction).id, direction, plan.end + 2300));
-        plan.end += 4600;
+    if (!cue || paused || cue.action === "map") return;
+    const config = PETS[petId];
+    const plan = buildScenePlan(cue, { map, width: DOG_W[stage] * config.scale * sceneScale, ratio: config.ratio }, Math.random);
+    const started = performance.now();
+    let raf = 0, previous = -1, spoken = -1, cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      const elapsed = performance.now() - started;
+      let index = -1;
+      for (let i = 0; i < plan.keyframes.length; i++) { if (plan.keyframes[i].at <= elapsed) index = i; }
+      if (index !== previous) { previous = index; setS(sampleScenePlan(plan, elapsed)); }
+      for (let i = spoken + 1; i <= index; i++) {
+        const key = plan.keyframes[i].say;
+        if (key) latest.current.onSay(line(key));
+        spoken = i;
       }
-      run(plan);
-    }
-    // 새 행동은 이전 연출과 잠 깨는 타이머를 함께 취소한다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cue?.id]);
-
-  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+      if (elapsed >= plan.durationMs) {
+        setS(plan.finalPose);
+        latest.current.onDone?.(cue.id, cue.action === "sleep");
+        return;
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    if (cue.action === "priest") latest.current.onSay(PRIEST_LINES[Math.floor(Math.random() * PRIEST_LINES.length)], "priest");
+    if (cue.action === "sleep") latest.current.onSay("잠시 눈을 붙일게요…");
+    raf = window.requestAnimationFrame(tick);
+    return () => { cancelled = true; window.cancelAnimationFrame(raf); };
+  }, [cue, map, petId, stage, sceneScale, paused]);
 
   const c = skyAt(hour);
   const body = bodyAt(hour);
@@ -565,7 +161,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
   });
 
   return (
-    <div className="pet-scene relative h-full w-full">
+    <div className="pet-scene relative h-full w-full" data-paused={paused}>
     <svg
       viewBox="0 6 160 90"
       className="block h-full w-full"
@@ -610,11 +206,8 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       <rect y="66" width="160" height="30" fill={c.ground} />
 
       <g pointerEvents="none" className={s.scroll ? "pet-photo-pan" : undefined}>
-        {[...Object.values(BACKGROUNDS), ...Object.values(CHURCH_BACKGROUNDS), ...PET_MAPS.flatMap((m) => m.background ? [m.background] : [])].filter((src) => photos[src]).map((src) => (
-          <image key={src} href={src} x="0" y="6" width="160" height="90"
-            preserveAspectRatio="none" className="pet-photo-fade"
-            style={{ opacity: shown === src ? 1 : 0 }} />
-        ))}
+        {!failed[background] && <image href={background} x="0" y="6" width="160" height="90"
+          preserveAspectRatio="none" onError={() => setFailed((prev) => ({ ...prev, [background]: true }))} />}
       </g>
 
       {map !== "field" && !church && <rect pointerEvents="none" y="6" width="160" height="90"
@@ -622,17 +215,17 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
         opacity={period === "night" ? 0.55 : period === "dusk" ? 0.23 : period === "dawn" ? 0.17 : 0} />}
 
       <g pointerEvents="none" style={{ filter: `brightness(${light})` }}>
-        <g transform={church ? "translate(12 21) scale(0.68)" : undefined}>
+        {church && <g transform="translate(-19 0)">
         <ellipse cx="34" cy="78" rx="8" ry="2" fill={`url(#${shadowId})`} />
         {failed[PRIEST] ? <text x="34" y="70" fontSize="6" textAnchor="middle">신부님</text> :
           <image href={PRIEST} x="26" y="29" width="16" height="49" preserveAspectRatio="xMidYMax meet"
             onError={() => setFailed((prev) => ({ ...prev, [PRIEST]: true }))} />}
-        </g>
+        </g>}
         {map === "home" && <g role="img" aria-label="개집">
-          <ellipse cx="122" cy="82" rx="27" ry="4" fill={`url(#${shadowId})`} />
-          {photos[DOGHOUSE] && !failed[DOGHOUSE] ? <image href={DOGHOUSE} x="95" y="34" width="55" height="48"
+          <ellipse cx="138" cy="82" rx="18" ry="4" fill={`url(#${shadowId})`} />
+          {photos[DOGHOUSE] && !failed[DOGHOUSE] ? <image href={DOGHOUSE} x="120" y="48" width="36" height="36"
             onError={() => setFailed((prev) => ({ ...prev, [DOGHOUSE]: true }))} /> :
-            <g fill="#a4784e"><path d="M99 52 L122 35 L145 52 V81 H99Z" /><path d="M114 81 V66 A8 8 0 0 1 16 0 V81" fill="#382b25" /></g>}
+            <g transform="translate(55 25) scale(.65)" fill="#a4784e"><path d="M99 52 L122 35 L145 52 V81 H99Z" /><path d="M114 81 V66 A8 8 0 0 1 16 0 V81" fill="#382b25" /></g>}
         </g>}
       </g>
 
@@ -651,7 +244,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
           <g
             transform={`translate(${{ mouth: w * 0.47, back: 0, tail: -w * 0.47, head: w * 0.34 }[s.carry]} ${{ mouth: -h * 0.76, back: -h * 0.8, tail: -h * 0.33, head: -h * 1.0 }[s.carry]})`}
           >
-            <Ball scale={sceneScale} />
+            <Ball scale={sceneScale} toy={toy} />
           </g>
         ) : null}
         <PetDog
@@ -663,9 +256,10 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
           light={light}
           collar={collar}
           photos={photos}
+          wearable={wearable}
           onTap={() => {
             // 한 연출이 끝나기 전에는 다른 연출을 시작하지 않는다
-            if (!locked && !running.current) onLocal?.({ action: "tap", id: Date.now() });
+            if (!locked) onLocal?.({ action: "tap", id: Date.now() });
           }}
         />
       </g>
@@ -725,11 +319,12 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
         ) : null}
       </g>
 
+      {toy && !s.ball && !s.carry && <g transform={`translate(${map === "home" ? 88 : 128} 81)`}><Ball toy={toy} /></g>}
       {/* 도구·공·손 */}
       <g style={{ filter: `brightness(${light}) drop-shadow(0 0.5px 0.5px #17231d40)` }}>
       {s.ball ? (
         <g style={move(s.ball.x, s.ball.y, s.ball.dur)}>
-          <Ball scale={sceneScale} />
+          <Ball scale={sceneScale} toy={toy} />
         </g>
       ) : null}
       {s.item ? (
@@ -751,15 +346,15 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       className={`absolute top-[58%] flex h-11 w-11 items-center justify-center rounded-full text-xl text-white [text-shadow:0_1px_4px_#000] focus-visible:outline-2 disabled:opacity-40 ${direction < 0 ? "left-0" : "right-0"}`}
       aria-label={`${neighborMap(map, direction).name}(으)로 이동`} disabled={locked}
       onClick={() => onLocal?.({ action: "map", direction, id: Date.now() })}>{direction < 0 ? "‹" : "›"}</button>)}
-    <button type="button" className={`absolute min-h-11 w-[12%] min-w-11 rounded-xl focus-visible:outline-2 ${church ? "left-[16%] top-[38%] h-[38%]" : "left-[15%] top-[30%] h-[50%]"}`}
-      aria-label="신부님께 인사하기" disabled={locked} onClick={() => onLocal?.({ action: "priest", id: Date.now() })} />
+    {church && <button type="button" className={`absolute min-h-11 w-[12%] min-w-11 rounded-xl focus-visible:outline-2 ${church ? "left-[4%] top-[25%] h-[50%]" : "left-[15%] top-[30%] h-[50%]"}`}
+      aria-label="신부님께 인사하기" disabled={locked} onClick={() => onLocal?.({ action: "priest", id: Date.now() })} />}
     {map === "street" && SHOPS.map((shop, index) => <button key={shop.name} type="button"
       className="absolute flex min-h-11 w-[23%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded text-[clamp(11px,3vw,16px)] font-semibold text-[#30271e] focus-visible:outline-2 disabled:opacity-60"
       style={{ left: `${shop.x}%`, top: `${shop.y}%` }} aria-label={`${shop.name} 앞으로 가기`} disabled={locked}
       onClick={() => onLocal?.({ action: "shop", shop: index, id: Date.now() })}>{shop.name}</button>)}
     {bubble && <SpeechBubble text={bubble} label={speaker === "priest" ? "신부님의 말" : `${PETS[petId].name}의 말`}
-      x={speaker === "priest" ? (church ? 43 : 47) : s.x + s.dir * w * sc * 0.25}
-      y={speaker === "priest" ? (church ? 45 : 39) : s.y - h * sc} duration={s.dur} />}
+      x={speaker === "priest" ? 18 : s.x + s.dir * w * sc * 0.25}
+      y={speaker === "priest" ? 31 : s.y - h * sc} duration={s.dur} />}
     </div>
   );
 });

@@ -1,5 +1,9 @@
 import type { PetAction } from "./pet";
 import type { PetId } from "./pet-photos";
+import type { PetIdentity } from "./pet-identity";
+import type { PetMap } from "./pet-maps";
+import type { PetState } from "./pet";
+import type { Reward } from "./pet-progress";
 
 type Result = { data: unknown; error: { code?: string; message: string } | null };
 type Rpc = (name: string, args: Record<string, string | number>) => PromiseLike<Result>;
@@ -16,4 +20,73 @@ export async function petRequest(rpc: Rpc, petId: PetId, nickname: string, actio
     return { data: null, error: { message: "미네는 아직 준비 중이에요." }, petId: 1 as const, legacy: true };
   }
   return { ...await rpc(name, args), petId: 1 as const, legacy: true };
+}
+
+export type PetCommand = { requestId: string } & (
+  | { kind: "action"; pet: PetId; action: PetAction }
+  | { kind: "purchase"; item: string }
+  | { kind: "equip"; pet: PetId; slot: "wearable" | "toy"; item: string | null }
+  | { kind: "explore_begin"; map: PetMap; source: "map" | "walk" }
+  | { kind: "explore_finish"; ticket: string }
+  | { kind: "record_season"; entry: string }
+  | { kind: "walk_begin" }
+  | { kind: "walk_claim" | "walk_end"; session: string }
+);
+export type V6Result = {
+  ok: boolean; code: string; serverNow: string; requestId?: string; version?: number;
+  player?: { xp: number; level: number; coins: number };
+  reward?: Reward;
+  shared?: { applied: boolean; reason: string | null; pet: PetState };
+  inventory?: string[]; album?: string[]; badges?: string[];
+  equipment?: { pet_id: PetId; slot: "wearable" | "toy"; item_id: string | null }[];
+  daily?: { reward_actions: number; explore_finishes: number; walk_claims: number };
+  ticket?: { id: string; map_id: PetMap; eligible_at: string; expires_at: string } | null;
+  season?: string; retryAfterSeconds?: number;
+};
+export interface PetApi {
+  legacy(pet: PetId, nickname: string, action?: PetAction, legacy?: boolean): ReturnType<typeof petRequest>;
+  capabilities(): Promise<boolean>;
+  register(identity: PetIdentity, signal?: AbortSignal): Promise<V6Result>;
+  state(identity: PetIdentity, pet: PetId, signal?: AbortSignal): Promise<V6Result>;
+  execute(identity: PetIdentity, command: PetCommand, signal?: AbortSignal): Promise<V6Result>;
+  operation(identity: PetIdentity, requestId: string): Promise<V6Result>;
+}
+type V6Rpc = (name: string, args: Record<string, string | number | null>, signal?: AbortSignal) => PromiseLike<Result>;
+export function createPetApi(rpc: V6Rpc): PetApi {
+  const call = async (name: string, args: Record<string, string | number | null>, signal?: AbortSignal) => {
+    const { data, error } = await rpc(`domine_pet_${name}_v6`, args, signal);
+    if (error) throw new Error(error.code ?? "NETWORK_ERROR");
+    if (!data || typeof data !== "object" || !("ok" in data)) throw new Error("INVALID_RESPONSE");
+    return data as V6Result;
+  };
+  const auth = (i: PetIdentity) => ({ p_nickname: i.nickname, p_secret: i.secret });
+  return {
+    legacy: (pet, nickname, action, legacy) => petRequest((name, args) => rpc(name, args), pet, nickname, action, legacy),
+    async capabilities() {
+      const { data, error } = await rpc("domine_pet_capabilities_v6", {});
+      if (error?.code === "PGRST202") return false;
+      if (error) throw new Error(error.code ?? "NETWORK_ERROR");
+      if (!data || (data as { version?: number }).version !== 6) throw new Error("INVALID_RESPONSE");
+      return true;
+    },
+    register: (i, signal) => call("register", auth(i), signal),
+    state: (i, pet, signal) => call("state", { ...auth(i), p_pet: pet }, signal),
+    operation: (i, id) => call("operation", { ...auth(i), p_request_id: id }),
+    execute(i, command, signal) {
+      const args: Record<string, string | number | null> = { ...auth(i), p_request_id: command.requestId };
+      switch (command.kind) {
+        case "action": Object.assign(args, { p_pet: command.pet, p_action: command.action }); break;
+        case "purchase": args.p_item = command.item; break;
+        case "equip": Object.assign(args, { p_pet: command.pet, p_slot: command.slot, p_item: command.item }); break;
+        case "explore_begin": Object.assign(args, { p_map: command.map, p_source: command.source }); break;
+        case "explore_finish": args.p_ticket = command.ticket; break;
+        case "record_season": args.p_entry = command.entry; break;
+        case "walk_claim": case "walk_end": args.p_session = command.session; break;
+      }
+      return call(command.kind, args, signal);
+    },
+  };
+}
+export function acceptsResult(current: V6Result | null, next: V6Result) {
+  return next.player !== undefined && (next.version ?? -1) >= (current?.version ?? -1);
 }

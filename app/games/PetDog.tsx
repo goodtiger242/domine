@@ -7,7 +7,7 @@ import { PETS, poseAt, type PetId } from "@/lib/domine/pet-photos";
  * 자세 사진이 준비되면 교체하고, 못 받았으면 기존 사진·CSS 연출을 쓴다.
  * 이 파일만 바꾸면 그림을 통째로 교체할 수 있다.
  */
-export const DOG_W: Record<PetStage, number> = { baby: 32, young: 42, adult: 48 };
+export const DOG_W: Record<PetStage, number> = { baby: 18, young: 22, adult: 26 };
 export const RATIO = 622 / 900;
 
 type Props = {
@@ -23,9 +23,10 @@ type Props = {
   collar: string;
   photos: Record<string, boolean>;
   onTap?: () => void;
+  wearable?: string | null;
 };
 
-export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, collar, photos, onTap }: Props) {
+export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, collar, photos, onTap, wearable }: Props) {
   const config = PETS[petId];
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const pose = poseAt(motion, face);
@@ -33,6 +34,10 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
   const src = photo?.src ?? config.standing[stage];
   const width = DOG_W[stage] * config.scale * scale * (photo?.width ?? 1);
   const height = width * (photo?.ratio ?? config.ratio);
+  const garment = wearable && /^0(6[1-9]|7[0-2])$/.test(wearable) ? `/pet/catalog/${wearable}.webp` : null;
+  const bodyWear = wearable && ["066", "067", "068", "071", "072"].includes(wearable);
+  const hat = wearable === "070";
+  const garmentWidth = width * (bodyWear ? .66 : hat ? .45 : .3);
   const sad = face === "hungry" || face === "sad";
   const dirty = face === "dirty" && motion !== "pet-shake";
   const filter = `brightness(${light}) saturate(${sad ? 0.8 : 1})${dirty ? " sepia(0.35)" : ""}`;
@@ -63,6 +68,11 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
         <path d={config.collar} stroke={collar} strokeWidth="15" strokeLinecap="round" fill="none" />
         <path d="M641 150 Q690 174 730 218" stroke="#00000030" strokeWidth="3" strokeLinecap="round" fill="none" />
       </g>}
+      {garment && <image href={garment} pointerEvents="none"
+        x={bodyWear ? -width * .3 : width * .12}
+        y={-height * (hat ? 1.14 : bodyWear ? .73 : .77)}
+        width={garmentWidth} height={height * (bodyWear ? .66 : .4)}
+        preserveAspectRatio="xMidYMid meet" style={{ filter }} />}
     </g>
   );
 }

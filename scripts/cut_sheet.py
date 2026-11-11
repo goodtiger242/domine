@@ -29,7 +29,30 @@ def main() -> int:
     a = ap.parse_args()
 
     names = [n.strip() for n in a.names.split(",")]
-    rgb = np.asarray(Image.open(a.sheet).convert("RGB")).astype(np.float32)
+    source = Image.open(a.sheet).convert("RGBA")
+    rgba_source = np.asarray(source)
+    # Generated transparent item sheets keep their alpha, including holes and soft edges.
+    if rgba_source[..., 3].min() < 255:
+        if len(names) != a.cols * a.rows:
+            ap.error("names must match the grid")
+        out = Path(a.dest)
+        out.mkdir(parents=True, exist_ok=True)
+        for k, name in enumerate(names):
+            if not name or name == "-":
+                continue
+            col, row = k % a.cols, k // a.cols
+            im = source.crop((round(col * source.width / a.cols), round(row * source.height / a.rows),
+                              round((col + 1) * source.width / a.cols), round((row + 1) * source.height / a.rows)))
+            box = im.getchannel("A").getbbox()
+            if box is None:
+                raise ValueError(f"Empty cell: {name}")
+            im = im.crop(box)
+            im.thumbnail((a.width, a.width), Image.Resampling.LANCZOS)
+            p = out / f"{name}.webp"
+            im.save(p, "WEBP", quality=a.quality, method=6)
+            print(f"{name}: {im.width}x{im.height} {p.stat().st_size} bytes")
+        return 0
+    rgb = rgba_source[..., :3].astype(np.float32)
     H, W, _ = rgb.shape
     bg = np.array([int(a.bg[i : i + 2], 16) for i in (0, 2, 4)], np.float32)
     dist = np.sqrt(((rgb - bg) ** 2).sum(-1))
