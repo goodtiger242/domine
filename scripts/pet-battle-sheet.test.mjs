@@ -519,11 +519,29 @@ test("기세 100에서 결정기 활성, 사용하면 컷인과 금색 게이지
 test("배속 토글: 보통→2배속→빠르게 넘기기, 등장 연출이 그만큼 짧아진다", t => {
   const measure = clicks => {
     const h = mount(t, { encounter: encounter(), petId: 1, stage: "adult", onClose() {} });
-    for (let i = 0; i < clicks; i++) h.click(["배속 보통", "2배속", "빠르게 넘기기"][i]);
+    for (let i = 0; i < clicks; i++) h.click(["배속 보통", "3배속", "빠르게 넘기기"][i]);
     let ms = 0; while (h.phase === "intro" || h.phase === "playback") { h.advance(50); ms += 50; if (ms > 20000) break; }
     return ms;
   };
   const normal = measure(0), double = measure(1), skip = measure(2);
-  assert.ok(double <= normal / 1.8, `x2 (${double}) is about twice as fast as x1 (${normal})`);
-  assert.ok(skip <= normal / 3, `skip (${skip}) is much faster than x1 (${normal})`);
+  assert.ok(double <= normal / 2.5, `x3 (${double}) is much faster than x1 (${normal})`);
+  assert.ok(skip <= normal / 8, `skip (${skip}) is much faster than x1 (${normal})`);
+});
+
+test("기술 카드의 작은 ⓘ 버튼으로 상세를 본다(길게 누르기도 유지)", t => {
+  const h = mount(t, { encounter: encounter(), petId: 1, stage: "adult", onClose() {} });
+  h.settle(); h.click("기술");
+  const infos = nodes(h.tree, n => n.type === "button" && n.props.className === "pet-battle-card-info");
+  assert.equal(infos.length, h.actions().length, "one info button per card");
+  infos[0].props.onClick({ stopPropagation() {} }); h.render();
+  assert.equal(nodes(h.tree, n => n.type === "dialog" && n.props.className === "pet-battle-details").length, 1);
+});
+
+test("확인 창이 닫히며 보낸 늦은 뒤로가기가 새 전투를 닫지 않는다(연속 전투 회귀)", t => {
+  let closed = 0;
+  const h = mount(t, { encounter: encounter(), petId: 1, stage: "adult", onClose() { closed++; } });
+  assert.equal(h.listeners.get("popstate"), undefined, "no popstate listener yet: a stale back from the previous sheet cannot reach it");
+  h.advance(150);
+  assert.equal(typeof h.listeners.get("popstate"), "function");
+  h.listeners.get("popstate")(); assert.equal(closed, 1, "a real back press after that still closes the battle");
 });

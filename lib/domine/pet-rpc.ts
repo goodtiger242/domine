@@ -47,7 +47,7 @@ export type V6Result = {
   season?: string; retryAfterSeconds?: number;
 };
 export type PetCapabilities = { version: 6; sharedEconomy: boolean; explorationThemes: number; v9: boolean; v10: boolean; perPetShop: boolean; history: boolean; busyLock?: boolean };
-export type PetHistoryEntry = { nickname: string; pet: PetId; kind: "action" | "purchase" | "equip" | "levelup" | "discover"; detail: string | null; at: string };
+export type PetHistoryEntry = { nickname: string; pet: PetId; kind: "action" | "purchase" | "equip" | "levelup" | "discover" | "battle" | "pickup"; detail: string | null; at: string };
 export class PetRpcError extends Error {
   definitive: boolean;
   constructor(code: string, definitive: boolean) { super(code); this.definitive = definitive; }

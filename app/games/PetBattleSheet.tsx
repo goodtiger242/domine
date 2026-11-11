@@ -105,8 +105,8 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   const [reducedPref, setReduced] = useState(false);
   const [speedMode, setSpeedMode] = useState<0 | 1 | 2>(0);
   const reduced = reducedPref || speedMode === 2;
-  const factor = [1, 2, 5][speedMode];
-  const fast = (ms: number) => Math.round(ms / factor);
+  const factor = [1, 3, 14][speedMode];
+  const fast = (ms: number) => ms > 0 ? Math.max(16, Math.round(ms / factor)) : 0;
   const [filter, setFilter] = useState<MoveFilter>("all"), [page, setPage] = useState(0);
   const [previewCost, setPreviewCost] = useState(0);
   const [detailSide, setDetailSide] = useState<Side | null>(null);
@@ -134,14 +134,20 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const updateMotion = () => setReduced(preference.matches);
     updateMotion(); preference.addEventListener("change", updateMotion);
-    let popped = false;
-    history.pushState({ ...history.state, petBattle: heading }, "");
+    let popped = false, armed = false;
     const back = () => { popped = true; closeRef.current(); };
-    window.addEventListener("popstate", back);
+    // The confirm sheet that opened this battle calls history.back() as it closes; that popstate lands a moment later and would
+    // close this battle at once (a second fight never started). Register only after it has passed.
+    const arm = setTimeout(() => {
+      armed = true;
+      history.pushState({ ...history.state, petBattle: heading }, "");
+      window.addEventListener("popstate", back);
+    }, 150);
     return () => {
-      window.removeEventListener("popstate", back);
+      clearTimeout(arm);
+      if (armed) window.removeEventListener("popstate", back);
       preference.removeEventListener("change", updateMotion);
-      if (!popped && history.state?.petBattle === heading) history.back();
+      if (armed && !popped && history.state?.petBattle === heading) history.back();
       modal?.close(); Object.assign(body.style, saved);
       window.scrollTo({ top: scrollY, behavior: "instant" }); opener?.focus({ preventScroll: true });
     };
@@ -213,7 +219,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   useEffect(() => {
     if (!playback || paused) return;
     const base = typing ? 18 : cue?.text ? 900 : cue?.moveName || cue?.result || cue?.rivalText || cue?.playerText ? cue.duration ?? 1200 : reduced && cue?.motion && !cue.moveFx ? cue.fx || cue.critical ? 300 : 0 : cue?.duration ?? 0;
-    const delay = typing ? base : fast(base);
+    const delay = fast(base);
     const timer = setTimeout(() => {
       if (typing) setPlayback({ ...playback, revealed: playback.revealed + 1 });
       else advance();
@@ -359,7 +365,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   return <dialog ref={dialog} className="pet-battle-screen" style={{ "--arena-bg": `url(${cellBackground(encounter.cellId, hour)})` } as CSSProperties} aria-labelledby={heading} tabIndex={-1} onCancel={e => { e.preventDefault(); if (paused) { closeDetail(); } else if (menu === "moves" && !playback) { setMenu("main"); setPreview(""); } else leave(); }}>
     <div className="pet-battle-scene" data-phase={phase} data-paused={paused} data-impact={cue?.motion === "effective" || !!cue?.critical} data-heavy={cue?.moveFx === "T63" && !cue.missed} key={attempt.current} onClick={intro && !paused ? advance : undefined}>
       <div ref={arena} className="pet-battle-arena">
-        <header className="pet-battle-topline"><h2 id={heading} className="pet-battle-sr">동네 겨루기</h2>{!finished && <button type="button" className="pet-battle-speed" aria-label={["배속 보통", "2배속", "빠르게 넘기기"][speedMode]} aria-pressed={speedMode > 0} onClick={() => setSpeedMode(((speedMode + 1) % 3) as 0 | 1 | 2)}>{["▶", "▶▶", "⏭"][speedMode]}</button>}{!finished && <span key={shown.round} className="pet-battle-round" data-urgency={shown.round >= MAX_ROUNDS ? "last" : shown.round >= MAX_ROUNDS - 1 ? "near" : shown.round >= MAX_ROUNDS - 2 ? "late" : undefined}>라운드 {shown.round}/{MAX_ROUNDS}</span>}</header>
+        <header className="pet-battle-topline"><h2 id={heading} className="pet-battle-sr">동네 겨루기</h2>{!finished && <button type="button" className="pet-battle-speed" aria-label={["배속 보통", "3배속", "빠르게 넘기기"][speedMode]} aria-pressed={speedMode > 0} onClick={() => setSpeedMode(((speedMode + 1) % 3) as 0 | 1 | 2)}>{["▶", "▶▶", "⏭"][speedMode]}</button>}{!finished && <span key={shown.round} className="pet-battle-round" data-urgency={shown.round >= MAX_ROUNDS ? "last" : shown.round >= MAX_ROUNDS - 1 ? "near" : shown.round >= MAX_ROUNDS - 2 ? "late" : undefined}>라운드 {shown.round}/{MAX_ROUNDS}</span>}</header>
         {!finished && hud("opponent")}{fighter("opponent")}{fighter("player")}{!finished && hud("player")}
         {moveFx && <div key={`${shown.round}-${playback?.index}-move`} className="pet-battle-move-fx" data-side={cue?.side} data-trail={moveFx.trail} data-local={moveFx.reaction === "none"} data-missed={cue?.missed} style={{ "--fx-duration": `${fast(moveFx.duration)}ms` } as CSSProperties} aria-hidden="true">
           {moveFx.elements.map((element, i) => <span key={i} className="pet-battle-fx-part" style={{ "--part": i, animationName: `pet-trail-${moveFx.trail}` } as CSSProperties}>
@@ -415,6 +421,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
                             <span className="pet-battle-move-copy"><span className="pet-battle-move-title"><strong title={label}>{label}</strong></span><small>{damage ? <>피해 {damage.base}{damage.delta !== 0 && <span className="pet-battle-delta" data-good={damage.delta > 0}> {damage.delta > 0 ? "↑+" : "↓−"}{Math.abs(damage.delta)}</span>}</> : move ? compactEffect(move, battle) : `기력 +${REST_ENERGY}`}</small></span>
                             <span className="pet-battle-cost" data-finisher={!!move?.finisher}>{move?.finisher ? "기세" : costBadge(cost)}{insufficient && <small>{move?.finisher ? "부족" : "기력 부족"}</small>}</span>
                           </button>
+                          <button type="button" className="pet-battle-card-info" aria-label={`${label} 상세 보기`} onClick={e => { e.stopPropagation(); showDetail(); }}>ⓘ</button>
                         </div>;
                       })}
                       {!items.length && <p className="pet-battle-empty">해당 기술 없음</p>}

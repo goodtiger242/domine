@@ -61,7 +61,27 @@ assert.equal(groupHistory([row(0), row(61)]).length, 2);
 assert.equal(groupHistory([row(0), row(1, {pet:2}), row(2, {kind:"equip"}), row(3, {detail:"treat"})]).length, 2);
 assert.ok(!renderToStaticMarkup(createElement(PetHistoryList,{entries})).includes("착용"));
 const limited = groupHistory(Array.from({length:20}, (_, i) => row(i * 61)));
-assert.equal(limited.length, 10); assert.equal(limited[0].at, row(19 * 61).at);
+assert.equal(limited.length, 8); assert.equal(limited[0].at, row(19 * 61).at);
 const repeated = renderToStaticMarkup(createElement(PetHistoryList, {entries:[...entries, entries[0]]}));
 assert.match(repeated, /돌봄 2번 \(밥2\)/);
 console.log("Pet history: short rows, one load, errors, 30-minute grouping across interleaved rows and 12-row limit passed.");
+
+// Fights and new-album lines merge instead of piling up; coin pickups and equips stay out.
+{
+  const now = Date.now(), stamp = n => new Date(now - n * 1000).toISOString();
+  const many = [
+    ...[1, 2, 3, 4, 5].map(n => ({ nickname: "민수", pet: 1, kind: "battle", detail: `참새 ${n} - ${n % 2 ? "win" : "lose"}`, at: stamp(n * 10) })),
+    ...[1, 2, 3].map(n => ({ nickname: "민수", pet: 2, kind: "discover", detail: "001", at: stamp(n * 20) })),
+    { nickname: "민수", pet: 1, kind: "pickup", detail: "3", at: stamp(5) },
+    { nickname: "민수", pet: 1, kind: "equip", detail: "061", at: stamp(6) },
+    { nickname: "민수", pet: 1, kind: "levelup", detail: "2", at: stamp(7) },
+  ];
+  const rows = groupHistory(many);
+  assert.equal(rows.length, 3, "levelup + one merged fight line + one merged album line");
+  const texts = rows.map(historyText);
+  assert.ok(texts.some(text => text.includes("대결 5번 (승 3 · 패 2)")), texts.join("|"));
+  assert.ok(texts.some(text => text.includes("새 도감 3개")));
+  assert.ok(texts.every(text => !text.includes("코인을 주웠어요")));
+  assert.ok(groupHistory(Array.from({ length: 30 }, (_, i) => ({ nickname: "민수", pet: 1, kind: "levelup", detail: String(i + 2), at: stamp(i) }))).length <= 8);
+  assert.equal(historyText({ nickname: "민수", pet: 1, kind: "battle", detail: "참새 햇깨알 - win", at: stamp(1) }), "⚔️ 민수 · 도미 참새 햇깨알 승리");
+}

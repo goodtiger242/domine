@@ -41,6 +41,8 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
   const [slot, setSlot] = useState(encounterSlot);
   const [wins, setWins] = useState<string[]>([]);
   const [animalMap, setAnimalMap] = useState(false), [noOpponent, setNoOpponent] = useState(false);
+  useEffect(() => { try { setAnimalMap(window.localStorage.getItem("domine-pet-map-animals") === "1"); } catch { /* Default: hidden. */ } }, []);
+  const rememberAnimals = (visible: boolean) => { setAnimalMap(visible); try { window.localStorage.setItem("domine-pet-map-animals", visible ? "1" : "0"); } catch { /* Session only. */ } };
   const [storageError, setStorageError] = useState("");
   const [nameSearch, setNameSearch] = useState(""), [connecting, setConnecting] = useState(false);
   const query = nameSearch.normalize("NFC").trim();
@@ -122,7 +124,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     return () => clearInterval(timer);
   }, [game.active, sheet]);
   function open(next: Sheet) { setNoOpponent(false); game.pause(next === "battle"); setSheet(next); }
-  function openMap(animals = false) { setAnimalMap(animals); open("map"); }
+  function openMap(animals = false) { if (animals) rememberAnimals(true); open("map"); }
   function startBattle(selected?: Encounter) {
     if (sheet || locked) return;
     if (!game.registered) { game.setMessage("이름을 먼저 입력해 주세요"); return; }
@@ -215,7 +217,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     {sheet === "encounter" && <PetEncounterSheet encounters={currentEncounters} selected={encounter} petId={game.petId} onSelect={setEncounter} onStart={confirmBattle} onClose={close} />}
     {sheet === "battle" && encounter && <PetBattleSheet key={`${encounter.id}:${game.petId}`} encounter={encounter} petId={game.petId} condition={pet ?? undefined} stage={stage} hour={hour} onClose={close} onWin={winBattle}
       kingApi={game.kingApi} identity={game.identity} firstWin={!!king.state && !king.state.encyclopedia.some(e => e.individualId === encounter.individual.id && e.wins > 0)} onSettled={king.settled} />}
-    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={sharedWins} careLevel={playerLevel} showAnimals={animalMap}
+    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={sharedWins} careLevel={playerLevel} showAnimals={animalMap} onAnimals={rememberAnimals}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
     {(sheet === "shop" || sheet === "bag") && <PetShopSheet bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={game.execute} onClose={close} onSelectPet={game.selectPet} multiPet={game.multiPet} onShop={() => setSheet("shop")} />}
     {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}

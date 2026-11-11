@@ -4,9 +4,9 @@ import { useState } from "react";
 import { PET_WORLD, worldCell } from "@/lib/domine/pet-world";
 import PetSheet from "./PetSheet";
 
-export default function PetWorldSheet({ current, visited, onMove, onClose, slot, wins, careLevel = 1, showAnimals = false }: {
+export default function PetWorldSheet({ current, visited, onMove, onClose, slot, wins, careLevel = 1, showAnimals = false, onAnimals }: {
   current: string; visited: string[]; onMove: (to: string) => void; onClose: () => void;
-  slot: number; wins: readonly string[]; careLevel?: number; showAnimals?: boolean;
+  slot: number; wins: readonly string[]; careLevel?: number; showAnimals?: boolean; onAnimals?: (visible: boolean) => void;
 }) {
   const [selected, setSelected] = useState(current);
   const cell = worldCell(selected);
@@ -17,7 +17,7 @@ export default function PetWorldSheet({ current, visited, onMove, onClose, slot,
     <div><button type="button" data-primary onClick={() => onMove(cell.id)}>이동</button>
       <button type="button" onClick={() => setSelected(current)}>취소</button></div>
   </div>}>
-    <p className="pet-sheet-note"><button type="button" className="pet-world-zoom" aria-pressed={animals} onClick={() => setAnimals(!animals)}>{animals ? "🐾 동물 숨기기" : "🐾 동물 보기"}</button> <button type="button" className="pet-world-zoom" aria-pressed={zoom} onClick={() => { setZoom(!zoom); if (!zoom) requestAnimationFrame(() => document.querySelector(".pet-world-grid [aria-current=location]")?.scrollIntoView({ block: "center", inline: "center" })); }}>{zoom ? "전체 보기" : "확대"}</button></p>
+    <p className="pet-sheet-note"><button type="button" className="pet-world-zoom" aria-pressed={animals} onClick={() => { setAnimals(!animals); onAnimals?.(!animals); }}>{animals ? "🐾 동물 숨기기" : "🐾 동물 보기"}</button> <button type="button" className="pet-world-zoom" aria-pressed={zoom} onClick={() => { setZoom(!zoom); if (!zoom) requestAnimationFrame(() => document.querySelector(".pet-world-grid [aria-current=location]")?.scrollIntoView({ block: "center", inline: "center" })); }}>{zoom ? "전체 보기" : "확대"}</button></p>
     <div className="pet-world-scroll" data-zoom={zoom} tabIndex={0} aria-label="동네 지도, 확대하면 상하좌우로 스크롤">
       <div className="pet-world-grid" role="group" aria-label="서쪽 A열부터 동쪽 J열, 북쪽 1행부터 남쪽 10행">
         {PET_WORLD.map((place) => {

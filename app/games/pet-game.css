@@ -778,3 +778,9 @@
 /* Speed toggle (x1 / x2 / skip) at the top of a battle. */
 .pet-battle-speed { position: absolute; z-index: 4; pointer-events: auto; top: 10px; right: 10px; min-width: 40px; height: 30px; padding: 0 8px; border: 1px solid #ffffff55; border-radius: 15px; background: #101b2edb; color: #ffe9b0; font-size: 12px; font-weight: 800; letter-spacing: -1px; }
 .pet-battle-speed[aria-pressed=true] { background: #f4cd69; color: #30281b; }
+/* Small detail button on every skill card (the long-press still works too). */
+.pet-battle-card { position: relative; }
+.pet-battle-actions .pet-battle-card .pet-battle-card-info { position: absolute; top: 0; right: 0; z-index: 2; width: 22px; min-width: 22px; height: 22px; min-height: 22px; padding: 0; border: 0; border-radius: 11px; background: transparent; box-shadow: none; color: #ffffffb8; font-size: 13px; line-height: 22px; }
+.pet-battle-actions .pet-battle-card .pet-battle-card-info:active { transform: none; box-shadow: none; }
+.pet-battle-card-info::after { content: ""; position: absolute; inset: -4px; }
+.pet-battle-card .pet-battle-cost { margin-top: 9px; }
