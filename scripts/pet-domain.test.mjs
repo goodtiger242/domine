@@ -89,7 +89,7 @@ const calls=[]; let response;
 const api=createPetApi(async(name,args)=>{calls.push({name,args});return response;});
 response={data:null,error:{code:"PGRST202",message:"missing"}}; assert.equal(await api.capabilities(),false);
 for(const code of ["42501","500","NETWORK_ERROR"]) {response={data:null,error:{code,message:"error"}}; await assert.rejects(api.capabilities());}
-response={data:{version:6},error:null};assert.deepEqual(await api.capabilities(),{version:6,sharedEconomy:false,explorationThemes:5,v9:false,v10:false,perPetShop:false,history:false});
+response={data:{version:6},error:null};assert.deepEqual(await api.capabilities(),{version:6,sharedEconomy:false,explorationThemes:5,v9:false,v10:false,perPetShop:false,history:false,busyLock:false});
 const identity={nickname:"김경석",secret:token};
 const command={kind:"action",pet:2,action:"feed",requestId:"00000000-0000-4000-8000-000000000001"};
 const storage=new Map();
@@ -107,7 +107,7 @@ const beforeRegion=calls.length;
 assert.equal((await api.execute(identity,newRegion)).code,"SERVER_UPDATE_REQUIRED");
 assert.equal(calls.length,beforeRegion,"new themes must not reach an old server");
 response={data:{version:6,sharedEconomy:true,explorationThemes:24,v9:true,v10:true,perPetShop:true,history:true},error:null};
-assert.deepEqual(await api.capabilities(),response.data);
+assert.deepEqual(await api.capabilities(),{...response.data,busyLock:false});
 response={data:{ok:true,code:"OK",serverNow:"2026-11-11T00:00:00Z",version:1,player:{xp:8,level:1,coins:4}},error:null};
 await api.execute(identity,command); await api.execute(identity,command);
 assert.deepEqual(calls.at(-1),calls.at(-2)); assert.equal(calls.at(-1).name,"domine_pet_action_v6");

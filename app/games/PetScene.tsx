@@ -192,7 +192,7 @@ export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face,
     let raf = 0, previous = -1, spoken = -1, cancelled = false;
     const tick = () => {
       if (cancelled) return;
-      const elapsed = performance.now() - started;
+      const elapsed = Math.max(performance.now() - started, cue.endsAt ? plan.durationMs - (cue.endsAt - Date.now()) : 0);
       let index = -1;
       for (let i = 0; i < plan.keyframes.length; i++) { if (plan.keyframes[i].at <= elapsed) index = i; }
       if (index !== previous) { previous = index; setS(sampleScenePlan(plan, elapsed)); }

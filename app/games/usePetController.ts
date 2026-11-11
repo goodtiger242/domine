@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { createPetApi, acceptsResult, PetRpcError, supportsExploration, type PetApi, type PetCapabilities, type PetCommand, type V6Result } from "@/lib/domine/pet-rpc";
+import { createPetApi, acceptsResult, PetRpcError, supportsExploration, type PetApi, type PetBusy, type PetCapabilities, type PetCommand, type V6Result } from "@/lib/domine/pet-rpc";
 import { createClient } from "@/lib/supabase/client";
 import { secretForName, normalizeNickname, registrationConfirmed, saveIdentity, storageAvailable, type PetIdentity } from "@/lib/domine/pet-identity";
 import { rewardDisplay } from "@/lib/domine/pet-progress";
@@ -23,8 +23,8 @@ function sceneDelay(ms: number, signal: AbortSignal) {
 }
 const safeGet = (key: string) => { try { return localStorage.getItem(key) ?? ""; } catch { return ""; } };
 const errorText: Record<string, string> = {
-  AUTH_FAILED: "이름을 다시 선택해 주세요",
-  NICKNAME_TAKEN: "이름을 다시 선택해 주세요",
+  AUTH_FAILED: "이름을 다시 입력해 주세요",
+  NICKNAME_TAKEN: "이름을 다시 입력해 주세요",
   SERVER_UPDATE_REQUIRED: "서버 업데이트 대기 중(새 지역 탐험은 아직)",
   INSUFFICIENT_COINS: "코인이 조금 더 필요해요.", NOT_OWNED: "먼저 구매해 주세요.",
   INVALID_INPUT: "입력 내용을 확인해 주세요.", REQUEST_CONFLICT: "요청이 달라 기록을 확인하지 못했어요.",
@@ -57,6 +57,10 @@ export function usePetController(injectedApi?: PetApi) {
   const [shared, setShared] = useState<PetState | null>(null);
   const [personal, setPersonal] = useState<V6Result | null>(null);
   const personalRef = useRef<V6Result | null>(null);
+  const petStates = useRef<Partial<Record<PetId, V6Result>>>({});
+  const [busyPets, setBusyPets] = useState<Partial<Record<PetId, PetBusy & { until: number }>>>({});
+  const busyRef = useRef(busyPets);
+  const [autoAttempts, setAutoAttempts] = useState(0);
   const [feedback, setFeedback] = useState<{ id: number; result: V6Result; previousLevel: number } | null>(null);
   const [message, setMessage] = useState("");
   const [rewardNotice, setRewardNotice] = useState("");
@@ -78,8 +82,22 @@ export function usePetController(injectedApi?: PetApi) {
   const host = useRef<HTMLDivElement>(null);
   const pendingKey = (i: PetIdentity) => `domine-pet-pending:${i.nickname.toLowerCase()}`;
   const current = useCallback((g: number, i: PetIdentity | null, selected: PetId) => alive.current && generation.current === g && identityRef.current === i && petRef.current === selected, []);
-  const apply = useCallback((result: V6Result, show = false) => {
-    if (result.pet !== undefined && result.pet !== petRef.current) return;
+  const apply = useCallback((result: V6Result, show = false, replay = false, elapsed = 0) => {
+    const selected = result.pet ?? petRef.current;
+    if (!acceptsResult(petStates.current[selected] ?? null, result)) return;
+    petStates.current[selected] = result;
+    if (!replay && "busy" in result) {
+      busyRef.current = { ...busyRef.current, [selected]: result.busy ? { ...result.busy, until: Date.now() + Math.max(0, result.busy.remainingMs - elapsed) } : undefined };
+      setBusyPets(busyRef.current);
+    }
+    if (selected !== petRef.current) {
+      const prior = personalRef.current;
+      if (prior && (result.version ?? -1) >= (prior.version ?? -1)) {
+        personalRef.current = { ...prior, coins: result.coins, levels: result.levels, album: result.album, equipment: result.equipment };
+        setPersonal(personalRef.current);
+      }
+      return;
+    }
     const prior = personalRef.current;
     const previousLevel = prior?.levels?.[petRef.current] ?? prior?.player?.level ?? result.player?.level ?? 1;
     if (acceptsResult(prior, result)) {
@@ -97,12 +115,13 @@ export function usePetController(injectedApi?: PetApi) {
   }, []);
   const refresh = useCallback(async () => {
     const g = generation.current, selected = petRef.current, i = identityRef.current, seq = ++readSequence.current;
+    const started = Date.now();
     try {
       if (capabilityRef.current === "ready" && i && registeredRef.current) {
         const result = await api.state(i, selected);
         if (!current(g, i, selected) || seq !== readSequence.current) return;
         if (!result.ok) { setMessage(errorText[result.code] ?? "우리 강아지 상태를 확인하지 못했어요."); return; }
-        apply(result);
+        apply(result, false, false, Date.now() - started);
         if (result.shared) setShared(result.shared.pet);
       } else {
         const result = await api.legacy(selected, nickRef.current, undefined, legacy.current);
@@ -118,46 +137,57 @@ export function usePetController(injectedApi?: PetApi) {
   const execute = useCallback(async (command: PetCommand, retry = false) => {
     const i = identityRef.current;
     if (!i || !registeredRef.current || capabilityRef.current !== "ready") return;
-    if (pending.current && !retry) { setMessage("보상 확인 중이라 이번엔 코인이 없어요"); return; }
+    if (pending.current && !retry) return;
     if (!retry && command.kind === "explore_begin" && !supportsExploration(featuresRef.current?.v9 === true, command.map)) {
       setMessage(errorText.SERVER_UPDATE_REQUIRED); return;
     }
-    const g = generation.current, selected = petRef.current;
+    const valid = () => alive.current && identityRef.current === i && pending.current?.requestId === command.requestId;
     if (retry && pending.current?.requestId !== command.requestId) return;
+    if (retry && machineRef.current.command === "pending") return;
     try { localStorage.setItem(pendingKey(i), JSON.stringify(command)); }
     catch { setMessage("기기에 기록을 저장할 수 없어 개인 보상을 잠시 멈췄어요."); return; }
     pending.current = command;
+    if (!retry) { setAutoAttempts(0); setMessage(""); }
     dispatch({ type: "request", id: command.requestId });
     abort.current?.abort();
     const controller = new AbortController(); abort.current = controller;
     if (commandTimer.current) clearTimeout(commandTimer.current);
     commandTimer.current = setTimeout(() => {
-      if (!current(g, i, selected) || pending.current?.requestId !== command.requestId) return;
+      if (!valid()) return;
       controller.abort(); dispatch({ type: "uncertain", id: command.requestId });
     }, 8000);
     let mutationAttempted = !retry;
+    const started = Date.now();
     try {
       let result: V6Result;
       if (retry) {
         result = await api.operation(i, command.requestId);
-        if (!current(g, i, selected) || controller.signal.aborted) return;
+        if (!valid() || controller.signal.aborted) return;
         if (result.code === "NOT_FOUND") { mutationAttempted = true; result = await api.execute(i, command, controller.signal); }
       } else result = await api.execute(i, command, controller.signal);
-      if (!current(g, i, selected) || controller.signal.aborted || pending.current?.requestId !== command.requestId) return;
+      if (!valid() || controller.signal.aborted) return;
       // A lookup rate limit does not establish whether an earlier mutation committed.
       if (retry && result.code === "RATE_LIMITED") { dispatch({ type: "uncertain", id: command.requestId }); return; }
       pending.current = null;
       try { localStorage.removeItem(pendingKey(i)); } catch { /* Same ID remains safe to replay. */ }
       dispatch({ type: "settled", id: command.requestId });
-      apply(result, true);
+      apply(result, true, retry, Date.now() - started);
       ++readSequence.current;
-      if (result.pet !== undefined && result.pet !== selected) void refresh();
-      if (result.shared && (command.kind === "action" || command.kind === "equip") && command.pet === selected) setShared(result.shared.pet);
-      if (!result.ok && !["ALREADY_OWNED", "TOO_EARLY", "EXPIRED"].includes(result.code)) setMessage(errorText[result.code] ?? "우리 강아지 상태를 확인하지 못했어요.");
+      if (retry || (result.pet !== undefined && result.pet !== petRef.current)) void refresh();
+      if (result.shared && (command.kind === "action" || command.kind === "equip") && command.pet === petRef.current) setShared(result.shared.pet);
+      if (!retry && result.ok && command.kind === "action" && featuresRef.current?.busyLock && command.pet === petRef.current && !visualLocked(machineRef.current)) {
+        const duration = Math.min(command.durationMs ?? SCENE_DURATION[command.action], (busyRef.current[command.pet]?.until ?? Date.now()) - Date.now());
+        if (duration > 0) {
+          const id = ++idCounter.current;
+          dispatch({ type: "act", id, now: Date.now(), duration });
+          setCue({ action: command.action, id, endsAt: Date.now() + duration });
+        }
+      }
+      if (!result.ok && !["BUSY", "ALREADY_OWNED", "TOO_EARLY", "EXPIRED"].includes(result.code)) setMessage(errorText[result.code] ?? "우리 강아지 상태를 확인하지 못했어요.");
       else setMessage("");
       if (result.ok && command.kind === "purchase") vibrate(15);
     } catch (error) {
-      if (!current(g, i, selected) || pending.current?.requestId !== command.requestId) return;
+      if (!valid() || controller.signal.aborted) return;
       // A failed lookup cannot establish whether the original mutation committed.
       if (mutationAttempted && error instanceof PetRpcError && error.definitive) {
         pending.current = null;
@@ -168,7 +198,27 @@ export function usePetController(injectedApi?: PetApi) {
     } finally {
       if (abort.current === controller && commandTimer.current) clearTimeout(commandTimer.current);
     }
-  }, [api, apply, current, dispatch, refresh]);
+  }, [api, apply, dispatch, refresh]);
+
+  useEffect(() => {
+    if (machine.command !== "uncertain" || autoAttempts >= 3) return;
+    const timer = setTimeout(() => {
+      if (!pending.current) return;
+      setAutoAttempts((count) => count + 1);
+      void execute(pending.current, true);
+    }, [1500, 3000, 6000][autoAttempts]);
+    return () => clearTimeout(timer);
+  }, [machine.command, machine.operationId, autoAttempts, execute]);
+
+  const busy = busyPets[petId];
+  useEffect(() => {
+    if (!busy) return;
+    const timer = setTimeout(() => {
+      busyRef.current = { ...busyRef.current, [petId]: undefined };
+      setBusyPets(busyRef.current);
+    }, Math.max(0, busy.until - Date.now()));
+    return () => clearTimeout(timer);
+  }, [busy, petId]);
 
   const startExploration = useCallback((map: PetMap, source: "map" | "walk") => {
     void execute({ kind: "explore_begin", map, source, requestId: crypto.randomUUID() });
@@ -239,26 +289,28 @@ export function usePetController(injectedApi?: PetApi) {
     }
   }, [dispatch, startExploration, visit, worldReady]);
   const care = useCallback((action: PetAction | "sleep") => {
-    if (visualLocked(machineRef.current)) return;
-    void localScene({ action, id: 0 });
-    if (!registeredRef.current) setMessage("구경 중이에요 · 내 이름을 선택하면 코인이 쌓여요");
+    if (!worldReady || visualLocked(machineRef.current) || (busyRef.current[petRef.current]?.until ?? 0) > Date.now()) return;
+    const waitForServer = featuresRef.current?.busyLock && registeredRef.current && action !== "sleep";
+    if (waitForServer && pending.current) return;
+    if (!waitForServer) void localScene({ action, id: 0 });
+    if (!registeredRef.current) setMessage("내 이름을 입력하면 함께 키울 수 있어요");
     if (action === "sleep") return;
     const i = identityRef.current;
     if (i && registeredRef.current && capabilityRef.current === "ready") {
-      void execute({ kind: "action", pet: petRef.current, action, requestId: crypto.randomUUID() });
+      void execute({ kind: "action", pet: petRef.current, action, durationMs: SCENE_DURATION[action], requestId: crypto.randomUUID() });
     } else if (nickRef.current && capabilityRef.current === "missing") {
       const selected = petRef.current, g = generation.current;
       void api.legacy(selected, nickRef.current, action, legacy.current)
         .then(() => { if (current(g, i, selected)) void refresh(); })
         .catch(() => { if (current(g, i, selected)) setMessage("공동 기록을 확인하지 못했어요."); });
     }
-  }, [api, current, execute, localScene, refresh]);
+  }, [api, current, execute, localScene, refresh, worldReady]);
 
   const connect = useCallback(async (raw: string) => {
     if (registrationPending.current) return;
     setMessage("");
     const nick = normalizeNickname(raw);
-    if (!nick) { setMessage("청년회 명단에서 이름을 선택해 주세요."); return; }
+    if (!nick) { setMessage("도미네 청년회 이름을 정자로 사용해주세요"); return; }
     if (pending.current && nick !== identityRef.current?.nickname) return;
     if (capabilityRef.current === "missing") {
       nickRef.current = nick; setNickname(nick);
@@ -292,6 +344,7 @@ export function usePetController(injectedApi?: PetApi) {
       setRewardNotice("");
       ++generation.current; ++readSequence.current;
       identityRef.current = candidate; setIdentity(candidate); nickRef.current = nick; setNickname(nick);
+      petStates.current = {}; busyRef.current = {}; setBusyPets({}); setAutoAttempts(0);
       personalRef.current = null; setPersonal(null); setFeedback(null); apply(result); dispatch({ type: "reset" }); setCue(null);
       const savedCommand = safeGet(pendingKey(candidate));
       if (savedCommand) {
@@ -318,7 +371,7 @@ export function usePetController(injectedApi?: PetApi) {
     alive.current = true;
     const stored = safeGet("domine-pet-nick"), nick = normalizeNickname(stored) ?? "";
     nickRef.current = nick; setNickname(nick);
-    if (stored && !nick) setMessage("이름을 선택해 주세요");
+    if (stored && !nick) setMessage("내 이름을 입력하면 함께 키울 수 있어요");
     const selected: PetId = safeGet("domine-pet-selected") === "2" ? 2 : 1; petRef.current = selected; setPetId(selected);
     let saved: string | null = null;
     try { saved = localStorage.getItem("domine-pet-cell"); } catch { /* Default location. */ }
@@ -371,7 +424,7 @@ export function usePetController(injectedApi?: PetApi) {
       const visible = !document.hidden && intersecting;
       if (visible === activeRef.current) return;
       activeRef.current = visible; setActive(visible);
-      if (!visible) { ++generation.current; abort.current?.abort(); mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); }
+      if (!visible) { ++generation.current; mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); }
       else { dispatch({ type: "resume" }); void refresh(); }
     };
     const observer = new IntersectionObserver(([entry]) => { intersecting = entry.isIntersecting; update(); });
@@ -384,9 +437,9 @@ export function usePetController(injectedApi?: PetApi) {
   }, [dispatch, refresh]);
   useEffect(() => {
     if (machine.visual !== "acting" || !machine.deadlineAt) return;
-    const timer = setTimeout(() => { setCue(null); dispatch({ type: "done", id: machine.sceneId }); }, Math.max(0, machine.deadlineAt - Date.now()));
+    const timer = setTimeout(() => dispatch({ type: "done", id: machine.sceneId }), Math.max(0, Math.min(machine.deadlineAt, cue?.endsAt ?? Infinity) - Date.now()));
     return () => clearTimeout(timer);
-  }, [machine.visual, machine.sceneId, machine.deadlineAt, dispatch]);
+  }, [machine.visual, machine.sceneId, machine.deadlineAt, cue?.endsAt, dispatch]);
   const completedWalk = useRef(0);
   useEffect(() => {
     if (machine.visual !== "idle" || machine.command !== "idle" || cue?.action !== "walk" || completedWalk.current === cue.id) return;
@@ -402,12 +455,11 @@ export function usePetController(injectedApi?: PetApi) {
 
   function selectPet(id: PetId) {
     if ((machineRef.current.visual !== "paused" && visualLocked(machineRef.current)) || id === petRef.current) return;
-    ++generation.current; ++readSequence.current; abort.current?.abort();
-    if (pending.current) dispatch({ type: "uncertain", id: pending.current.requestId });
-    petRef.current = id; setPetId(id); setCue(null); setShared(null);
+    ++generation.current; ++readSequence.current;
+    petRef.current = id; setPetId(id); setCue(null); setShared(petStates.current[id]?.shared?.pet ?? null); setMessage("");
     setFeedback(null);
     if (personalRef.current) {
-      personalRef.current = { ...personalRef.current, pet: id, coins: personalRef.current.coins ?? personalRef.current.player?.coins, player: undefined, inventory: undefined };
+      personalRef.current = petStates.current[id] ?? { ...personalRef.current, pet: id, coins: personalRef.current.coins ?? personalRef.current.player?.coins, player: undefined, inventory: undefined };
       setPersonal(personalRef.current);
     }
     try { localStorage.setItem("domine-pet-selected", String(id)); } catch { /* Optional preference. */ }
@@ -422,16 +474,20 @@ export function usePetController(injectedApi?: PetApi) {
     identityRef.current = null; setIdentity(null);
     nickRef.current = ""; setNickname("");
     registeredRef.current = false; setRegistered(false);
+    petStates.current = {}; busyRef.current = {}; setBusyPets({}); setAutoAttempts(0);
     personalRef.current = null; setPersonal(null); setFeedback(null); setRewardNotice(""); setCue(null);
     dispatch({ type: "reset" });
-    setMessage("이름을 선택해 주세요");
+    setMessage("내 이름을 입력하면 함께 키울 수 있어요");
     void refresh();
   }
   const done = useCallback((id: number, sleep?: boolean) => dispatch({ type: "done", id, sleep }), [dispatch]);
   return { host, api, machine, active, shared, personal, feedback, message, rewardNotice, setMessage, capability, features, registered, identity, nickname, petId, multiPet, cue, visited, arrival, travel, worldReady,
+    busy: busy && busy.until > Date.now() ? busy : undefined,
+    requestingAction: machine.command === "pending" && pending.current?.kind === "action" && pending.current.pet === petId ? pending.current.action : null,
+    canRetry: machine.command === "uncertain" && autoAttempts >= 3,
     care, localScene, done, connect, clearIdentity, selectPet, execute, refresh, checkCapabilities,
     retry: () => { if (pending.current) void execute(pending.current, true); },
-    pause: () => { ++generation.current; abort.current?.abort(); mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },
+    pause: () => { ++generation.current; mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },
     resume: () => { if (activeRef.current) { dispatch({ type: "resume" }); void refresh(); } },
   };
 }

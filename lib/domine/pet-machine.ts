@@ -30,7 +30,7 @@ export function gameReducer(s: GameMachine, e: GameEvent): GameMachine {
     case "uncertain": return s.operationId !== e.id ? s : { ...s, command: "uncertain" };
     case "map": return visualLocked(s) ? s : { ...s, visual: "loading-map", pendingMap: e.map, sceneId: e.id };
     case "map-ready": return s.visual !== "loading-map" || s.sceneId !== e.id || !s.pendingMap ? s : { ...s, visual: "switching-map", committedMap: s.pendingMap, pendingMap: null };
-    case "pause": return { ...s, visual: "paused", pendingMap: null, deadlineAt: null, epoch: s.epoch + 1, command: s.command === "pending" ? "uncertain" : s.command };
+    case "pause": return { ...s, visual: "paused", pendingMap: null, deadlineAt: null, epoch: s.epoch + 1 };
     case "resume": return { ...s, visual: "idle" };
     case "reset": return { ...initialMachine, committedMap: s.committedMap, epoch: s.epoch + 1, sceneId: s.sceneId + 1 };
   }

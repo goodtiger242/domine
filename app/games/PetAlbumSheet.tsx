@@ -16,7 +16,6 @@ export default function PetAlbumSheet({ state, disabled, notice, map, execute, o
   const [detail, setDetail] = useState<string | null>(null);
   const [filter, setFilter] = useState("전체"), [category, setCategory] = useState("전체");
   const found = state?.album ?? [];
-  const core = CATALOG.filter(i => i.core && found.includes(i.id)).length;
   const discovered = CATALOG.filter(i => found.includes(i.id)).length;
   const item = CATALOG.find(i => i.id === detail);
   const visible = CATALOG.filter(i => (category === "전체" || i.category === category) && (filter === "전체" || found.includes(i.id) === (filter === "발견")));
@@ -33,8 +32,7 @@ export default function PetAlbumSheet({ state, disabled, notice, map, execute, o
       {explanations[item.id] && <p>게임의 확인 기록이며 실제 미사 참석이나 신앙 활동의 증명은 아니에요.</p>}
       {item.storage === "device" && <p>기기 산책 기념 · 다음 단계 준비 중</p>}
     </section>}>
-    <p className="pet-sheet-note">상시 {core}/80 · 전례 기록 12 · 기기 산책 기념 4</p>
-    <p className="pet-sheet-note" role="status">{notice || "맵 이동·산책 뒤 같은 맵에서 15초 머무르면 탐색해요. 발견 확률 75%, 발견 시 일반 65% · 특별 25% · 희귀 8% · 아주 드묾 2%. 새 발견 없이 4회면 다음 탐색에서 가능한 미발견 하나를 보장해요."}</p>
+    {notice && <p className="pet-sheet-note" role="status">{notice}</p>}
     <div className="pet-catalog-grid pet-album-grid">{visible.map(item => <button type="button" key={item.id} className="pet-catalog-card" data-found={found.includes(item.id)} aria-pressed={detail === item.id} onClick={() => {
       setDetail(item.id);
       if (explanations[item.id] && !disabled && map === "church" && seasonIds[state?.season ?? ""]?.includes(item.id)) void execute({ kind: "record_season", entry: item.id, requestId: crypto.randomUUID() });

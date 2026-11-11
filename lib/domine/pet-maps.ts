@@ -30,7 +30,7 @@ export const PET_MAPS = [
 export type PetMap = typeof PET_MAPS[number]["id"];
 export const DEFAULT_MAP: PetMap = "church";
 export type SceneAction = PetAction | "sleep";
-export type SceneCue = { id: number } & (
+export type SceneCue = { id: number; endsAt?: number } & (
   { action: SceneAction | "tap" | "priest" } |
   { action: "map"; direction?: "n" | "s" | "e" | "w"; to?: string } |
   { action: "shop"; shop: number }

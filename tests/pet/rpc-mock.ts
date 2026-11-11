@@ -6,9 +6,11 @@ import type { PetState } from "../../lib/domine/pet";
 import { ACTION_REWARDS, levelOf, rewardEligible, type Reward } from "../../lib/domine/pet-progress";
 import { SHOP } from "../../lib/domine/pet-catalog";
 
-export function createPetMock(options: { missing?: boolean; v9?: boolean; delayMs?: number; error?: "constraint" | "network" } = {}) {
+export function createPetMock(options: { missing?: boolean; v9?: boolean; busyLock?: boolean; delayMs?: number; error?: "constraint" | "network" } = {}) {
   const shared: PetState = { name: "도미", fullness: 100, mood: 100, clean: 100, care_total: 120, today_top: [], recent: [], cooldown: { feed:0,treat:0,pet:0,play:0,walk:0,brush:0,bath:0,train:0 } };
   let owner: PetIdentity | null = null, version = 0, coins = 100, now = Date.parse("2026-11-11T09:00:00Z");
+  const owners = new Map<string, PetIdentity>();
+  const busy: Partial<Record<PetId, { until: number; nickname: string; action: import("../../lib/domine/pet").PetAction }>> = {};
   const xp: Record<PetId, number> = { 1: 32, 2: 32 }, inventory: Record<PetId, string[]> = { 1: [], 2: [] };
   const album: string[] = [], badges: string[] = [], history: PetHistoryEntry[] = [];
   const equipment: NonNullable<V6Result["equipment"]> = [], calls: string[] = [];
@@ -20,30 +22,41 @@ export function createPetMock(options: { missing?: boolean; v9?: boolean; delayM
     history.push({ nickname: owner!.nickname, pet, kind, detail, at: new Date(now).toISOString() });
     while (history.length > 100 || (history.length && Date.parse(history[0].at) < now - 14 * 86400000)) history.shift();
   };
-  const snapshot = (pet: PetId = 1): V6Result => ({ ok:true,code:"OK",serverNow:new Date(now).toISOString(),version,pet,coins,levels:{1:levelOf(xp[1]),2:levelOf(xp[2])},player:{xp:xp[pet],level:levelOf(xp[pet]),coins},inventory:[...inventory[pet]],album:[...new Set([...album,...inventory[1],...inventory[2]])],badges:[...badges],equipment:equipment.map(e=>({...e})),daily:{reward_actions:daily,explore_finishes:exploreFinishes,walk_claims:walkClaims},ticket,season:"ordinary",shared:{applied:false,reason:"공동 수치는 충분해요",pet:{...shared}} });
+  const snapshot = (pet: PetId = 1): V6Result => ({ ok:true,code:"OK",serverNow:new Date(now).toISOString(),version,pet,coins,levels:{1:levelOf(xp[1]),2:levelOf(xp[2])},player:{xp:xp[pet],level:levelOf(xp[pet]),coins},inventory:[...inventory[pet]],album:[...new Set([...album,...inventory[1],...inventory[2]])],badges:[...badges],equipment:equipment.map(e=>({...e})),daily:{reward_actions:daily,explore_finishes:exploreFinishes,walk_claims:walkClaims},ticket,season:"ordinary",shared:{applied:false,reason:"공동 수치는 충분해요",pet:{...shared}}, ...(options.busyLock ? { busy: busy[pet] && busy[pet]!.until > now ? { nickname: busy[pet]!.nickname, action: busy[pet]!.action, remainingMs: busy[pet]!.until - now } : null } : {}) });
   const failure = (code: string): V6Result => ["AUTH_FAILED", "NICKNAME_TAKEN"].includes(code)
     ? {ok:false,code,serverNow:new Date(now).toISOString()} : {...snapshot(),ok:false,code};
-  const authorized = (i: PetIdentity) => owner?.nickname.toLowerCase()===i.nickname.toLowerCase() && owner.secret===i.secret;
+  const authorized = (i: PetIdentity) => owners.get(i.nickname.toLowerCase())?.secret === i.secret;
   const api: PetApi = {
-    capabilities: async()=>options.missing ? false : {version:6,sharedEconomy:true,explorationThemes:24,v9:options.v9!==false,v10:true,perPetShop:true,history:true},
+    capabilities: async()=>options.missing ? false : {version:6,sharedEconomy:true,explorationThemes:24,v9:options.v9!==false,v10:true,perPetShop:true,history:true,busyLock:options.busyLock===true},
     history: async()=> { calls.push("history"); return history.filter(row=>Date.parse(row.at)>=now-14*86400000).slice(-30).reverse().map(row=>({...row})); },
     legacy: async(pet,nickname,action)=> { calls.push(action ? "legacy-action" : "legacy-state"); return { data: action ? {ok:true} : {...shared,name:pet===1?"도미":"미네"},error:null,petId:pet,legacy:false }; },
     register: async(i)=> {
       calls.push("register");
       if (!/^[가-힣a-zA-Z0-9]{1,8}$/.test(i.nickname) || !/^[0-9a-f]{64}$/.test(i.secret)) return failure("INVALID_INPUT");
-      if(owner&&!authorized(i)) return failure("NICKNAME_TAKEN");
-      owner={...i}; return snapshot();
+      if(owners.has(i.nickname.toLowerCase())&&!authorized(i)) return failure("NICKNAME_TAKEN");
+      owner={...i}; owners.set(i.nickname.toLowerCase(), owner); return snapshot();
     },
     state: async(i,pet)=> { calls.push("state"); return authorized(i)?snapshot(pet):failure("AUTH_FAILED"); },
-    operation: async(i,id)=> { calls.push("operation"); return authorized(i) ? operations.get(id)?.result ?? failure("NOT_FOUND") : failure("AUTH_FAILED"); },
+    operation: async(i,id)=> { calls.push("operation"); return authorized(i) ? operations.get(`${i.nickname}:${id}`)?.result ?? failure("NOT_FOUND") : failure("AUTH_FAILED"); },
     execute: async(i,command:PetCommand)=> {
       calls.push(command.kind);
       if(options.error==="constraint") throw new PetRpcError("23514",true);
       if(options.error==="network") throw new TypeError("Failed to fetch");
       if(!authorized(i)) return failure("AUTH_FAILED");
-      const serialized=JSON.stringify(command), existing=operations.get(command.requestId);
+      owner = i;
+      const operationKey = `${i.nickname}:${command.requestId}`;
+      const serialized=JSON.stringify(command), existing=operations.get(operationKey);
       if(existing) return existing.input===serialized ? existing.result : failure("REQUEST_CONFLICT");
       const pet = "pet" in command ? command.pet ?? 1 : 1;
+      if (options.busyLock && command.kind === "action") {
+        if ((busy[pet]?.until ?? 0) > now) {
+          const result = { ...snapshot(pet), ok: false, code: "BUSY", requestId: command.requestId };
+          operations.set(operationKey, { input: serialized, result });
+          return result;
+        }
+        if (command.durationMs !== undefined && !Number.isInteger(command.durationMs)) return failure("INVALID_INPUT");
+        busy[pet] = { until: now + Math.max(500, Math.min(20000, command.durationMs ?? 6000)), nickname: i.nickname, action: command.action };
+      }
       let code="OK", gain=0, money=0, levelCoins=0; const entries:string[]=[],freshBadges:string[]=[];
       let skipped: Reward["skipped"];
       if(command.kind==="action" && !rewardEligible(now,last,daily)) skipped=daily>=120?"DAILY_CAP":"TOO_FAST";
@@ -87,7 +100,7 @@ export function createPetMock(options: { missing?: boolean; v9?: boolean; delayM
       for(const entry of entries) log(pet,"discover",entry);
       coins+=money+levelCoins;version++;
       const result={...snapshot(pet),ok:code==="OK",code,requestId:command.requestId,reward:{xp:gain,coins:money,levelCoins,newEntries:entries,newBadges:freshBadges,...(skipped?{skipped}:{}),...(skipped==="TOO_FAST"?{retryAfterSeconds:Math.ceil((last!+3000-now)/1000)}:{})}};
-      operations.set(command.requestId,{input:serialized,result});
+      operations.set(operationKey,{input:serialized,result});
       // Commit first, then delay delivery to exercise response-loss recovery.
       if(options.delayMs) await new Promise(r=>setTimeout(r,options.delayMs));
       return result;

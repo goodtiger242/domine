@@ -82,7 +82,7 @@ let mock=createPetMock(), h=mount(mock.api);
 await h.flush();assert.equal(h.game.registered,false);
 h.game.care("feed");await h.flush();
 assert.equal(h.game.machine.visual,"acting");
-assert.equal(h.game.message,"구경 중이에요 · 내 이름을 선택하면 코인이 쌓여요");
+assert.equal(h.game.message,"내 이름을 입력하면 함께 키울 수 있어요");
 assert.ok(!mock.calls.includes("action"));h.close();
 
 mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
@@ -96,7 +96,7 @@ assert.equal(mock.calls.filter(c=>c==="register").length,2);h.close();
 
 mock=createPetMock();await mock.api.register({...identity,secret:"b".repeat(64)});h=mount(mock.api,savedToken);await h.flush();
 assert.equal(h.game.registered,false);assert.ok(!h.storage.has(`domine-pet-reg:${identity.nickname}`));
-assert.equal(h.game.message,"이름을 다시 선택해 주세요");h.close();
+assert.equal(h.game.message,"이름을 다시 입력해 주세요");h.close();
 
 // Old random tokens are ignored, including when the name has a confirmation flag.
 mock=createPetMock();await mock.api.register(identity);
@@ -106,13 +106,13 @@ assert.equal(mock.calls.filter(c=>c==="register").length,1,"confirmed name reads
 
 // A stale confirmation is cleared after authentication fails, allowing registration on retry.
 mock=createPetMock();h=mount(mock.api,[...savedToken,[`domine-pet-reg:${identity.nickname}`,"1"]]);await h.flush();
-assert.equal(h.game.message,"이름을 다시 선택해 주세요");assert.equal(h.game.registered,false);
+assert.equal(h.game.message,"이름을 다시 입력해 주세요");assert.equal(h.game.registered,false);
 await h.game.checkCapabilities();await h.flush();assert.equal(h.game.registered,true);h.close();
 
 for (const missing of [false,true]) {
   mock=createPetMock({missing});h=mount(mock.api,[["domine-pet-nick","옛별명"],["domine-pet-identity:옛별명","a".repeat(64)],["domine-pet-reg:옛별명","1"]]);await h.flush();
   assert.equal(h.game.nickname,"");assert.equal(h.game.identity,null);assert.equal(h.game.registered,false);
-  assert.equal(h.game.message,"이름을 선택해 주세요");assert.ok(!mock.calls.includes("register"));assert.ok(!mock.calls.includes("state"));
+  assert.equal(h.game.message,"내 이름을 입력하면 함께 키울 수 있어요");assert.ok(!mock.calls.includes("register"));assert.ok(!mock.calls.includes("state"));
   for (const invalid of ["옛별명","a!","123456789",`${identity.nickname}:${identity.secret}`]) {
     const before=mock.calls.length;await h.game.connect(invalid);await h.flush();assert.equal(mock.calls.length,before);
   }
@@ -155,7 +155,7 @@ mock.api.execute=()=>new Promise(()=>{});
 void h.game.execute({...command,requestId:"timeout"});await h.flush();
 assert.equal(h.game.machine.command,"pending");
 h.game.care("pet");await h.flush();assert.equal(h.game.machine.visual,"acting");
-assert.equal(h.game.message,"보상 확인 중이라 이번엔 코인이 없어요");
+assert.equal(h.game.message,"");
 await h.advance(8000);assert.equal(h.game.machine.command,"uncertain");
 mock.api.operation=async()=>{throw new PetRpcError("42P01",true);};
 h.game.retry();await h.flush();assert.equal(h.game.machine.command,"uncertain","lookup failures cannot discard an unresolved mutation");h.close();
@@ -233,3 +233,79 @@ for (const failure of ["error", "timeout", "pause", "unmount"]) {
   if(failure!=="unmount") { assert.equal(h.game.machine.visual,"idle"); assert.equal(h.game.travel,null); h.close(); }
 }
 console.log("Pet travel: exit, ready gate, crossfade, entry, reduced motion, failures and cancellation passed.");
+
+// Uncertain requests recover with the same ID, without exposing manual retry early.
+for (const restored of [false, true]) {
+  mock=createPetMock(); await mock.api.register(identity);
+  const savedCommand={kind:"action",pet:1,action:"feed",requestId:`auto-${restored}`};
+  const committed=await mock.api.execute(identity,savedCommand);
+  const lookup=mock.api.operation; const times=[];
+  mock.api.operation=async(i,id)=>{times.push(Date.now());assert.equal(id,savedCommand.requestId);if(times.length<3)throw new TypeError("offline");return lookup(i,id);};
+  h=mount(mock.api,[...savedToken,...(restored?[[`domine-pet-pending:${identity.nickname}`,JSON.stringify(savedCommand)]]:[])]);await h.flush();
+  if(!restored){mock.api.execute=async()=>{throw new TypeError("lost response");};await h.game.execute(savedCommand);await h.flush();}
+  assert.equal(h.game.canRetry,false);
+  await h.advance(1499);assert.deepEqual(times,[]);
+  await h.advance(1);assert.deepEqual(times,[1500]);assert.equal(h.game.canRetry,false);
+  await h.advance(3000);assert.deepEqual(times,[1500,4500]);assert.equal(h.game.canRetry,false);
+  await h.advance(6000);assert.deepEqual(times,[1500,4500,10500]);
+  assert.equal(h.game.machine.command,"idle");assert.equal(h.game.personal.coins,committed.coins);
+  assert.ok(!h.storage.has(`domine-pet-pending:${identity.nickname}`));h.close();
+}
+mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+mock.api.execute=async()=>{throw new TypeError("offline");};let attempts=0;
+mock.api.operation=async()=>{attempts++;throw new TypeError("offline");};
+await h.game.execute({...command,requestId:"exhausted"});await h.flush();
+await h.advance(1500);assert.equal(h.game.canRetry,false);
+await h.advance(3000);assert.equal(h.game.canRetry,false);
+await h.advance(6000);assert.equal(h.game.canRetry,true);assert.equal(attempts,3);
+await h.advance(60000);assert.equal(attempts,3,"automatic retries stop at three");h.close();
+
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+const send=mock.api.execute;let deliver;
+mock.api.execute=async(...args)=>{await new Promise(resolve=>{deliver=resolve;});return send(...args);};
+h.game.care("feed");await h.flush();
+assert.equal(h.game.machine.visual,"idle","wait for server before scene");assert.equal(h.game.requestingAction,"feed");
+assert.equal(JSON.parse(h.storage.get(`domine-pet-pending:${identity.nickname}`)).durationMs,2400);
+h.game.selectPet(2);await h.flush();
+assert.equal(h.game.machine.command,"pending","switching does not abort or mark uncertain");
+deliver();await h.flush();
+assert.equal(h.game.machine.command,"idle");assert.equal(h.game.personal.pet,2);assert.equal(h.game.personal.player.level,1);
+assert.equal(h.game.machine.visual,"idle","a response for another pet does not animate the current one");
+h.game.selectPet(1);await h.flush();assert.equal(h.game.personal.player.level,2);assert.ok(h.game.busy);h.close();
+
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+h.game.care("treat");await h.flush();assert.equal(h.game.machine.visual,"acting");assert.equal(h.game.cue.action,"treat");
+await h.advance(2200);assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy,undefined);h.close();
+
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+await mock.api.register({nickname:"김보영",secret:"b".repeat(64)});
+await mock.api.execute({nickname:"김보영",secret:"b".repeat(64)},{...command,pet:2,action:"treat",durationMs:2200,requestId:"someone-else"});
+h.game.selectPet(2);await h.flush();assert.equal(h.game.busy.nickname,"김보영");
+h.game.care("feed");await h.flush();assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.cue,null);
+h.game.selectPet(1);await h.flush();assert.equal(h.game.busy,undefined);h.game.care("pet");await h.flush();assert.equal(h.game.machine.visual,"acting");
+await h.advance(1800);mock.advance(1800);h.game.selectPet(2);await h.flush();assert.ok(h.game.busy);
+await h.advance(400);assert.equal(h.game.busy,undefined);h.close();
+
+// A racing click receives BUSY, then unlocks automatically without any scene.
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+await mock.api.execute(identity,{...command,requestId:"racer",durationMs:500});
+h.game.care("pet");await h.flush();assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy.action,"feed");assert.equal(h.game.message,"");
+await h.advance(500);assert.equal(h.game.busy,undefined);h.close();
+console.log("Pet recovery/busy: 1.5/3/6s retries, restored pending, exhaustion, in-flight pet switching, server-first scenes and expiry passed.");
+
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+h.game.care("walk");await h.flush();
+await h.advance(4000);assert.ok(mock.calls.includes("explore_begin"),"lock expiry still completes the walk exploration");h.close();
+
+mock=createPetMock({busyLock:true,delayMs:300});h=mount(mock.api,savedToken);await h.flush();
+h.game.care("feed");await h.flush();assert.equal(h.game.machine.visual,"idle");
+await h.advance(300);assert.equal(h.game.machine.visual,"acting");assert.equal(h.game.cue.endsAt,2400,"network delay cannot extend the scene beyond the reservation");
+await h.advance(2100);assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy,undefined);h.close();
+
+// A timeout is also recovered automatically even if the transport ignores abort.
+mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+const commitBeforeTimeout=mock.api.execute;
+mock.api.execute=async(...args)=>{await commitBeforeTimeout(...args);return new Promise(()=>{});};
+void h.game.execute({...command,requestId:"recover-timeout"});await h.flush();
+await h.advance(8000);assert.equal(h.game.machine.command,"uncertain");assert.equal(h.game.canRetry,false);
+await h.advance(1500);assert.equal(h.game.machine.command,"idle");assert.ok(mock.calls.includes("operation"));h.close();

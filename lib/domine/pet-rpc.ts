@@ -23,7 +23,7 @@ export async function petRequest(rpc: Rpc, petId: PetId, nickname: string, actio
 }
 
 export type PetCommand = { requestId: string } & (
-  | { kind: "action"; pet: PetId; action: PetAction }
+  | { kind: "action"; pet: PetId; action: PetAction; durationMs?: number }
   | { kind: "purchase"; pet: PetId; item: string }
   | { kind: "equip"; pet: PetId; slot: "wearable" | "toy"; item: string | null }
   | { kind: "explore_begin"; map: PetMap; source: "map" | "walk" }
@@ -32,7 +32,9 @@ export type PetCommand = { requestId: string } & (
   | { kind: "walk_begin" }
   | { kind: "walk_claim" | "walk_end"; pet?: PetId; session: string }
 );
+export type PetBusy = { nickname: string; action: PetAction; remainingMs: number };
 export type V6Result = {
+  busy?: PetBusy | null;
   ok: boolean; code: string; serverNow: string; requestId?: string; version?: number;
   player?: { xp: number; level: number; coins: number };
   pet?: PetId; levels?: Record<PetId, number>; coins?: number;
@@ -44,7 +46,7 @@ export type V6Result = {
   ticket?: { id: string; map_id: PetMap; eligible_at: string; expires_at: string } | null;
   season?: string; retryAfterSeconds?: number;
 };
-export type PetCapabilities = { version: 6; sharedEconomy: boolean; explorationThemes: number; v9: boolean; v10: boolean; perPetShop: boolean; history: boolean };
+export type PetCapabilities = { version: 6; sharedEconomy: boolean; explorationThemes: number; v9: boolean; v10: boolean; perPetShop: boolean; history: boolean; busyLock?: boolean };
 export type PetHistoryEntry = { nickname: string; pet: PetId; kind: "action" | "purchase" | "equip" | "levelup" | "discover"; detail: string | null; at: string };
 export class PetRpcError extends Error {
   definitive: boolean;
@@ -62,7 +64,7 @@ export interface PetApi {
 }
 type V6Rpc = (name: string, args: Record<string, string | number | null>, signal?: AbortSignal) => PromiseLike<Result>;
 export function createPetApi(rpc: V6Rpc): PetApi {
-  let v9 = false, v10 = false;
+  let v9 = false, v10 = false, busyLock = false;
   const call = async (name: string, args: Record<string, string | number | null>, signal?: AbortSignal, version = 6) => {
     const { data, error, status } = await rpc(`domine_pet_${name}_v${version}`, args, signal);
     if (error) throw new PetRpcError(error.code || "NETWORK_ERROR", (status ?? 0) >= 400 || /^(?:[0-9A-Z]{5}|PGRST\d{3}|[45]\d{2})$/.test(error.code ?? ""));
@@ -75,6 +77,7 @@ export function createPetApi(rpc: V6Rpc): PetApi {
     async capabilities() {
       v9 = false;
       v10 = false;
+      busyLock = false;
       const { data, error } = await rpc("domine_pet_capabilities_v6", {});
       if (error?.code === "PGRST202") return false;
       if (error) throw new Error(error.code ?? "NETWORK_ERROR");
@@ -82,7 +85,8 @@ export function createPetApi(rpc: V6Rpc): PetApi {
       const flags = data as Partial<PetCapabilities>;
       v9 = flags.v9 === true;
       v10 = flags.v10 === true;
-      return { version: 6, sharedEconomy: flags.sharedEconomy === true, explorationThemes: flags.explorationThemes ?? 5, v9, v10, perPetShop: flags.perPetShop === true, history: flags.history === true };
+      busyLock = flags.busyLock === true;
+      return { version: 6, sharedEconomy: flags.sharedEconomy === true, explorationThemes: flags.explorationThemes ?? 5, v9, v10, perPetShop: flags.perPetShop === true, history: flags.history === true, busyLock };
     },
     register: (i, signal) => call("register", auth(i), signal),
     state: (i, pet, signal) => call("state", { ...auth(i), p_pet: pet }, signal),
@@ -99,7 +103,10 @@ export function createPetApi(rpc: V6Rpc): PetApi {
       }
       const args: Record<string, string | number | null> = { ...auth(i), p_request_id: command.requestId };
       switch (command.kind) {
-        case "action": Object.assign(args, { p_pet: command.pet, p_action: command.action }); break;
+        case "action":
+          Object.assign(args, { p_pet: command.pet, p_action: command.action });
+          if (busyLock) return call("action", { ...args, p_duration_ms: command.durationMs ?? 6000 }, signal, 16);
+          break;
         case "purchase": {
           args.p_item = command.item;
           try { return await call("purchase", { ...args, p_pet: command.pet ?? 1 }, signal, 10); }

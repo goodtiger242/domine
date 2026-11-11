@@ -25,6 +25,7 @@ export default function PetSheet({ title, onClose, onBack, children, toolbar, pa
     let popped = false;
     Object.assign(body.style, { overflow: "hidden", position: "fixed", top: `-${scrollY}px`, width: "100%" });
     dialog?.showModal();
+    if (!opener?.matches?.(":focus-visible")) dialog?.focus({ preventScroll: true });
     const viewport = window.visualViewport;
     const resize = () => {
       dialog?.style.setProperty("--pet-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
@@ -44,7 +45,7 @@ export default function PetSheet({ title, onClose, onBack, children, toolbar, pa
       dialog?.close(); Object.assign(body.style, saved); window.scrollTo({ top: scrollY, behavior: "instant" }); opener?.focus({ preventScroll: true });
     };
   }, [heading]);
-  return <dialog ref={ref} className="pet-sheet" aria-labelledby={heading}
+  return <dialog ref={ref} className="pet-sheet" aria-labelledby={heading} tabIndex={-1}
     onPointerDown={(event) => { backdrop.current = event.target === event.currentTarget; }}
     onClick={(event) => { if (backdrop.current && event.target === event.currentTarget) onClose(); backdrop.current = false; }}
     onCancel={(event) => { event.preventDefault(); if (!onBack?.()) onClose(); }}>

@@ -41,32 +41,35 @@ const gameView = mount("PetGame", {}, {
 });
 gameView.render(); button(gameView.tree, "김경석").props.onClick(); gameView.render();
 assert.ok(text(gameView.tree).includes("지금: 김경석"));
-assert.equal(nodes(gameView.tree, n => n.type === "input").length, 0);
-button(gameView.tree, "다른 이름으로").props.onClick(); gameView.render();
-const nameButtons = () => nodes(gameView.tree, n => n.props.className === "pet-name-grid").flatMap(n => nodes(n, n => n.type === "button"));
-const search = nodes(gameView.tree, n => n.type === "input")[0];
-assert.equal(nodes(gameView.tree, n => n.type === "input").length, 1);
-assert.equal(search.props.placeholder, "이름"); assert.equal(search.props.enterKeyHint, "go");
-assert.equal(nameButtons().length, 0, "suggestions only while typing");
-search.props.onChange({ target: { value: "경석" } }); gameView.render();
-assert.deepEqual(nameButtons().map(text), ["김경석"]);
-search.props.onChange({ target: { value: "ㄱㄱㅅ" } }); gameView.render(); assert.equal(nameButtons().length, 0);
-assert.match(text(gameView.tree), /청년회 명단에 있는 이름을 입력해 주세요/);
-search.props.onChange({ target: { value: "김" } }); gameView.render(); assert.ok(nameButtons().length <= 6);
-search.props.onChange({ target: { value: "보영" } }); gameView.render();
-button(gameView.tree, "김보영").props.onClick(); await Promise.resolve(); await Promise.resolve(); gameView.render();
-assert.equal(game.nickname, "김보영");
-assert.equal(nodes(gameView.tree, n => n.type === "input").length, 0, "chip starts and closes sheet");
-button(gameView.tree, "김보영").props.onClick(); gameView.render(); button(gameView.tree, "다른 이름으로").props.onClick(); gameView.render();
 const input = () => nodes(gameView.tree, n => n.type === "input")[0];
-input().props.onChange({target:{value:"명단에없음"}}); gameView.render();
+const nameSheet = () => nodes(gameView.tree, n => n.type === "section" && n.props.title === "내 이름")[0];
 const submit = () => nodes(gameView.tree, n => n.type === "form")[0].props.onSubmit({preventDefault(){}});
-submit(); await Promise.resolve(); gameView.render(); assert.equal(game.nickname,"김보영");
-input().props.onChange({target:{value:"김경석"}}); gameView.render(); submit(); await Promise.resolve(); await Promise.resolve(); gameView.render(); assert.equal(game.nickname,"김경석");
-assert.doesNotMatch(text(gameView.tree), /개인 기록|개인 진행|함께한 돌봄|최근 기록|오늘 돌봐 준/);
+assert.equal(nodes(gameView.tree, n => n.type === "input").length, 1);
+assert.equal(input().props.placeholder, "이름"); assert.equal(input().props.enterKeyHint, "go");
+function noRoster() {
+  const html = renderToStaticMarkup(createElement("section", null, nameSheet().props.children));
+  for (const name of PET_LEGAL_NAMES) if (name !== game.nickname) assert.ok(!html.includes(name), `sheet must not render ${name}`);
+  assert.equal(nodes(nameSheet(), n => n.type === "button").length, 1, "only the start button in the name content");
+  assert.doesNotMatch(html, /선택 해제|연결 다시 확인|결과 확인|개인 기록|성장 단계|함께한 돌봄|최근 기록|오늘 돌봐 준|다른 이름으로/);
+}
+assert.equal(PET_LEGAL_NAMES.length, 21);
+noRoster();
+for (const value of ["김", "경석", "ㄱㄱㅅ", "보영", ...PET_LEGAL_NAMES.map(name => name.slice(0, 1))]) {
+  input().props.onChange({target:{value}}); gameView.render(); noRoster();
+}
+input().props.onChange({target:{value:"명단에없음"}}); gameView.render(); submit(); await Promise.resolve(); gameView.render();
+assert.equal(game.nickname,"김경석");
+assert.match(text(nameSheet()), /도미네 청년회 이름을 정자로 사용해주세요/); noRoster();
+input().props.onChange({target:{value:"김보영"}}); gameView.render(); submit(); await Promise.resolve(); await Promise.resolve(); gameView.render();
+assert.equal(game.nickname,"김보영"); assert.equal(nodes(gameView.tree, n => n.type === "input").length, 0, "enter starts and closes sheet");
+button(gameView.tree, "김보영").props.onClick(); gameView.render(); noRoster();
+game.nickname=""; game.registered=false; gameView.render(); noRoster();
+assert.ok(button(gameView.tree,"내 이름"));
 const gameCss = readFileSync("app/games/pet-game.css", "utf8");
-assert.match(gameCss, /\.pet-name-grid button\s*\{[^}]*min-height: 44px/);
-console.log("Pet name: one input, up to six matching chips, submit validation, immediate start and no records passed.");
+assert.match(gameCss, /\.pet-record-form input[^{}]*\{[^}]*font-size: 16px/);
+assert.match(gameCss, /button:focus:not\(:focus-visible\)/);
+assert.match(gameCss, /header button\s*\{[^}]*border: 0/);
+console.log("Pet name: one input, enter submit, no roster HTML, exact validation message and minimal content passed.");
 const cards = tree => nodes(tree.props.children, n => n.props.className === "pet-catalog-card");
 const state = { ok: true, code: "OK", serverNow: "", coins: 100, player: { coins: 100, xp: 0, level: 1 }, inventory: [], equipment: [] };
 let calls = [], release;
@@ -137,7 +140,7 @@ globalThis.window = { scrollY: 120, innerHeight: 780, scrollTo(value) { restored
 globalThis.history = { state: { original: true }, pushState(value) { this.state = value; }, back() { backs++; } };
 const sheet = mount("PetSheet", { title: "가방", children: "목록", onClose() { closed++; }, onBack: () => false });
 sheet.render();
-const dialog = { showModal() {}, close() {}, style: { setProperty() {} } };
+const dialog = { showModal() {}, close() {}, focus() {}, style: { setProperty() {} } };
 sheet.tree.props.ref.current = dialog;
 const scroll = nodes(sheet.tree, n => n.props.className === "pet-sheet-content")[0]; scroll.props.ref.current = { scrollTop: 0 };
 sheet.flushEffects(); assert.equal(style.position, "fixed"); assert.equal(style.top, "-120px"); assert.equal(history.state.original, true);

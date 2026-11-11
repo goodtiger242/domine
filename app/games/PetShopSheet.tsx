@@ -44,7 +44,7 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
   return <PetSheet title={bag ? `${dog}의 가방` : "상점"} onClose={onClose} onBack={back}
     toolbar={<>
       {bag && onSelectPet && <div className="pet-chips" role="group" aria-label="가방 강아지 선택">{([1, 2] as const).filter(id => multiPet || id === 1).map(id => <button type="button" key={id} aria-pressed={petId === id} disabled={blocked} onClick={() => { if (id === petId) return; setAsked(null); setDone(""); onSelectPet(id); }}>{PETS[id].name}</button>)}</div>}
-      <p className="pet-shop-coins">우리 코인(공용) {coins} · {dog}</p>
+      <p className="pet-shop-coins">우리 코인(공용) {coins} · {dog}의 {bag ? "가방" : "상점"}</p>
       {!bag && <div className="pet-chips" role="group" aria-label="상품 분류">{["전체", "옷", "장난감"].map(value => <button type="button" key={value} aria-pressed={category === value} onClick={() => setCategory(value)}>{value}</button>)}</div>}
     </>}
     panel={!bag && selected && <div className="pet-product-detail">
