@@ -679,3 +679,27 @@
 .pet-scene[data-occupied=true] .pet-battle-encounter { top: 4px; right: 116px; min-width: 76px; min-height: 36px; padding: 4px 8px; }
 .pet-scene[data-occupied=true] .pet-battle-encounter-label { display: none; }
 .pet-scene[data-occupied=true] .pet-location { max-width: calc(100% - 208px); }
+
+/* Phone: compact every battle readout so the scene gets the space (user request 2026-11-11). */
+@media (max-width: 480px) {
+  .pet-battle-hud { padding: 0 7px 6px; border-radius: 10px; }
+  .pet-battle-hud[data-side=opponent] { top: calc(40px + env(safe-area-inset-top, 0px)); left: 8px; width: 54%; }
+  .pet-battle-hud[data-side=player] { right: 8px; bottom: 10px; width: 48%; }
+  .pet-battle-hud h3 { height: 30px; font-size: 13px; gap: 3px; }
+  .pet-battle-hud h3 small { font-size: 11px; }
+  .pet-battle-info { flex: 0 0 30px; height: 30px; font-size: 14px; }
+  .pet-battle-hp { height: 7px; }
+  .pet-battle-energy { margin-top: 3px; gap: 4px; font-size: 11px; line-height: 14px; }
+  .pet-battle-energy small { font-size: 11px; }
+  .pet-battle-energy i { height: 4px; }
+  .pet-battle-momentum { height: 5px; margin-top: 4px; }
+  .pet-battle-round { padding: 3px 10px; font-size: 13px; }
+  .pet-battle-console { min-height: 246px; padding-top: 6px; }
+  .pet-battle-actions { grid-auto-rows: 46px; gap: 6px; }
+  .pet-battle-actions button, .pet-battle-result-actions button { height: 46px; padding: 4px 9px; border-radius: 12px; }
+  .pet-battle-actions strong { font-size: 14px; line-height: 18px; }
+  .pet-battle-actions small { margin-top: 0; font-size: 11px; line-height: 14px; }
+  .pet-battle-actions[data-menu=moves] { grid-template-rows: 38px auto 30px; height: auto; }
+  .pet-battle-actions [data-group] { height: 46px; min-height: 46px; }
+  .pet-battle-skill-name, .pet-battle-rival { padding: 5px 8px; font-size: 13px; line-height: 18px; }
+}
