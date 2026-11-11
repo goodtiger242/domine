@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { performance } from "node:perf_hooks";
 import { loadTS } from "./pet-test-loader.mjs";
 
-const { createBattle, stepRound, availableActions, buildFighter, opponentFor } = loadTS("lib/domine/battle/engine.ts");
-const { BREEDS, MOVES, ITEMS, GROWTH, MOVE_BY_ID, PUSH } = loadTS("lib/domine/battle/data.ts");
+const { createBattle, stepRound, availableActions, buildFighter, opponentFor, turnOrder, MAX_ENERGY, START_ENERGY, REST_ENERGY } = loadTS("lib/domine/battle/engine.ts");
+const { BREEDS, MOVES, ITEMS, GROWTH, MOVE_BY_ID, PUSH, FINISHERS, CONSUMABLES, ITEM_BY_ID, powerBudget } = loadTS("lib/domine/battle/data.ts");
 const { matchup, sizeMultiplier, temperamentBonus, damageAt, previewDamage, effectHint, effectiveStat, hitChance, statusChance, recoveryLeft, moveFor, cumulativeXp, levelFromXp, xpToNext, growthQ, growthScale, normalizedStat, recommendedAllocation, conditionPenalty, critChance } = loadTS("lib/domine/battle/rules.ts");
 const { chooseOpponentAction } = loadTS("lib/domine/battle/ai.ts");
 const { random } = loadTS("lib/domine/battle/rng.ts");
@@ -17,8 +17,8 @@ const make = (player = "B001", opponent = "B002", level = 10, seed = 27) => crea
 function freeze(value) { Object.freeze(value); for (const child of Object.values(value)) if (child && typeof child === "object" && !Object.isFrozen(child)) freeze(child); return value; }
 function quiet(state) { state.opponentAction = rest; return state; }
 
-test("12종·30기술·8아이템과 학습/성장/슬롯 무결성", () => {
-  assert.equal(BREEDS.length,12); assert.equal(MOVES.length,30); assert.equal(ITEMS.length,8);
+test("12종·33기술·8기존아이템과 학습/성장/슬롯 무결성", () => {
+  assert.equal(BREEDS.length,12); assert.equal(MOVES.length,33); assert.equal(ITEMS.length,8);
   for (const list of [BREEDS,MOVES,ITEMS]) {
     assert.equal(new Set(list.map(v => v.id)).size,list.length);
     assert.equal(new Set(list.map(v => v.name)).size,list.length);
@@ -40,13 +40,13 @@ test("12종·30기술·8아이템과 학습/성장/슬롯 무결성", () => {
       for (const key of Object.keys(breed.base)) assert.equal(fighter.stats[key],Math.floor(breed.base[key]*(1+q/20*(.8+1.2*(total ? fighter.allocation[key]/total : 0)))));
     }
   }
-  assert.deepEqual(new Set(BREEDS.flatMap(b => b.learn.map(l => l.move))),new Set(MOVES.filter(m => !m.common).map(m => m.id)));
+  assert.deepEqual(new Set(BREEDS.flatMap(b => b.learn.map(l => l.move))),new Set(MOVES.filter(m => !m.common || m.kind === "defense").map(m => m.id)));
   assert.ok(ITEMS.filter(i => i.slot === "bag").length <= 2);
   for (const item of ITEMS) for (const [stat,rate] of Object.entries(item.rates ?? {})) assert.ok(rate > 0 && rate <= (stat === "hp" ? .1 : .08));
   for (const item of ITEMS.filter(i => i.slot === "bag")) assert.ok(item.energy > 0 && item.energy <= 10 || item.heal > 0 && item.heal <= .25);
   const plain = buildFighter("B001",10), equipped = buildFighter("B001",10,["I04","I08","I13"]);
-  assert.equal(equipped.stats.attack,plain.stats.attack+Math.max(1,Math.floor(plain.stats.attack*.07)));
-  assert.equal(equipped.stats.hp,plain.stats.hp+Math.max(1,Math.floor(plain.stats.hp*.06)));
+  assert.deepEqual(equipped.stats,plain.stats);
+  assert.ok(buildFighter("B001",10,["I04"],{equipmentStats:true}).stats.attack > plain.stats.attack);
 });
 
 test("입력 경계: 견종·레벨·기술·장비·시드 검증", () => {
@@ -110,36 +110,30 @@ test("상성 36칸·체급·기질 전체 행렬과 피해/명중/상태 수식"
   assert.equal(effectiveStat(state.player,"attack"),Math.floor(state.player.stats.attack*1.15*.85));
 });
 
-test("기력 시작 6/7·최대 10·숨 고르기 +4·종료 +2·숨참 만료", () => {
+test("기력 10/10·숨 고르기 +5·자동 회복 없음", () => {
   const state = quiet(make());
-  assert.equal(state.player.energy,6); assert.equal(state.opponent.energy,6);
-  assert.equal(createBattle({ seed: 1, player: state.player, opponent: state.opponent, startEnergyBonus: 1 }).player.energy,7);
+  assert.equal(state.player.energy,START_ENERGY); assert.equal(MAX_ENERGY,10); assert.equal(REST_ENERGY,5);
+  assert.equal(createBattle({ seed: 1, player: state.player, opponent: state.opponent, startEnergyBonus: 1 }).player.energy,10);
   state.player.energy = 0;
-  let result = stepRound(state,rest);
-  assert.equal(result.state.player.energy,6);
+  let result = stepRound(state,rest); assert.equal(result.state.player.energy,5);
   result = stepRound(quiet(result.state),rest); assert.equal(result.state.player.energy,10);
   state.player.statuses = [{ id: "winded", applied: 1, expires: 2 }];
-  result = stepRound(state,rest); assert.equal(result.state.player.energy,5);
-  result.state.player.energy = 0;
-  result = stepRound(quiet(result.state),rest); assert.equal(result.state.player.energy,6);
-  assert.ok(result.events.some(e => e.type === "status" && e.change === "removed"));
+  result = stepRound(state,{kind:"push"}); assert.equal(result.state.player.energy,0);
+  assert.ok(!result.events.some(e => e.type === "energy" && e.reason === "round"));
+  assert.ok(availableActions(result.state,"player").some(a => a.kind === "push"));
 });
 
-test("회복 총량 25%·실손실 제한·소모품 1회·매 판 초기화", () => {
-  let state = createBattle({ seed: 2, player: buildFighter("B001",18,[],{ moves: ["T60"], consumable: "I21" }), opponent: buildFighter("B001",18) });
+test("회복 총량 60%·3개 가방·실손실 제한·매 판 초기화", () => {
+  let state = createBattle({ seed: 2, player: buildFighter("B001",18,[],{ items: ["P03","P03","P03"] }), opponent: buildFighter("B001",18) });
   const max = state.player.stats.hp;
-  state.player.hp = 1; state.player.energy = 10;
-  state = stepRound(quiet(state),move("T60")).state;
-  state = stepRound(quiet(state),{ kind: "item", itemId: "I21" }).state;
-  state = stepRound(quiet(state),move("T60")).state;
-  assert.equal(state.player.healed,Math.floor(max*.25));
-  assert.equal(state.player.hp,1+Math.floor(max*.25));
+  for(let i=0;i<2;i++) { state.player.hp=1; state=stepRound(quiet(state),{kind:"item",itemId:"P03"}).state; }
+  assert.equal(state.player.healed,Math.floor(max*.6));
   assert.equal(recoveryLeft(state.player),0);
-  assert.ok(!availableActions(state,"player").some(a => a.kind === "item" || a.moveId === "T60"));
-  const fresh = createBattle({ seed: 2, player: state.player, opponent: state.opponent });
-  assert.equal(fresh.player.hp,max); assert.equal(fresh.player.energy,6); assert.equal(fresh.player.healed,0); assert.equal(fresh.player.itemUsed,false);
+  assert.ok(!availableActions(state,"player").some(a => a.kind === "item"));
+  const fresh=createBattle({seed:2,player:state.player,opponent:state.opponent});
+  assert.equal(fresh.player.healed,0); assert.deepEqual(fresh.player.usedItems,[]);
   fresh.player.hp--;
-  const healed = stepRound(quiet(fresh),move("T60")).state;
+  const healed=stepRound(quiet(fresh),{kind:"item",itemId:"P03"}).state;
   assert.equal(healed.player.healed,1); assert.equal(healed.player.hp,max);
 });
 
@@ -161,8 +155,8 @@ test("12라운드 HP 비율 판정: 5%p 포함 경계와 그만하기", () => {
 test("실행한 행동만 기력 차감·빗나감·방어막 지속/소비·연속 방어", () => {
   let state = quiet(make());
   let result = stepRound(state,move("T43"));
-  assert.equal(result.state.player.shield.multiplier,.65);
-  result = stepRound(quiet(result.state),move("T43")); assert.equal(result.state.player.shield.multiplier,.85);
+  assert.ok(result.events.some(e=>e.type==="shield"&&e.change==="applied"&&Math.abs(e.multiplier-.4)<1e-9));
+  result = stepRound(quiet(result.state),move("T43")); assert.ok(result.events.some(e=>e.type==="shield"&&e.change==="applied"&&Math.abs(e.multiplier-.7)<1e-9));
   result = stepRound(quiet(result.state),rest); assert.equal(result.state.player.shield,undefined);
   let missed = false, hit = false, ended = false;
   for (let seed = 0; seed < 150 && !(missed && hit && ended); seed++) {
@@ -170,13 +164,13 @@ test("실행한 행동만 기력 차감·빗나감·방어막 지속/소비·연
     state.opponent.shield = { multiplier: .65, expires: 2 };
     result = stepRound(state,move("T01"));
     if (result.events.some(e => e.type === "miss")) {
-      missed = true; assert.ok(result.state.opponent.shield); assert.equal(result.state.player.energy,6);
+      missed = true; assert.ok(result.state.opponent.shield); assert.equal(result.state.player.energy,8);
       assert.ok(!result.events.some(e => e.type === "damage"));
     } else { hit = true; assert.equal(result.state.opponent.shield,undefined); }
     state = make("B002","B001",10,seed); state.opponent.hp = 1; state.opponentAction = move("T01");
     result = stepRound(state,move("T13"));
     if (result.state.outcome === "player") {
-      ended = true; assert.equal(result.state.opponent.energy,6);
+      ended = true; assert.equal(result.state.opponent.energy,10);
       assert.equal(result.events.filter(e => e.type === "action").length,1);
     }
   }
@@ -207,7 +201,7 @@ test("상태 최대 2개·오래된 상태 교체·갱신·면역과 견종 특�
   state = stepRound(state,move("T34")).state;
   assert.equal(state.player.buffs[0].expires,3);
   state = quiet(make("B005","B001")); state.round = 3; state.player.energy = 0;
-  assert.equal(stepRound(state,rest).state.player.energy,8);
+  assert.equal(stepRound(state,rest).state.player.energy,7);
   state = make("B002","B001");
   assert.equal(effectiveStat(state.player,"speed",1),Math.floor(state.player.stats.speed*1.05));
   assert.equal(effectiveStat(state.player,"speed",3),state.player.stats.speed);
@@ -273,7 +267,7 @@ test("레벨 1·10·20·30/후반 학습/양쪽 아이템/두 난이도 완료 �
         const a = result.state[side];
         assert.ok(a.hp >= 0 && a.hp <= a.stats.hp);
         assert.ok(a.energy >= 0 && a.energy <= 10);
-        assert.ok(a.healed <= Math.floor(a.stats.hp*.25));
+        assert.ok(a.healed <= Math.floor(a.stats.hp*.6));
         assert.ok(a.statuses.length <= 2);
       }
       state = result.state;
@@ -282,9 +276,9 @@ test("레벨 1·10·20·30/후반 학습/양쪽 아이템/두 난이도 완료 �
   }
   const input = buildFighter("B001",10,[],{ consumable: "I19" });
   const state = createBattle({ seed: 20, player: input, opponent: input });
-  state.player.energy = 0; state.opponentAction = { kind: "item", itemId: "I19" };
+  state.player.energy = 0; state.opponent.energy = 7; state.opponentAction = { kind: "item", itemId: "I19" };
   const result = stepRound(state,{ kind: "item", itemId: "I19" });
-  assert.equal(result.state.player.energy,5);
+  assert.equal(result.state.player.energy,3);
   assert.equal(result.state.opponent.energy,10);
   assert.ok(result.state.player.itemUsed && result.state.opponent.itemUsed);
 });
@@ -377,7 +371,7 @@ test("충전 예고·선불 기력·강제 발동·취소·연속 개별 명중�
     assert.equal(availableActions(state,"player").find(a=>a.moveId===id).phase,"prepare");
     const prep=stepRound(quiet(state),move(id)); state=prep.state;
     assert.equal(state.player.charging,id); assert.ok(!prep.events.some(e=>e.type==="damage"));
-    assert.equal(state.player.energy,12-MOVE_BY_ID[id].energy);
+    assert.equal(state.player.energy,10-MOVE_BY_ID[id].energy);
     assert.equal(availableActions(state,"player")[0].phase,"release");
     assert.throws(()=>stepRound(state,rest));
     assert.equal(previewDamage(MOVE_BY_ID[id],state.player,state.opponent).preparationRounds,0);
@@ -403,12 +397,12 @@ test("충전 예고·선불 기력·강제 발동·취소·연속 개별 명중�
   for(const id of ["C05","C06"]) {
     let state=createBattle({seed:3,player:buildFighter("B001",10,[],{moves:[id]}),opponent:buildFighter("B001",10)});
     state.player.energy=10; state=stepRound(quiet(state),move(id)).state;
-    if(id==="C05") assert.equal(state.player.energy,6);
+    if(id==="C05") assert.equal(state.player.energy,4);
     else assert.equal(effectiveStat(state.player,"defense",2),Math.floor(state.player.stats.defense*.85));
     state=stepRound(quiet(state),rest).state; assert.equal(state.player.recoil,undefined);
   }
   assert.ok(MOVES.every(m=>Number.isInteger(m.energy)&&m.energy>=0&&m.energy<=8));
-  assert.equal(MOVES.filter(m=>m.mode==="normal").length,24);
+  assert.equal(MOVES.filter(m=>m.mode==="normal").length,27);
 });
 
 test("연속 공격 프리뷰 방어막 1회 소비·신규 기술 AI 선택과 종료", () => {
@@ -452,64 +446,255 @@ function play(player,opponent,seed,criticals = true) {
   return state;
 }
 
-function concentrated(id,level,stat) {
-  const allocation = recommendedAllocation(id,level), total = 3*(level-1), cap = Math.max(1,Math.floor(total*.4));
-  if (!total) return allocation;
-  while (allocation[stat] < cap) {
-    const donor = Object.keys(allocation).filter(s => s !== stat).sort((a,b) => allocation[b]-allocation[a])[0];
-    allocation[donor]--; allocation[stat]++;
-  }
-  return allocation;
-}
-
-test("밸런스: 레벨별 동급·크리티컬·컨디션·분배·숙련도", () => {
-  const start = performance.now(), samples = Number(process.env.BATTLE_SAMPLES ?? 300), rows = [];
-  assert.ok(Number.isInteger(samples) && samples > 0);
-  const variants = ["base","noCrit","condition10","condition20","condition30",...Object.keys(BREEDS[0].base).map(s => `allocation:${s}`),"mastery5"];
-  for (const level of [1,10,30,60,100]) for (const id of ["B001","B002"]) for (const variant of variants) {
-    const count = variant === "base" ? samples : Math.min(samples,100);
-    const options = {};
-    if (variant.startsWith("condition")) options.condition = { fullness: 30, mood: variant === "condition10" ? 100 : 30, clean: variant === "condition30" ? 30 : 100 };
-    if (variant.startsWith("allocation:")) options.allocation = concentrated(id,level,variant.split(":")[1]);
-    if (variant === "mastery5") options.mastery = Object.fromEntries([...MOVES,PUSH].map(m => [m.id,5]));
-    const player = buildFighter(id,level,[],options);
-    let wins=0, rounds=0, limit=0, draws=0, pairedWins=0;
-    for (const breed of BREEDS) {
-      const opponent = buildFighter(breed.id,level);
-      for (let seed=10000; seed<10000+count; seed++) {
-        const state=play(player,opponent,seed,variant !== "noCrit");
-        wins += state.outcome === "player"; if(seed<10100) pairedWins += state.outcome === "player"; draws += state.outcome === "draw"; rounds += state.round; limit += state.round === 12;
-      }
+test("위력 예산·유료 공격의 평균 피해 단조성·무료 기본기", () => {
+  for(const m of MOVES.filter(m=>m.kind==="attack")) assert.equal(m.power,powerBudget(m.energy,m),m.id);
+  assert.equal(PUSH.power,10);
+  assert.equal(FINISHERS.length,6); assert.ok(FINISHERS.every(m=>m.energy===0&&m.power===34));
+  const average=m=>{
+    let total=0;
+    for(const level of [1,10,30,60,100]) for(const a of BREEDS) for(const d of BREEDS) {
+      const p=previewDamage(m,buildFighter(a.id,level),buildFighter(d.id,level)); total+=(p.min+p.max)/2;
     }
-    const n = count*BREEDS.length;
-    rows.push({level,id,variant,count,pairedRate:pairedWins/(Math.min(count,100)*12)*100,rate:wins/n*100,rounds:rounds/n,limit:limit/n*100,draws:draws/n*100});
-  }
-  const elapsed=(performance.now()-start)/1000;
-  console.log(JSON.stringify({samples,elapsed,summary:rows.filter(r=>r.variant === "base").map(b=>({...b, changes:rows.filter(r=>r.level===b.level&&r.id===b.id).map(r=>[r.variant,+(r.rate-b.pairedRate).toFixed(1)])}))}));
-  if (samples === 300) {
-    for (const row of rows.filter(r => r.variant === "base")) {
-      assert.ok(row.rate >= 55 && row.rate <= 75,`${row.id} Lv.${row.level} 승률 ${row.rate}`);
-      assert.ok(row.rounds >= 6 && row.rounds <= 10,`${row.id} Lv.${row.level} 라운드 ${row.rounds}`);
-      assert.ok(row.limit <= 15,`${row.id} Lv.${row.level} 12라운드 도달 ${row.limit}`);
-      for (const v of rows.filter(r => r.id === row.id && r.level === row.level && (r.variant.startsWith("allocation:") || r.variant === "mastery5"))) assert.ok(Math.abs(v.rate-row.pairedRate) <= 10,`${row.id} Lv.${row.level} ${v.variant} 변화 ${v.rate-row.pairedRate}`);
-    }
-    assert.ok(elapsed < 28,`로더 포함 30초 예산: 시뮬레이션 ${elapsed.toFixed(2)}초`);
-  }
-  if (process.env.BATTLE_REPORT === "1") writeReport(rows,samples,elapsed);
+    return total/(5*12*12);
+  };
+  const free=average(PUSH), paid=MOVES.filter(m=>m.kind==="attack").map(m=>({m,damage:average(m)}));
+  for(const {m,damage} of paid) assert.ok(damage>free,`${m.id}: ${damage} <= ${free}`);
+  const plain=paid.filter(({m})=>!m.status&&!m.buff&&!m.priority&&!m.breaksDefense&&m.mode==="normal");
+  for(const a of plain) for(const b of plain) if(a.m.energy>b.m.energy) assert.ok(a.damage>b.damage,`${a.m.id}/${b.m.id}`);
 });
 
-function writeReport(rows,samples,elapsed) {
-  const f=n=>n.toFixed(2), name=id=>id === "B001" ? "도미" : "미네";
-  const lines=["# 싸움왕 1단계 전투 엔진 검증", "", `12견종, Lv.1·10·30·60·100, 무장비·소모품 없음, 시작 기력 6, 기본 장착 기술, 일반 AI. 기준 조합당 ${samples}개 시드, 영향 비교 조합당 ${Math.min(samples,100)}개 시드(10000부터), 총 ${rows.reduce((s,r)=>s+r.count*12,0)}판. 시뮬레이션 ${f(elapsed)}초. 탐욕 정책은 명중률을 반영한 즉시 기대 피해 최대 공격을 고르며 예고를 선행 탐색하지 않는다. 승률은 순수 승리 비율이며 무승부를 승리에 포함하지 않는다. 12라운드 도달률은 마지막 라운드 KO도 포함한다.`, "", "| 레벨 | 강아지 | 승률 | 평균 라운드 | 12라운드 도달 |", "|---:|---|---:|---:|---:|"];
-  for (const r of rows.filter(r=>r.variant === "base")) lines.push(`| ${r.level} | ${name(r.id)} | ${f(r.rate)}% | ${f(r.rounds)} | ${f(r.limit)}% |`);
-  lines.push("", "영향 비교는 같은 상대·레벨·처음 100개 시드를 짝지었다. 아래 기준 승률은 이 100개 시드의 결과라 위 300개 시드 표와 조금 다르다. 크리티컬 끄기는 양쪽에 적용하고, 다른 옵션은 플레이어만 바꾼다. 한 스탯 편중은 40% 상한까지 올리고 나머지 추천 분배에서 많은 순으로 옮긴다. Lv.1은 포인트가 없어 분배 효과가 없다. 숙련도는 기본 밀기를 포함한 모든 공격 Lv.1→5 비교다.", "", "| 레벨 | 강아지 | 크리티컬 전→후 승률 | 컨디션 0/10/20/30% 승률 | 체력/공격/방어/민첩/집중/침착 편중 변화(%p) | 숙련도 1→5 변화(%p) |", "|---:|---|---|---|---|---:|");
-  for (const b of rows.filter(r=>r.variant === "base")) {
-    const get=v=>rows.find(r=>r.level===b.level&&r.id===b.id&&r.variant===v);
-    lines.push(`| ${b.level} | ${name(b.id)} | ${f(get("noCrit").rate)}→${f(b.pairedRate)}% | ${[b.pairedRate,...[10,20,30].map(n=>get(`condition${n}`).rate)].map(f).join(" / ")}% | ${Object.keys(BREEDS[0].base).map(s=>f(get(`allocation:${s}`).rate-b.pairedRate)).join(" / ")} | ${f(get("mastery5").rate-b.pairedRate)} |`);
-  }
-  lines.push("", "## 조정한 수치", "", "성장식만 교체한 첫 12개 시드 표본에서 도미 승률은 Lv.1 19.4%, Lv.10 42.4%였고, Lv.100 체력 편중은 +29.9%p, 숙련도는 +25.7%p였다. 집중 보정·분배·숙련도 비율을 낮추지 않고 기본 체력과 앞발 밀기 위력을 조정했다. 체력이 낮은 상대와 오래 버티는 상대의 차이가 커졌으므로, 전체 평균 합격이 상대별 균형을 뜻하지는 않는다.", "", "| 견종 | 체력 변경 |", "|---|---:|");
-  const old={B001:121,B002:140,B003:140,B004:135,B005:166,B007:142,B009:128,B015:144,B017:140,B018:136,B020:180,B022:136};
-  for(const b of BREEDS) lines.push(`| ${b.name} | ${old[b.id]} → ${b.base.hp} |`);
-  lines.push("", "앞발 밀기 위력 12→16. 다른 기본 스탯·기존 기술 위력은 유지했다. 크리티컬은 5 + 정규화 집중×0.2(%), 상한 25%, 피해 ×1.5로 도입했고 추가 조정하지 않았다. 분배 자동 80%·분배 20%, 숙련도 레벨당 +4%도 유지했다. 일반 AI는 기존 후보 가중치 60/30/10%를 유지하면서 명중률·운용 시간을 반영한다.", "", "## 규칙과 호환성", "", "누적 XP와 Q·S 성장 감쇠는 설계식 그대로다. 레벨당 3점, 한 스탯 최대 max(1, floor(총점×0.4)), Lv.1은 0점이다. 체력의 4배 단위를 보존하며 추천 비율이 없는 견종은 체력/4를 분배 가중치로 쓴다. 도미·미네는 설계서 추천 비율을 사용한다. allocation 생략은 추천 자동 분배, 빈 객체는 전부 미분배다. xpToNext(xp)는 다음 레벨까지 남은 XP이며 Lv.999는 0이다.", "", "conditionPenalty는 0~0.30 비율이며 체력을 제외한 최종 스탯에 적용한다. 직업은 스탯별 비율 표(±8%)만 받는다. 전투 생성 때 분배·직업·컨디션·숙련도·환경을 포함해 다시 검증하고 복사한다. 실제 저장이나 재분배 처리는 포함하지 않는다.", "", "기존 24기술은 normal. C01/C02는 charge(6/8기력), C03/C04는 multi(2/3회, 타격별 명중 판정), C05/C06는 recoil(다음 라운드 기력 −3/방어 −15%)다. 새 기술은 공통으로 선택 가능하지만 기본 장착에는 넣지 않는다. 충전은 준비 때 비용을 지불하고 다음 라운드 강제 발동한다. 예고 phase=prepare/release로 구분한다. 기력 반동은 라운드 종료 회복 후 다음 행동 예고 전에 적용한다.", "", "미리보기 min/max는 비크리티컬 전타 명중 기준이다. perHit·hits·criticalMax·criticalChance·preparationRounds·recoil을 추가했다. damageAt은 타격 1회의 피해다. 그 라운드 상대가 방어를 선택하면 행동 순서와 무관하게 크리티컬이 없다. AI는 크리티컬 확률을 평가에 쓰지 않는다. 비교용 createBattle({criticals:false})도 난수 1회를 소비하므로 분기가 갈라지기 전까지 같은 난수열이다.", "", "움직임·서식지·환경은 FighterOptions 선택 필드다. 종/환경 정보가 없는 기존 견종은 해당 보정 1.0이며 체급 보정은 유지한다. 보조 배율은 0.88~1.12, 힌트는 합산 1.10 이상/0.90 이하로 판정한다. 활동 시간은 집중 +3%다. 기존 export 이름·인자·필드와 이벤트 종류를 유지하고 선택 필드만 추가했다.", "", "SQL·화면·서버·저장·직업 데이터·실기기·빌드는 범위 밖이다. 같은 시드와 행동열의 결정성, 입력 불변성, XP 전 레벨 경계, 옵션 검증, 신규 기술을 단위 테스트로 확인한다. 기본 장착에 없는 공통 예시 기술의 조합별 승률은 이번 기본 12견종 시뮬레이션에 포함하지 않았다. 재현: `node --test scripts/pet-battle.test.mjs`; 보고서 갱신: PowerShell에서 `$env:BATTLE_REPORT='1'` 후 같은 명령.");
-  writeFileSync("docs/pet-battle-sim.md",lines.join("\n")+"\n");
+function duel(playerMove, opponentMove, seed=1, options={}) {
+  const state=createBattle({seed,criticals:false,player:buildFighter("B001",10,[],{moves:[playerMove],...options}),opponent:buildFighter("B001",10,[],{moves:[opponentMove]})});
+  state.opponentAction=move(opponentMove);
+  return state;
 }
+function hitResult(state, action, input) {
+  for(let seed=0;seed<100;seed++) {
+    const result=stepRound({...state,rng:seed},action,input);
+    if(!result.events.some(e=>e.type==="miss")) return result;
+  }
+  assert.fail("명중 표본 없음");
+}
+
+test("방어 4종·반격 피해·헛돌기·연속 약화·흔들기와 휘청", () => {
+  const attack=MOVE_BY_ID.T01, base=duel("T43","T01"); base.player.energy=5;
+  const guarded=hitResult(base,move("T43"));
+  assert.equal(guarded.state.player.energy,6); assert.equal(guarded.state.player.momentum,18);
+  assert.ok(guarded.events.some(e=>e.type==="shield"&&e.change==="applied"));
+  const actor={...base.player,defense:{kind:"guard",strength:1,expires:1}};
+  assert.equal(damageAt(attack,base.opponent,actor,1),Math.floor(damageAt(attack,base.opponent,base.player,1)/.95*.95*.4));
+  const counter=hitResult(duel("T31","T01"),move("T31"));
+  assert.equal(counter.state.player.hp,counter.state.player.stats.hp);
+  assert.ok(counter.events.some(e=>e.type==="counter")); assert.equal(counter.state.player.momentum,30);
+  assert.ok(counter.events.some(e=>e.type==="damage"&&e.side==="player"&&e.amount>0));
+  const missed=stepRound(quiet(duel("T31","T01")),move("T31"));
+  assert.equal(missed.state.player.exposedUntil,2);
+  const normal={...missed.state.player,exposedUntil:undefined};
+  assert.ok(damageAt(attack,missed.state.opponent,missed.state.player,1,2)>=damageAt(attack,missed.state.opponent,normal,1,2)*1.25-1);
+  const repeat={...counter.state,opponentAction:move("T01")};
+  const repeated=hitResult(repeat,move("T31")); assert.ok(repeated.state.player.hp<repeat.player.hp);
+  const switched=structuredClone(repeat); switched.player.moves=["T21","T31"]; switched.player.lastAction=move("T21");
+  assert.equal(hitResult(switched,move("T31")).state.player.hp,repeated.state.player.hp);
+  const protectedState=duel("T31","T01"); protectedState.opponent.defense={kind:"stance",strength:1,expires:2}; protectedState.opponent.shield={multiplier:.5,expires:12};
+  const protectedCounter=hitResult(protectedState,move("T31"));
+  const retaliation=counter.events.find(e=>e.type==="damage"&&e.side==="player").amount;
+  assert.equal(protectedCounter.events.find(e=>e.type==="damage"&&e.side==="player").amount,Math.floor(retaliation*.5*.7));
+  assert.equal(protectedCounter.state.opponent.shield,undefined);
+  for(const id of ["C01","C04","F01"]) {
+    const state=duel("T19",id==="F01" ? "T01" : id);
+    if(id==="C01") state.opponent.charging=id;
+    if(id==="F01") { state.opponent.finisher=id; state.opponent.momentum=100; }
+    state.opponentAction=move(id);
+    const result=hitResult(state,move("T19"));
+    assert.ok(result.events.some(e=>e.type==="evade"));
+    if(id!=="C04") assert.equal(result.state.player.hp,state.player.hp);
+    else assert.ok(result.state.player.hp<state.player.hp);
+    assert.equal(result.state.opponent.energy,10-(id==="C04" ? MOVE_BY_ID.C04.energy+1 : 2));
+  }
+  const stance=hitResult(duel("T67","T01"),move("T67"));
+  assert.equal(stance.state.player.defense.kind,"stance"); assert.equal(stance.state.player.defense.expires,2);
+  const after=hitResult({...stance.state,opponentAction:move("T01")},rest);
+  assert.equal(after.state.player.defense,undefined);
+  const broken=hitResult(duel("K01","T43"),move("K01"));
+  assert.ok(broken.events.some(e=>e.type==="break")); assert.ok(broken.events.some(e=>e.type==="stagger"));
+  assert.equal(broken.state.opponent.defense,undefined);
+  assert.ok(!availableActions(broken.state,"opponent").some(a=>moveFor(a)?.kind==="defense"));
+  assert.throws(()=>stepRound({...broken.state,opponentAction:move("T43")},rest));
+  const clear=stepRound({...broken.state,opponentAction:rest},rest).state;
+  assert.ok(availableActions(clear,"opponent").some(a=>moveFor(a)?.kind==="defense"));
+  let blocked=false;
+  for(let seed=0;seed<100&&!blocked;seed++) {
+    const state=duel("T67","K01",seed);
+    state.opponent=buildActor("B018",["T16"],seed); state.opponentAction=move("T16");
+    blocked=stepRound(state,move("T67")).events.some(e=>e.type==="status"&&e.change==="blocked");
+  }
+  assert.ok(blocked);
+});
+function buildActor(id,moves,seed=1,options={}) {
+  const fighter=buildFighter(id,10,[],{moves,...options});
+  return createBattle({seed,player:fighter,opponent:fighter}).player;
+}
+
+test("소모품 8분류·중복 강화·보호·급소·취소·대장·버티기·주인 AI", () => {
+  assert.equal(CONSUMABLES.length,14); assert.equal(new Set(CONSUMABLES.map(i=>i.category)).size,8);
+  for(const options of [{items:["P01","P01","P01","P01"]},{items:["bad"]},{items:["I01"]},{items:["P01"],consumable:"I19"},{owned:1},{boss:"yes"},{equipmentStats:1},{finisher:"T01"}]) assert.throws(()=>buildFighter("B001",10,[],options));
+  for(const item of CONSUMABLES.filter(i=>i.buff)) {
+    const state=quiet(duel("T01","T01",1,{items:[item.id,item.id]}));
+    const used=stepRound(state,{kind:"item",itemId:item.id}).state;
+    assert.equal(effectiveStat(used.player,item.buff,2),Math.floor(state.player.stats[item.buff]*1.2));
+    assert.ok(!availableActions(used,"player").some(a=>a.kind==="item"));
+    assert.equal(used.player.buffs[0].expires,3);
+    const expired=stepRound(quiet(stepRound(quiet(used),rest).state),rest).state;
+    assert.ok(availableActions(expired,"player").some(a=>a.kind==="item"));
+  }
+  for(const [id,amount] of [["P04",3],["P05",6]]) {
+    const state=quiet(duel("T01","T01",1,{items:[id]})); state.player.energy=0;
+    assert.equal(stepRound(state,{kind:"item",itemId:id}).state.player.energy,amount);
+  }
+  const dirty=quiet(duel("T01","T01",1,{items:["P10"]})); dirty.player.statuses=[{id:"stagger",applied:1,expires:2}]; dirty.player.exposedUntil=2;
+  const clean=stepRound(dirty,{kind:"item",itemId:"P10"}).state;
+  assert.deepEqual(clean.player.statuses,[]); assert.equal(clean.player.exposedUntil,undefined);
+  const shield=hitResult(duel("T01","T01",1,{items:["P11"]}),{kind:"item",itemId:"P11"});
+  assert.equal(shield.state.player.shield,undefined);
+  assert.ok(shield.events.some(e=>e.type==="shield"&&e.multiplier===.5));
+  let sweet=stepRound(quiet(duel("T01","T01",1,{items:["P12"]})),{kind:"item",itemId:"P12"}).state;
+  sweet.criticals=true;
+  const crit=hitResult(quiet(sweet),move("T01"));
+  assert.ok(crit.events.some(e=>e.type==="damage"&&e.critical)); assert.equal(crit.state.player.guaranteedCritical,false);
+  for(const boss of [false,true]) {
+    const state=duel("T01","T01",1,{items:["P13"]}); state.opponent.boss=boss;
+    const result=hitResult(state,{kind:"item",itemId:"P13"});
+    assert.equal(result.events.some(e=>e.type==="cancel"),!boss);
+    assert.equal(result.events.some(e=>e.type==="action"&&e.side==="opponent"),boss);
+  }
+  const dying=duel("T01","T01",1,{items:["P14","P14"]}); dying.player.hp=1;
+  const saved=hitResult(dying,{kind:"item",itemId:"P14"});
+  assert.equal(saved.state.player.hp,1); assert.equal(saved.state.player.survivalUsed,true);
+  assert.ok(!availableActions(saved.state,"player").some(a=>a.kind==="item"));
+  const dead=hitResult({...saved.state,opponentAction:move("T01")},rest);
+  assert.equal(dead.state.outcome,"opponent");
+  const state=make(); state.opponent.items=["P05"]; state.opponent.energy=0;
+  for(let rng=0;rng<50;rng++) assert.notEqual(chooseOpponentAction({...state,rng}).action.kind,"item");
+  state.opponent.owned=true;
+  assert.ok(Array.from({length:50},(_,rng)=>chooseOpponentAction({...state,rng}).action).some(a=>a.kind==="item"));
+});
+
+test("기세·결정기·타이밍 입력·순서 미리보기·깊은 복사", () => {
+  let state=duel("T01","T01",1,{items:["P01"],finisher:"F02"}); state.player.momentum=100;
+  assert.ok(availableActions(state,"player").some(a=>a.moveId==="F02"));
+  const before=structuredClone(state), result=hitResult(freeze(state),move("F02"));
+  assert.deepEqual(state,before); assert.ok(result.events.some(e=>e.type==="finisher"));
+  assert.ok(result.events.some(e=>e.type==="momentum"&&e.amount===-100));
+  assert.equal(result.state.player.energy,10); assert.ok(result.state.player.momentum<100);
+  result.state.player.items.push("P02"); result.state.player.usedItems.push("P02");
+  assert.deepEqual(state.player.items,["P01"]); assert.deepEqual(state.player.usedItems,[]);
+  state=quiet(duel("T01","T01"));
+  const normal=hitResult(state,move("T01")), perfect=hitResult(state,move("T01"),{attackTiming:"perfect"}), good=hitResult(state,move("T01"),{attackTiming:"good"});
+  const amount=r=>r.events.find(e=>e.type==="damage").amount;
+  assert.equal(amount(perfect),Math.floor(amount(normal)*1.1)); assert.equal(amount(good),Math.floor(amount(normal)*1.05));
+  assert.deepEqual(stepRound(state,move("T01")),stepRound(state,move("T01"),{attackTiming:"miss",guardTiming:"miss"}));
+  state=duel("T43","T01"); state.player.energy=4;
+  const guard=hitResult(state,move("T43")), timed=hitResult(state,move("T43"),{guardTiming:"perfect"});
+  assert.equal(amount(timed),Math.floor(amount(guard)*.8)); assert.equal(timed.state.player.energy,6);
+  assert.throws(()=>stepRound(state,rest,{attackTiming:"bad"}));
+  for(let seed=0;seed<50;seed++) for(const action of [move("T01"),rest,{kind:"quit"}]) {
+    const s=duel("T01","T01",seed), before=structuredClone(s), order=turnOrder(freeze(s),action);
+    assert.deepEqual(s,before); assert.equal(stepRound(s,action).events.find(e=>e.type==="action").side,order[0]);
+  }
+  const finish=quiet(duel("T01","T01")); finish.opponent.hp=1;
+  const ended=hitResult(finish,move("T01")); assert.equal(ended.events.at(-1).type,"end");
+  const reflect=duel("T31","T01"); reflect.opponent.hp=1;
+  const reflected=hitResult(reflect,move("T31")); assert.equal(reflected.events.at(-1).type,"end");
+  assert.equal(reflected.state.outcome,"player");
+});
+
+function expected(action, actor, target, round) {
+  const m=moveFor(action); if(!m || m.kind!=="attack") return 0;
+  const p=previewDamage(m,actor,target,round);
+  return (p.min+p.max)/2*p.hitChance/100/(1+p.preparationRounds);
+}
+function policy(state, kind) {
+  const actions=availableActions(state,"player"), actor=state.player, target=state.opponent;
+  if(actor.charging) return actions[0];
+  const attacks=actions.filter(a=>moveFor(a)?.kind==="attack").sort((a,b)=>expected(b,actor,target,state.round)-expected(a,actor,target,state.round));
+  const best=attacks[0] ?? rest, damage=expected(best,actor,target,state.round);
+  if(kind==="attack") return actor.energy<2 && damage<target.hp && !moveFor(best)?.finisher ? rest : best;
+  if(kind==="items") {
+    const threat=expected(state.opponentAction,target,actor,state.round);
+    const item=actions.find(a=>a.kind==="item" && (ITEM_BY_ID[a.itemId].heal && actor.hp<=actor.stats.hp*.45 && (threat>=actor.hp || threat<actor.stats.hp*ITEM_BY_ID[a.itemId].heal*.7)
+      || ITEM_BY_ID[a.itemId].energy && actor.energy<=1 || ITEM_BY_ID[a.itemId].category==="critical" && threat===0 && actor.energy>=3 && target.hp>damage*2));
+    if(item && damage<target.hp) return item;
+  }
+  if(kind==="read" || kind==="items") {
+    const incoming=moveFor(state.opponentAction), threat=expected(state.opponentAction,target,actor,state.round);
+    const counter=actions.find(a=>moveFor(a)?.defense==="counter");
+    if(counter && incoming?.contact && incoming.energy>=2 && !incoming.breaksDefense && threat>=damage*1.05 && actor.lastAction?.moveId!==counter.moveId) return counter;
+    const guard=actions.find(a=>moveFor(a)?.defense==="guard");
+    if(guard && threat>0 && !incoming?.breaksDefense && actor.energy<2 && threat>actor.stats.hp*.15 && actor.lastAction?.moveId!==guard.moveId) return guard;
+  }
+  if((actor.energy<2 || kind==="manage" && actor.energy<=4 && expected(state.opponentAction,target,actor,state.round)===0) && damage<target.hp && !moveFor(best)?.finisher) return rest;
+  return best;
+}
+
+test("2차 정책 시뮬레이션", () => {
+  const start=performance.now(), samples=Number(process.env.BATTLE_SAMPLES ?? 32), rows=[];
+  assert.ok(Number.isInteger(samples)&&samples>0);
+  for(const level of [1,10,30,60,100]) for(const id of BREEDS.map(b=>b.id)) for(const kind of ["attack","manage","read","items"]) {
+    const player=buildFighter(id,level,[],{moves:[...BREEDS.find(b=>b.id===id).learn.filter(l=>l.level<=level&&MOVE_BY_ID[l.move].kind==="attack").slice(0,2).map(l=>l.move),"T43","T31"],...(kind==="items" ? {items:["P02","P05","P12"]} : {})});
+    let wins=0, rounds=0, limit=0, stuck=0, exhausted=0, uses=0;
+    for(const breed of BREEDS) {
+      const opponent=buildFighter(breed.id,level);
+      for(let seed=10000;seed<10000+samples;seed++) {
+        let state=createBattle({seed,player,opponent});
+        while(!state.outcome) {
+          const actions=availableActions(state,"player");
+          stuck+=!actions.some(a=>a.kind!=="quit");
+          exhausted+=!actions.some(a=>moveFor(a)?.kind==="attack" && moveFor(a).energy>0);
+          state=stepRound(state,policy(state,kind)).state;
+        }
+        wins+=state.outcome==="player"; rounds+=state.round; limit+=state.round===12; uses+=state.player.usedItems.length;
+      }
+    }
+    const n=BREEDS.length*samples;
+    rows.push({level,id,kind,rate:wins/n*100,rounds:rounds/n,limit:limit/n*100,stuck:stuck/rounds*100,exhausted:exhausted/rounds*100,uses:uses/n});
+  }
+  const elapsed=(performance.now()-start)/1000;
+  const summary=[1,10,30,60,100].flatMap(level=>["attack","manage","read","items"].map(kind=>{
+    const group=rows.filter(r=>r.level===level&&r.kind===kind), result={level,kind};
+    for(const key of ["rate","rounds","limit","stuck","exhausted","uses"]) result[key]=group.reduce((s,r)=>s+r[key],0)/group.length;
+    return result;
+  }));
+  console.log(JSON.stringify({samples,elapsed,rows:summary}));
+  if(samples>=32) {
+    for(const row of summary) {
+      assert.ok(row.rate>=55&&row.rate<=75,`정책 승률 ${JSON.stringify(row)}`);
+      assert.ok(row.rounds>=6&&row.rounds<=10,`정책 라운드 ${JSON.stringify(row)}`);
+      assert.ok(row.limit<=15,`정책 12라운드 ${JSON.stringify(row)}`);
+      assert.ok(row.stuck<=10);
+    }
+    for(const row of summary.filter(r=>r.kind==="read")) {
+      const attack=summary.find(r=>r.level===row.level&&r.kind==="attack");
+      const items=summary.find(r=>r.level===row.level&&r.kind==="items");
+      assert.ok(row.rate-attack.rate>=5&&row.rate-attack.rate<=12,`방어 이득 ${row.id}/${row.level}: ${row.rate-attack.rate}`);
+      assert.ok(items.rate-row.rate<=15,`소모품 이득 ${items.rate-row.rate}`);
+    }
+    assert.ok(elapsed<28,`실행 시간 ${elapsed}`);
+  }
+  if(process.env.BATTLE_REPORT==="1") {
+    const names={attack:"공격",manage:"기력 관리",read:"방어 읽기",items:"소모품"}, f=n=>n.toFixed(2);
+    const lines=[`12견종 × 12상대 × 5레벨 × 4정책 × ${samples}시드 = ${12*12*5*4*samples}판. 시드 10000~${9999+samples}, 시뮬레이션 ${f(elapsed)}초.`,"",
+      "| 레벨 | 정책 | 승률 | 평균 라운드 | 12라운드 도달 | 행동 불가 | 유료 공격 불가 | 평균 소모품 사용 |",
+      "|---:|---|---:|---:|---:|---:|---:|---:|"];
+    for(const r of summary) lines.push(`| ${r.level} | ${names[r.kind]} | ${f(r.rate)}% | ${f(r.rounds)} | ${f(r.limit)}% | ${f(r.stuck)}% | ${f(r.exhausted)}% | ${f(r.uses)} |`);
+    lines.push("","| 레벨 | 방어 읽기 − 공격 | 소모품 − 방어 읽기 |","|---:|---:|---:|");
+    for(const level of [1,10,30,60,100]) {
+      const rate=kind=>summary.find(r=>r.level===level&&r.kind===kind).rate;
+      lines.push(`| ${level} | +${f(rate("read")-rate("attack"))}%p | ${f(rate("items")-rate("read"))}%p |`);
+    }
+    const range=rows.filter(r=>r.kind==="read").map(r=>r.rate);
+    lines.push("",`견종별 방어 읽기 승률 범위는 ${f(Math.min(...range))}~${f(Math.max(...range))}%다. 평균 합격이 모든 견종·상대 조합의 균형을 뜻하지는 않는다.`);
+    const path="docs/pet-battle-sim.md", doc=readFileSync(path,"utf8");
+    assert.ok(doc.includes("<!-- simulation:start -->")&&doc.includes("<!-- simulation:end -->"));
+    writeFileSync(path,doc.replace(/<!-- simulation:start -->[\s\S]*?<!-- simulation:end -->/,`<!-- simulation:start -->\n${lines.join("\n")}\n<!-- simulation:end -->`));
+  }
+});

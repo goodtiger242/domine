@@ -1,7 +1,10 @@
-import { BREED_BY_ID, ITEM_BY_ID, MOVE_BY_ID, MOVES, PUSH } from "./data";
+import { BREED_BY_ID, FINISHERS, ITEM_BY_ID, MOVE_BY_ID, MOVES, PUSH } from "./data";
+import { random } from "./rng";
 import type { Action, Actor, BattleState, Condition, Fighter, FighterOptions, Group, Hint, Move, MovementType, Side, Size, Stat, Stats, Temperament } from "./types";
 
 export const MAX_ENERGY = 10;
+export const START_ENERGY = 10;
+export const REST_ENERGY = 5;
 export const MAX_ROUNDS = 12;
 export const MAX_LEVEL = 999;
 export const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -89,6 +92,11 @@ export function buildFighter(breedId: string, level: number, equipment: readonly
   const breed = BREED_BY_ID[breedId];
   checkLevel(level);
   if (!breed) throw new Error("견종이 올바르지 않습니다.");
+  for (const flag of [options.owned,options.boss,options.equipmentStats]) if (flag !== undefined && typeof flag !== "boolean") throw new Error("전투 옵션은 참/거짓입니다.");
+  if (options.finisher !== undefined && !FINISHERS.some(m => m.id === options.finisher)) throw new Error("올바른 결정기가 아닙니다.");
+  const items = options.items ?? (options.consumable ? [options.consumable] : []);
+  if (!Array.isArray(items) || items.length > 3 || items.some(id => ITEM_BY_ID[id]?.slot !== "bag")) throw new Error("소모품은 한 판에 3개까지입니다.");
+  if (options.items && options.consumable) throw new Error("items와 consumable은 함께 지정할 수 없습니다.");
   const allocation = options.allocation ?? recommendedAllocation(breedId,level), total = 3 * (level - 1);
   for (const [stat,value] of Object.entries(allocation)) if (!STATS.includes(stat as Stat) || !Number.isInteger(value) || value < 0 || value > (total ? Math.max(1,Math.floor(total*.4)) : 0)) throw new Error("분배 포인트 상한을 확인해 주세요.");
   if (Object.values(allocation).reduce((s,v) => s+v,0) > total) throw new Error("분배 포인트가 부족합니다.");
@@ -105,7 +113,7 @@ export function buildFighter(breedId: string, level: number, equipment: readonly
     const item = ITEM_BY_ID[id];
     if (!item || item.slot === "bag" || slots.has(item.slot)) throw new Error("장비는 슬롯별 한 개만 선택합니다.");
     slots.add(item.slot);
-    for (const stat of Object.keys(item.rates ?? {}) as Stat[]) rates[stat] = (rates[stat] ?? 0) + item.rates![stat]!;
+    if (options.equipmentStats === true) for (const stat of Object.keys(item.rates ?? {}) as Stat[]) rates[stat] = (rates[stat] ?? 0) + item.rates![stat]!;
   }
   if (options.consumable && ITEM_BY_ID[options.consumable]?.slot !== "bag") throw new Error("올바른 소모품이 아닙니다.");
   const q = growthQ(level);
@@ -118,14 +126,14 @@ export function buildFighter(breedId: string, level: number, equipment: readonly
   const learned = breed.learn.filter(entry => entry.level <= level).map(entry => entry.move);
   const moves = options.moves ?? learned.slice(0, 4);
   if (!moves.length || moves.length > 4 || new Set(moves).size !== moves.length || moves.some(id => !learned.includes(id) && !MOVES.some(m => m.id === id && m.common))) throw new Error("배운 기술 중 1~4개를 선택합니다.");
-  return { ...structuredClone(options), allocation: { ...allocation }, breedId, level, stats: result, equipment: [...equipment], moves: [...moves] };
+  return { ...structuredClone(options), finisher: options.finisher ?? FINISHERS.find(m => m.group === breed.group)!.id, allocation: { ...allocation }, breedId, level, stats: result, equipment: [...equipment], moves: [...moves] };
 }
 
 export function effectiveStat(actor: Fighter | Actor, stat: Exclude<Stat, "hp">, round = 1): number {
   let rate = 1;
   if ("buffs" in actor) {
     if (actor.recoil?.stat === stat && actor.recoil.expires >= round) rate *= 1 - (actor.recoil.rate ?? 0);
-    if (actor.buffs.some(b => b.stat === stat)) rate *= 1.15;
+    rate *= 1 + Math.max(0,...actor.buffs.filter(b => b.stat === stat && b.expires >= round).map(b => b.rate ?? .15));
     const penalty = { attack: ["stagger", .85], defense: ["open", .85], speed: ["slow", .8], focus: ["tense", .8] } as const;
     if (stat !== "calm" && actor.statuses.some(s => s.id === penalty[stat][0])) rate *= penalty[stat][1];
   }
@@ -160,10 +168,23 @@ export function damageAt(move: Move, attacker: Fighter | Actor, defender: Fighte
   }
   if (a.trait === "trackDamage" && move.group === "track") trait *= 1.04;
   if ("traitUsed" in defender && d.trait === "firstShield" && !defender.traitUsed) trait *= .92;
-  const shield = "shield" in defender ? defender.shield?.multiplier ?? 1 : 1;
+  const defending = "defense" in defender && defender.defense && defender.defense.expires >= round ? defender.defense : undefined;
+  const shield = move.breaksDefense && defending ? 1 : ("shield" in defender ? defender.shield?.multiplier ?? 1 : 1) * defenseMultiplier(move,defender,round);
+  const exposed = "exposedUntil" in defender && defender.exposedUntil === round ? 1.25 : 1;
+  const breakRate = move.breaksDefense && !defending ? .6 : 1;
+  const hits = move.mode === "multi" ? move.hits ?? 2 : 1;
   const power = move.power * (1 + .04 * ((attacker.mastery?.[move.id] ?? 1) - 1));
   const levelRate = clamp(1 + .02 * (growthQ(attacker.level) - growthQ(defender.level)),.85,1.15);
-  return Math.max(1, Math.floor((1.5 * power + .45 * offense) * 40 / (40 + defense) * growthScale(attacker.level) * levelRate * matchup(move.group,d.group,attacker,defender) * trait * shield * roll));
+  if (shield === 0) return 0;
+  return Math.max(1, Math.floor((1.5 * power + .45 * offense) / hits * 40 / (40 + defense) * growthScale(attacker.level) * levelRate * matchup(move.group,d.group,attacker,defender) * trait * shield * exposed * breakRate * roll));
+}
+export function defenseMultiplier(move: Move, defender: Fighter | Actor, round = 1): number {
+  const defense = "defense" in defender ? defender.defense : undefined;
+  if (!defense || defense.expires < round || move.breaksDefense) return 1;
+  const reduction = defense.kind === "guard" ? .6 : defense.kind === "stance" ? .3
+    : defense.kind === "counter" ? (move.contact ? 1 : 0)
+    : move.mode === "multi" ? .5 : move.mode === "charge" || move.finisher ? 1 : 0;
+  return 1 - reduction * defense.strength;
 }
 // Damage range is conditional on a hit; hitChance is reported separately.
 export function previewDamage(move: Move, attacker: Fighter | Actor, defender: Fighter | Actor, round = 1) {
@@ -186,7 +207,7 @@ export function moveFor(action: Action): Move | undefined {
   return action.kind === "push" ? PUSH : action.kind === "move" ? MOVE_BY_ID[action.moveId] : undefined;
 }
 export function recoveryLeft(actor: Actor): number {
-  return Math.max(0, Math.min(actor.stats.hp - actor.hp, Math.floor(actor.stats.hp * .25) - actor.healed));
+  return Math.max(0, Math.min(actor.stats.hp - actor.hp, Math.floor(actor.stats.hp * .60) - actor.healed));
 }
 export function availableActions(state: BattleState, side: Side): Action[] {
   if (state.outcome) return [];
@@ -195,12 +216,29 @@ export function availableActions(state: BattleState, side: Side): Action[] {
   const result: Action[] = [{ kind: "push" }, { kind: "rest" }];
   for (const id of actor.moves) {
     const move = MOVE_BY_ID[id];
-    if (move.energy <= actor.energy && (!move.heal || recoveryLeft(actor) > 0)) result.push({ kind: "move", moveId: id, ...(move.mode === "charge" ? { phase: "prepare" as const } : {}) });
+    if (move.energy <= actor.energy && !(move.kind === "defense" && actor.statuses.some(s => s.id === "stagger" && s.expires >= state.round)) && (!move.heal || recoveryLeft(actor) > 0)) result.push({ kind: "move", moveId: id, ...(move.mode === "charge" ? { phase: "prepare" as const } : {}) });
   }
-  const item = actor.consumable && ITEM_BY_ID[actor.consumable];
-  if (item && !actor.itemUsed && (item.heal ? recoveryLeft(actor) > 0 : actor.energy < MAX_ENERGY)) result.push({ kind: "item", itemId: item.id });
+  if ((actor.momentum ?? 0) >= 100 && actor.finisher) result.push({ kind: "move", moveId: actor.finisher });
+  const items = actor.items ?? (actor.consumable ? [actor.consumable] : []);
+  for (const id of new Set(items)) {
+    const item = ITEM_BY_ID[id];
+    if ((actor.usedItems?.filter(i => i === id).length ?? (actor.itemUsed ? 1 : 0)) >= items.filter(i => i === id).length) continue;
+    if (item.heal && !recoveryLeft(actor) || item.energy && actor.energy >= MAX_ENERGY || item.buff && actor.buffs.some(b => b.stat === item.buff && b.expires >= state.round)
+      || item.category === "cleanse" && !actor.statuses.length && !actor.exposedUntil
+      || item.category === "protect" && actor.shield || item.category === "critical" && actor.guaranteedCritical
+      || item.category === "survive" && (actor.survival || actor.survivalUsed)) continue;
+    result.push({ kind: "item", itemId: id });
+  }
   if (side === "player") result.push({ kind: "quit" });
   return result;
+}
+export function actionOrder(state: BattleState, playerAction: Action): number {
+  const priority = (a: Action) => a.kind === "quit" ? 3 : a.kind === "item" ? 2 : moveFor(a)?.priority ?? 0;
+  return priority(playerAction) - priority(state.opponentAction) || effectiveStat(state.player,"speed",state.round) - effectiveStat(state.opponent,"speed",state.round);
+}
+export function turnOrder(state: BattleState, playerAction: Action): [Side,Side] {
+  const order = actionOrder(state,playerAction);
+  return order > 0 || order === 0 && random(state.rng).value < .5 ? ["player","opponent"] : ["opponent","player"];
 }
 export function sameAction(a: Action, b: Action): boolean {
   return a.kind === b.kind && (a.kind !== "move" || b.kind === "move" && a.moveId === b.moveId) && (a.kind !== "item" || b.kind === "item" && a.itemId === b.itemId);
