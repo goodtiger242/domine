@@ -1,5 +1,6 @@
 "use client";
 
+import { cellBackground, cellShops } from "@/lib/domine/pet-cells";
 import { memo, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { bubblePosition } from "@/lib/domine/pet-bubble";
 import type { PetFace, PetStage } from "@/lib/domine/pet";
@@ -108,6 +109,7 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
 
 export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
   const cell = worldCell(cellId);
+  const [moving, setMoving] = useState(false);
   const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
   const ask = asking?.from === cell.id ? neighborCell(cell.id, asking.direction) : null;
   const map = cell.theme;
@@ -187,7 +189,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
   const period = backgroundAt(hour);
   const church = map === "church";
   const sceneScale = church ? 0.85 : 1;
-  const background = mapBackground(map, hour);
+  const background = cellBackground(cell.id, hour);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -329,7 +331,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
         </g>
       ) : null}
 
-      {travel?.phase === "cross" && <image className="pet-background-cross" href={mapBackground(worldCell(travel.from).theme, hour)} x="0" y="6" width="160" height="90" preserveAspectRatio="none" pointerEvents="none" />}
+      {travel?.phase === "cross" && <image className="pet-background-cross" href={cellBackground(travel.from, hour)} x="0" y="6" width="160" height="90" preserveAspectRatio="none" pointerEvents="none" />}
 
       {/* 도미 (가로 위치·방향·깊이는 transition 으로 부드럽게) */}
       <g key={travel ? `${travel.id}-${travel.phase}` : reduced ? `actor-${cue?.id}` : "actor"} data-pet-actor className={travel ? `pet-travel pet-travel-${travel.phase}` : reduced && cue ? "pet-action-fade" : undefined} style={travelStyle ?? move(s.x, s.y, s.dur, ` scale(${s.dir * sc}, ${sc})`)}>
@@ -458,12 +460,14 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
     <div className="pet-scene-picture pet-scene-ui">
       {busyText && <div className="pet-busy" role="status">{busyText}</div>}
       <div key={arrivalId ?? 0} className={`pet-location${arrivalId && !travel ? " pet-location-arrived" : ""}`} aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
+      {cellShops(cell.id).length > 0 && <ul className="pet-shop-plates" aria-label="이 칸의 가게">{cellShops(cell.id).map((name) => <li key={name}>{name}</li>)}</ul>}
       <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기"><span>MAP</span></button>
-      {DIRECTIONS.map((direction) => {
+      <button type="button" className="pet-move-toggle" aria-pressed={moving} disabled={locked} onClick={() => { setMoving(!moving); setAsking(null); }}><span>{moving ? "닫기" : "이동"}</span></button>
+      {moving && DIRECTIONS.map((direction) => {
         const destination = neighborCell(cell.id, direction);
         return destination && <button key={direction} type="button" className={`pet-direction pet-direction-${direction}`}
           aria-label={`${destination.name}(으)로 이동`} disabled={locked} title={destination.name}
-          onClick={() => setAsking({ from: cell.id, direction })}>
+          onClick={() => { setAsking({ from: cell.id, direction }); setMoving(false); }}>
           <span aria-hidden="true">{{ n: "↑", s: "↓", e: "→", w: "←" }[direction]}</span>
         </button>;
       })}

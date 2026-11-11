@@ -106,11 +106,9 @@ for (const cell of PET_WORLD) {
   assert.ok(html.includes('aria-label="미네의 말"'));
   assert.equal(html.includes('aria-label="신부님께 인사하기" disabled=""'), map.id === "church");
   assert.ok(html.includes(cell.name));
-  for (const direction of DIRECTIONS) {
-    const neighbor = neighborCell(cell.id, direction);
-    assert.equal(html.includes(`pet-direction-${direction}`), !!neighbor);
-    if (neighbor) assert.ok(html.includes(`aria-label="${neighbor.name}(으)로 이동" disabled=""`));
-  }
+  // 화살표는 "이동" 버튼을 눌러야 나타난다.
+  assert.ok(html.includes('class="pet-move-toggle"'));
+  for (const direction of DIRECTIONS) assert.ok(!html.includes(`pet-direction-${direction}`));
 }
 assert.ok(renderScene({ speaker: "priest" }).includes('aria-label="신부님의 말"'));
 // Verify the sheet's actual click handlers without opening a browser or database.
@@ -143,7 +141,7 @@ assert.ok(worldSheet.includes('aria-current="location"'));
 assert.ok(worldSheet.includes("D5 도미네 집 마당, 이동, 방문함"));
 sheetClicks.get("E5")(); assert.equal(moves.length,0);
 sheetClicks.get("A1")(); assert.deepEqual(moves,[]);
-assert.ok(renderSheet().includes("A1 · 군포산본 율곡아파트 · 아파트 단지"));
+assert.ok(renderSheet().includes("A1 · 율곡마을 아파트 단지 · 아파트 단지"));
 sheetClicks.get("아니요")(); assert.equal(selectedCell,"E5"); assert.deepEqual(moves,[]);
 sheetClicks.get("A1")(); renderSheet(); sheetClicks.get("이동하기")(); assert.deepEqual(moves,["A1"]);
 const scales = [];
@@ -177,13 +175,16 @@ try {
   globalThis.Image = class { set src(value) { requested.push(value); } };
   globalThis.document = { hidden: false, addEventListener() {}, removeEventListener() {} };
   globalThis.window = { matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }), requestIdleCallback: (cb) => { cb(); return 0; }, cancelIdleCallback() {}, clearTimeout() {} };
+  const cellSource = readFileSync("lib/domine/pet-cell-data.ts", "utf8");
+  const CELL_IMAGES = Object.fromEntries(Object.entries(JSON.parse(cellSource.slice(cellSource.indexOf("= {") + 2, cellSource.lastIndexOf("}") + 1))).map(([id, v]) => [id, v.image]));
   for (const cell of PET_WORLD) for (const hour of [6, 12, 18, 22]) {
     sceneEffects = [];
     requested.length = 0;
     const map = petMap(cell.theme);
     const rendered = renderScene({ cellId: cell.id, hour });
     const cleanups = sceneEffects.map((effect) => effect());
-    const expected = map.background ?? (map.id === "church" ? CHURCH_BACKGROUNDS : BACKGROUNDS)[backgroundAt(hour)];
+    const cellImage = CELL_IMAGES[cell.id] ? `/pet/cell/${cell.id}.webp` : null;
+    const expected = cellImage ?? map.background ?? (map.id === "church" ? CHURCH_BACKGROUNDS : BACKGROUNDS)[backgroundAt(hour)];
     assert.ok(rendered.includes(`href="${expected}"`), "Only committed background renders");
     assert.deepEqual(requested.filter((src) => src.startsWith("/pet/bg/")), [], "No background preloading outside map preparation");
     assert.ok(!requested.some((src) => src.includes("/mine/")), "Other dog's photos are not preloaded");

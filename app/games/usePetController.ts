@@ -1,5 +1,6 @@
 "use client";
 
+import { cellBackground } from "@/lib/domine/pet-cells";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createPetApi, acceptsResult, PetRpcError, supportsExploration, type PetApi, type PetBusy, type PetCapabilities, type PetCommand, type V6Result } from "@/lib/domine/pet-rpc";
 import { createClient } from "@/lib/supabase/client";
@@ -259,7 +260,7 @@ export function usePetController(injectedApi?: PetApi) {
       controller.signal.addEventListener("abort", cancel, { once: true });
       const safety = setTimeout(() => controller.abort(), 2500);
       try {
-        const src = mapBackground(cell.theme, new Date().getHours());
+        const src = cellBackground(cell.id, new Date().getHours());
         const [ready] = await Promise.all([prepareImage(src, controller.signal), sceneDelay(reduced ? 0 : 450, controller.signal)]);
         if (!valid()) return;
         if (ready === false) { controller.abort(); return; }
@@ -380,7 +381,7 @@ export function usePetController(injectedApi?: PetApi) {
     const id = ++idCounter.current;
     const controller = new AbortController();
     dispatch({ type: "map", map, id }); dispatch({ type: "map-ready", id }); dispatch({ type: "done", id });
-    void prepareImage(mapBackground(worldCell(map).theme, new Date().getHours()), controller.signal).then(() => {
+    void prepareImage(cellBackground(map, new Date().getHours()), controller.signal).then(() => {
       if (!alive.current || controller.signal.aborted) return;
       visit(map); setWorldReady(true);
     });
@@ -408,9 +409,9 @@ export function usePetController(injectedApi?: PetApi) {
       const hour = new Date().getHours();
       const backgrounds = new Set(DIRECTIONS.flatMap((dir) => {
         const cell = neighborCell(machine.committedMap, dir);
-        return cell ? [mapBackground(cell.theme, hour)] : [];
+        return cell ? [cellBackground(cell.id, hour)] : [];
       }));
-      backgrounds.delete(mapBackground(worldCell(machine.committedMap).theme, hour));
+      backgrounds.delete(cellBackground(machine.committedMap, hour));
       backgrounds.forEach((src) => { void prepareImage(src, controller.signal); });
     };
     const idle = typeof window.requestIdleCallback === "function";

@@ -7,7 +7,7 @@ import PetSheet from "./PetSheet";
 
 export function PetHistoryList({ entries }: { entries: PetHistoryEntry[] }) {
   return <ul className="pet-history" aria-label="최근 활동">{groupHistory(entries).map((row, index) => <li key={`${row.at}-${index}`}>
-    {historyText(row)}{row.count > 1 ? ` × ${row.count}` : ""} · <time dateTime={row.at}>{timeAgo(row.at)}</time>
+    {historyText(row)} · <time dateTime={row.at}>{timeAgo(row.at)}</time>
   </li>)}</ul>;
 }
 
