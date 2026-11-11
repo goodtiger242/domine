@@ -5,6 +5,13 @@ export type Direction = NonNullable<Extract<SceneCue, { action: "map" }>["direct
 export const DIRECTIONS = ["n", "s", "e", "w"] as const;
 export const DEFAULT_CELL = "E5";
 
+export function travelDirection(from: string, to: string): Direction {
+  const dx = to.charCodeAt(0) - from.charCodeAt(0);
+  const dy = Number(to.slice(1)) - Number(from.slice(1));
+  return Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? "e" : "w") : (dy >= 0 ? "s" : "n");
+}
+export type MapTravel = { id: number; from: string; direction: Direction; phase: "exit" | "cross" | "enter"; reduced: boolean };
+
 // 실제 지도(public/pet/world.webp, OpenStreetMap)의 200m 격자에서 읽은 장소. D5만 게임용 가상 장소이고, 가게 4곳은 대략의 위치다.
 export const PET_WORLD: readonly WorldCell[] = [
   { id: "A1", name: "군포산본 율곡아파트", theme: "apartment", kind: "아파트 단지" },

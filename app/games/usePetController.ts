@@ -7,12 +7,20 @@ import { createSecret, normalizeNickname, parseTransfer, readIdentity, registrat
 import { rewardDisplay } from "@/lib/domine/pet-progress";
 import { gameReducer, initialMachine, visualLocked, type GameEvent } from "@/lib/domine/pet-machine";
 import { mapBackground, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
-import { DIRECTIONS, neighborCell, savedCell, visitedCells, worldCell } from "@/lib/domine/pet-world";
+import { DIRECTIONS, neighborCell, savedCell, visitedCells, worldCell, travelDirection, type MapTravel } from "@/lib/domine/pet-world";
 import { type PetId } from "@/lib/domine/pet-photos";
 import { prepareImage, vibrate } from "@/lib/domine/pet-assets";
 import { SCENE_DURATION } from "@/lib/domine/pet-scene-plan";
 import type { PetAction, PetState } from "@/lib/domine/pet";
 
+function sceneDelay(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve) => {
+    const finish = () => { clearTimeout(timer); signal.removeEventListener("abort", finish); resolve(); };
+    const timer = setTimeout(finish, ms);
+    signal.addEventListener("abort", finish, { once: true });
+    if (signal.aborted) finish();
+  });
+}
 const safeGet = (key: string) => { try { return localStorage.getItem(key) ?? ""; } catch { return ""; } };
 const errorText: Record<string, string> = {
   AUTH_FAILED: "이미 쓰는 별명이에요. 다른 기기의 이전 코드를 입력하거나 다른 별명을 고르세요",
@@ -54,6 +62,7 @@ export function usePetController(injectedApi?: PetApi) {
   const [rewardNotice, setRewardNotice] = useState("");
   const [cue, setCue] = useState<SceneCue | null>(null);
   const [visited, setVisited] = useState<string[]>([]);
+  const [travel, setTravel] = useState<MapTravel | null>(null);
   const [arrival, setArrival] = useState<{ id: number; text: string } | null>(null);
   const [worldReady, setWorldReady] = useState(false);
   const [multiPet, setMultiPet] = useState(true);
@@ -186,16 +195,44 @@ export function usePetController(injectedApi?: PetApi) {
       const cell = next.to ? worldCell(next.to) : next.direction ? neighborCell(currentCell.id, next.direction) : null;
       if (!cell || cell.id === currentCell.id) return;
       const g = generation.current;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const trip: MapTravel = { id, from: currentCell.id, direction: travelDirection(currentCell.id, cell.id), phase: "exit", reduced };
       dispatch({ type: "map", map: cell.id, id });
+      setCue(null); setTravel(trip);
       const controller = new AbortController(); mapAbort.current?.abort(); mapAbort.current = controller;
-      const hour = new Date().getHours();
-      const src = mapBackground(cell.theme, hour);
-      await prepareImage(src, controller.signal);
-      if (!alive.current || generation.current !== g || controller.signal.aborted || machineRef.current.sceneId !== id) return;
-      dispatch({ type: "map-ready", id }); setCue(null);
-      visit(cell.id);
-      setArrival({ id, text: `${cell.name}에 왔어요` });
-      startExploration(cell.theme, "map");
+      const valid = () => alive.current && generation.current === g && !controller.signal.aborted && machineRef.current.sceneId === id;
+      const cancel = () => {
+        if (!alive.current) return;
+        setTravel((current) => current?.id === id ? null : current);
+        dispatch({ type: "map-cancel", id });
+      };
+      controller.signal.addEventListener("abort", cancel, { once: true });
+      const safety = setTimeout(() => controller.abort(), 2500);
+      try {
+        const src = mapBackground(cell.theme, new Date().getHours());
+        const [ready] = await Promise.all([prepareImage(src, controller.signal), sceneDelay(reduced ? 0 : 450, controller.signal)]);
+        if (!valid()) return;
+        if (ready === false) { controller.abort(); return; }
+        dispatch({ type: "map-ready", id });
+        setTravel({ ...trip, phase: "cross" });
+        visit(cell.id);
+        await sceneDelay(200, controller.signal);
+        if (!valid()) return;
+        if (!reduced) {
+          setTravel({ ...trip, phase: "enter" });
+          await sceneDelay(450, controller.signal);
+          if (!valid()) return;
+        }
+        setTravel(null); dispatch({ type: "done", id });
+        setArrival({ id, text: `${cell.name}에 왔어요` });
+        startExploration(cell.theme, "map");
+      } catch {
+        controller.abort();
+      } finally {
+        clearTimeout(safety);
+        controller.signal.removeEventListener("abort", cancel);
+        cancel();
+      }
     } else {
       dispatch({ type: "act", id, now: Date.now(), duration: SCENE_DURATION[next.action] });
       setCue({ ...next, id });
@@ -309,7 +346,7 @@ export function usePetController(injectedApi?: PetApi) {
 
   useEffect(() => {
     if (!feedback) return;
-    const timer = setTimeout(() => setFeedback(null), 2500);
+    const timer = setTimeout(() => setFeedback(null), 3000);
     return () => clearTimeout(timer);
   }, [feedback]);
 
@@ -348,7 +385,6 @@ export function usePetController(injectedApi?: PetApi) {
     return () => { observer.disconnect(); clearInterval(poll); document.removeEventListener("visibilitychange", update); window.removeEventListener("pagehide", hide); window.removeEventListener("pageshow", show); };
   }, [dispatch, refresh]);
   useEffect(() => {
-    if (machine.visual === "switching-map") { const timer = setTimeout(() => dispatch({ type: "done", id: machine.sceneId }), 180); return () => clearTimeout(timer); }
     if (machine.visual !== "acting" || !machine.deadlineAt) return;
     const timer = setTimeout(() => { setCue(null); dispatch({ type: "done", id: machine.sceneId }); }, Math.max(0, machine.deadlineAt - Date.now()));
     return () => clearTimeout(timer);
@@ -380,7 +416,7 @@ export function usePetController(injectedApi?: PetApi) {
     void refresh();
   }
   const done = useCallback((id: number, sleep?: boolean) => dispatch({ type: "done", id, sleep }), [dispatch]);
-  return { host, api, machine, active, shared, personal, feedback, message, rewardNotice, setMessage, capability, features, registered, identity, nickname, petId, multiPet, cue, visited, arrival, worldReady,
+  return { host, api, machine, active, shared, personal, feedback, message, rewardNotice, setMessage, capability, features, registered, identity, nickname, petId, multiPet, cue, visited, arrival, travel, worldReady,
     care, localScene, done, connect, selectPet, execute, refresh, checkCapabilities,
     retry: () => { if (pending.current) void execute(pending.current, true); },
     pause: () => { ++generation.current; abort.current?.abort(); mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },

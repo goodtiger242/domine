@@ -14,11 +14,11 @@ export function restingPose(map: PetMap): ScenePose {
   return { ...START_POINTS[map], dir: 1, dur: 0, motion: null, ball: null, hand: null, item: null, bowl: null, fx: [], scroll: false, carry: null };
 }
 export const SCENE_DURATION = { feed: 2400, treat: 2200, pet: 1800, play: 3500, walk: 4000, brush: 2600, bath: 3200, train: 3000, sleep: 1500, tap: 1100, priest: 1800, shop: 2000, map: 180 };
-export function buildScenePlan(cue: SceneCue, context: { map: PetMap; width: number; ratio: number }, random: () => number): ScenePlan {
+export function buildScenePlan(cue: SceneCue, context: { map: PetMap; width: number; ratio: number; origin?: { x: number; y: number } }, random: () => number): ScenePlan {
   const { map, width: w, ratio } = context, zone = SAFE_ZONES[map], h = w * ratio;
   const bound = actorBounds(w);
   const point = (x: number, y: number) => clampActor({ x, y }, bound, zone);
-  const start = point(zone.left + random() * (zone.right - zone.left), 82);
+  const start = cue.action === "tap" && context.origin ? point(context.origin.x, context.origin.y) : point(zone.left + random() * (zone.right - zone.left), 82);
   let pose: ScenePose = { ...restingPose(map), ...start, dir: random() < .5 ? -1 : 1 };
   const frames: SceneKeyframe[] = [];
   const add = (at: number, patch: Partial<ScenePose>, say?: string) => {
@@ -51,7 +51,7 @@ export function buildScenePlan(cue: SceneCue, context: { map: PetMap; width: num
     add(400, { motion: "pet-eatnod" });
     add(1700, { item: null, bowl: null, motion: null }, action === "feed" ? "feed_done" : "treat_eat");
   } else if (action === "pet" || action === "tap") {
-    add(0, { motion: random() < .5 ? "pet-nuzzle" : "pet-wiggle", fx: ["hearts"], hand: action === "pet" ? { x: start.x, y: start.y - h, dur: 0, rot: 0, stroke: true, e: "🤚" } : null }, action === "pet" ? "pet_head" : "tap_hop");
+    add(0, { motion: action === "tap" ? "pet-hop" : random() < .5 ? "pet-nuzzle" : "pet-wiggle", fx: ["hearts"], hand: action === "pet" ? { x: start.x, y: start.y - h, dur: 0, rot: 0, stroke: true, e: "🤚" } : null }, action === "pet" ? "pet_head" : "tap_hop");
   } else if (action === "brush") {
     add(0, { item: prop("🪮"), motion: "pet-wiggle" }, "brush_start");
     add(700, { item: { ...prop("🪮"), x: start.x - w * .3, dur: 500 } });

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { CATALOG } from "@/lib/domine/pet-catalog";
+import { CATALOG, catalogHint } from "@/lib/domine/pet-catalog";
 import type { PetCommand, V6Result } from "@/lib/domine/pet-rpc";
 import PetSheet from "./PetSheet";
 import PetItemIcon from "./PetItemIcon";
@@ -21,7 +21,7 @@ export default function PetAlbumSheet({ state, disabled, notice, map, execute, o
     <p className="pet-sheet-note" role="status">{notice || "맵 이동·산책 뒤 같은 맵에서 15초 머무르면 탐색해요. 발견 확률 75%, 발견 시 일반 65% · 특별 25% · 희귀 8% · 아주 드묾 2%. 새 발견 없이 4회면 다음 탐색에서 가능한 미발견 하나를 보장해요."}</p>
     {detail ? <div className="pet-product-detail"><button type="button" onClick={() => setDetail(null)}>‹ 목록으로</button><h3>{CATALOG.find((i) => i.id === detail)?.name}</h3><p>{explanations[detail]}</p><p>게임의 확인 기록이며 실제 미사 참석이나 신앙 활동의 증명은 아니에요.</p></div>
       : <><div className="pet-catalog-grid">{CATALOG.slice(0, count).map((item) => <div key={item.id} className="pet-catalog-card" data-found={found.includes(item.id)}>
-        <PetItemIcon item={item} discovered={found.includes(item.id)} /><small>{item.id} · {item.rarity}</small><strong>{item.name}</strong><span>{item.condition}{item.storage === "device" ? " · 다음 단계 준비 중" : ""}</span>
+        <PetItemIcon item={item} discovered={found.includes(item.id)} /><small>{item.id} · {item.rarity}</small><strong>{item.name}</strong><span>{found.includes(item.id) ? item.condition : catalogHint(item)}{item.storage === "device" ? " · 다음 단계 준비 중" : ""}</span>
         {explanations[item.id] && <button type="button" onClick={() => { setDetail(item.id); if (!disabled && map === "church" && seasonIds[state?.season ?? ""]?.includes(item.id)) void execute({ kind: "record_season", entry: item.id, requestId: crypto.randomUUID() }); }}>설명 읽기{found.includes(item.id) ? " ✓" : ""}</button>}
         {found.includes(item.id) && <small>✓ 기록함</small>}
       </div>)}</div>{count < 96 && <button type="button" className="pet-more" onClick={() => setCount(count + 24)}>24개 더 보기 ({count}/96)</button>}</>}

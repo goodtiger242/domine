@@ -169,10 +169,12 @@ for (const petId of [1, 2]) {
 // Exercise mount loaders with a fake browser: no network or DB calls.
 const oldWindow = globalThis.window;
 const oldImage = globalThis.Image;
+const oldDocument = globalThis.document;
 try {
   const requested = [];
   globalThis.Image = class { set src(value) { requested.push(value); } };
-  globalThis.window = { requestIdleCallback: (cb) => { cb(); return 0; }, cancelIdleCallback() {}, clearTimeout() {} };
+  globalThis.document = { hidden: false, addEventListener() {}, removeEventListener() {} };
+  globalThis.window = { matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }), requestIdleCallback: (cb) => { cb(); return 0; }, cancelIdleCallback() {}, clearTimeout() {} };
   for (const cell of PET_WORLD) for (const hour of [6, 12, 18, 22]) {
     sceneEffects = [];
     requested.length = 0;
@@ -188,6 +190,7 @@ try {
 } finally {
   globalThis.window = oldWindow;
   globalThis.Image = oldImage;
+  globalThis.document = oldDocument;
 }
 let total = 0;
 for (const src of [...Object.values(BACKGROUNDS), ...Object.values(POSES).map((p) => p.src)]) {

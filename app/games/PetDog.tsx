@@ -23,10 +23,11 @@ type Props = {
   collar: string;
   photos: Record<string, boolean>;
   onTap?: () => void;
+  disabled?: boolean;
   wearable?: string | null;
 };
 
-export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, collar, photos, onTap, wearable }: Props) {
+export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, collar, photos, onTap, wearable, disabled = false }: Props) {
   const config = PETS[petId];
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const pose = poseAt(motion, face);
@@ -42,15 +43,26 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
   const dirty = face === "dirty" && motion !== "pet-shake";
   const filter = `brightness(${light}) saturate(${sad ? 0.8 : 1})${dirty ? " sepia(0.35)" : ""}`;
   const cls =
-    photo ? "pet-bob" : motion === "pet-sleep" ? "pet-lie" : motion ?? (face === "sleepy" ? "pet-lie" : sad ? "pet-sag" : "pet-bob");
+    photo && (!motion || ["pet-sit", "pet-lie", "pet-sleep"].includes(motion)) ? "pet-bob" : motion === "pet-sleep" ? "pet-lie" : motion ?? (face === "sleepy" ? "pet-lie" : sad ? "pet-sag" : "pet-bob");
   return (
     <g
       className={cls}
       style={{ ["--oy" as string]: `${-height * 0.5}px`, cursor: "pointer" }}
-      onClick={onTap}
+      onPointerDown={(event) => {
+        if (disabled) return;
+        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        event.currentTarget.animate(reduced ? [{ opacity: .6 }, { opacity: 1 }] : [
+          { transform: "scale(1.12,.90)", offset: 0 },
+          { transform: "translateY(-3px) scale(.92,1.10)", offset: .35 },
+          { transform: "scale(1.12,.90)", offset: .77 },
+          { transform: "scale(1)", offset: 1 },
+        ], { duration: reduced ? 200 : 520, easing: "ease-out" });
+      }}
+      onClick={disabled ? undefined : onTap} aria-disabled={disabled}
       role="button" tabIndex={0} aria-label={`${config.name} 쓰다듬어 인사하기`}
-      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onTap?.(); } }}
+      onKeyDown={(event) => { if (!disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onTap?.(); } }}
     >
+      <g className={!motion || ["pet-sit", "pet-lie", "pet-sleep"].includes(motion) ? "pet-breath" : undefined}>
       {failed[src] ? <text y={-height / 3} textAnchor="middle" fontSize={width * 0.6}>🐕</text> : <image
         href={src}
         x={-width / 2}
@@ -73,6 +85,7 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
         y={-height * (hat ? 1.14 : bodyWear ? .73 : .77)}
         width={garmentWidth} height={height * (bodyWear ? .66 : .4)}
         preserveAspectRatio="xMidYMid meet" style={{ filter }} />}
+      </g>
     </g>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useId, useState } from "react";
-import { ACTION_DONE, ACTION_ICON, ACTION_LABEL, availableActionGroups, collarToday, faceOf, LOCAL_ACTIONS, PET_ACTIONS, saysText, stageOf, STAGE_LABEL, timeAgo, type PetCategory } from "@/lib/domine/pet";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { ACTION_DONE, ACTION_ICON, ACTION_LABEL, availableActionGroups, collarToday, faceOf, LOCAL_ACTIONS, PET_ACTIONS, stageOf, STAGE_LABEL, timeAgo, type PetCategory, type PetState } from "@/lib/domine/pet";
+import { line } from "@/lib/domine/pet-lines";
+import { fallingNeeds } from "@/lib/domine/pet-signals";
 import { actionsForMap } from "@/lib/domine/pet-maps";
 import { worldCell } from "@/lib/domine/pet-world";
 import { PETS, petText } from "@/lib/domine/pet-photos";
@@ -56,13 +58,24 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     : game.capability === "error" ? "개인 기록 연결을 확인하지 못했어요. 기록 메뉴에서 다시 확인해 주세요."
     : !game.registered ? "기록 메뉴에서 별명을 등록하면 코인이 쌓여요." : game.message;
   const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeech({ text, speaker }), []);
+  const needs = useRef<Record<number, { previous: PetState; seen: Set<string>; pending: string[] }>>({});
+  useEffect(() => {
+    if (!pet) return;
+    const entry = needs.current[game.petId] ??= { previous: pet, seen: new Set(), pending: [] };
+    entry.pending.push(...fallingNeeds(entry.previous, pet, entry.seen));
+    entry.previous = pet;
+    if (!locked && game.active && !sheet && entry.pending.length) {
+      say([...new Set(entry.pending)].map((key) => line(key)).join(" "));
+      entry.pending = [];
+    }
+  }, [pet, game.petId, locked, game.active, sheet, say]);
   useEffect(() => { if (game.arrival) say(game.arrival.text); }, [game.arrival, say]);
   useEffect(() => { setHour(new Date().getHours()); }, []);
   useEffect(() => {
     if (!game.active || sheet) return;
-    const timer = setInterval(() => { setHour(new Date().getHours()); if (machine.visual === "idle") say(saysText(face)); }, 9000);
+    const timer = setInterval(() => { setHour(new Date().getHours()); }, 9000);
     return () => clearInterval(timer);
-  }, [game.active, sheet, machine.visual, face, say]);
+  }, [game.active, sheet]);
   function open(next: Sheet) { game.pause(); setSheet(next); }
   function close() { setShowCode(false); setTransfer(""); setSheet(null); game.resume(); }
   const equipment = (slot: string) => personal?.equipment?.find((e) => e.pet_id === game.petId && e.slot === slot)?.item_id;
@@ -76,7 +89,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       <div role="group" aria-label="강아지 선택">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeech({ text: "", speaker: "dog" }); }}>{PETS[id].name}</button>)}</div>
       <button type="button" className="pet-record-button" onClick={() => open("record")}>내 별명 바꾸기</button>
     </div>
-    <div className="pet-progress-row">{personal && !personal.player ? <span role="status">{PETS[game.petId].name} 진행 불러오는 중… · 우리 코인(공용) {personal.coins ?? 0}</span> : <PetProgress name={PETS[game.petId].name} xp={personal?.player?.xp ?? 0} coins={personal?.coins ?? personal?.player?.coins ?? 0} />}
+    <div className="pet-progress-row">{personal && !personal.player ? <span role="status">{PETS[game.petId].name} 진행 불러오는 중… · 우리 코인(공용) {personal.coins ?? 0}</span> : <PetProgress key={game.petId} name={PETS[game.petId].name} xp={personal?.player?.xp ?? 0} coins={personal?.coins ?? personal?.player?.coins ?? 0} />}
       {game.capability === "missing" && <span className="pet-preparing">준비 중</span>}
       {machine.command === "uncertain" && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>
@@ -89,7 +102,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     </div>
     {game.capability === "ready" && !game.features?.v9 && <p className="pet-progress-note">서버 업데이트 대기 중(새 지역 탐험은 아직)</p>}
     <div className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
-      {game.worldReady ? <PetScene key={game.petId} petId={game.petId} cellId={cell.id} onMap={() => open("map")} onLocal={game.localScene} locked={locked}
+      {game.worldReady ? <PetScene key={game.petId} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => open("map")} onLocal={game.localScene} locked={locked}
         paused={!game.active || !!sheet || machine.visual === "paused"} stage={stage} face={face} hour={hour}
         light={hour >= 21 || hour < 5 ? .8 : hour < 7 || hour >= 17 ? .9 : 1} collar={collarToday().hex}
         cue={game.cue} onSay={say} onDone={game.done} speaker={speech.speaker}

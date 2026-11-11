@@ -11,12 +11,13 @@ const source = ts.transpileModule(readFileSync("app/games/usePetController.ts", 
 }).outputText;
 
 // Exercise the real controller with deterministic hooks/timers and no browser or database.
-function mount(api, saved = []) {
+function mount(api, saved = [], reduced = false) {
+  let imageLoader = async () => true;
   const storage = new Map(saved), slots = [], effects = [], timers = new Map();
   let cursor = 0, dirty = true, game, now = 0, timerId = 0;
   globalThis.localStorage = { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) };
   globalThis.document = { hidden: false, addEventListener() {}, removeEventListener() {} };
-  globalThis.window = { addEventListener() {}, removeEventListener() {}, setTimeout: (...args) => setTimeout(...args), clearTimeout: id => clearTimeout(id) };
+  globalThis.window = { matchMedia: () => ({ matches: reduced }), addEventListener() {}, removeEventListener() {}, setTimeout: (...args) => setTimeout(...args), clearTimeout: id => clearTimeout(id) };
   globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
   globalThis.setTimeout = (fn,ms) => { const id=++timerId; timers.set(id,{fn,at:now+ms}); return id; };
   globalThis.clearTimeout = id => timers.delete(id);
@@ -49,7 +50,7 @@ function mount(api, saved = []) {
   new Function("require","exports",source)(name=>{
     if(name==="react") return hooks;
     if(name==="@/lib/supabase/client") return {createClient:()=>({})};
-    if(name==="@/lib/domine/pet-assets") return {prepareImage:async()=>{},vibrate:()=>{}};
+    if(name==="@/lib/domine/pet-assets") return {prepareImage:(...args)=>imageLoader(...args),vibrate:()=>{}};
     return loadTS(`${name.slice(2)}.ts`);
   },exports);
   async function flush() {
@@ -61,7 +62,7 @@ function mount(api, saved = []) {
     assert.equal(dirty,false,"controller settles without an effect loop");
   }
   return {
-    get game(){return game;},storage,flush,
+    get game(){return game;},storage,flush, setImageLoader(fn){imageLoader=fn;},
     async advance(ms) {
       const end=now+ms;
       for(;;) {
@@ -142,7 +143,7 @@ mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
 mock.api.execute=async()=>({...mock.state(),version:1,reward:{xp:0,coins:0,levelCoins:0,newEntries:[],newBadges:[],skipped:"DAILY_CAP"}});
 await h.game.execute(command);await h.flush();
 assert.equal(h.game.rewardNotice,"오늘 보상 한도를 채웠어요(내일 다시)");
-await h.advance(2499);assert.ok(h.game.feedback);
+await h.advance(2999);assert.ok(h.game.feedback);
 await h.advance(1);assert.equal(h.game.feedback,null);assert.ok(h.game.rewardNotice);
 await h.game.refresh();await h.flush();assert.ok(h.game.rewardNotice,"polling does not clear the daily cap");
 mock.api.execute=async()=>({...mock.state(),version:2,reward:{xp:8,coins:4,levelCoins:0,newEntries:[],newBadges:[]}});
@@ -164,3 +165,36 @@ h.game.selectPet(1);await h.flush();
 mock.api.operation=async()=>({...mock.state(2),version:99,reward:{xp:8,coins:4,levelCoins:0,newEntries:[],newBadges:[]}});
 h.game.retry();await h.flush();assert.equal(h.game.personal.pet,1);assert.deepEqual(h.game.personal.inventory,["061"]);assert.equal(h.game.personal.player.level,2);h.close();
 console.log("Pet controller: registration recovery, retries, per-pet switching and stale result isolation passed.");
+
+// Confirmed travel preserves the old map until both departure and decoding finish.
+for (const reduced of [false, true]) {
+  h=mount(createPetMock().api, [], reduced); await h.flush();
+  void h.game.localScene({action:"map",direction:"e",id:0}); await h.flush();
+  assert.equal(h.game.travel.phase,"exit"); assert.equal(h.game.travel.direction,"e");
+  assert.equal(h.game.machine.visual,"loading-map"); assert.equal(h.game.machine.committedMap,"E5");
+  h.game.care("feed"); await h.flush(); assert.equal(h.game.machine.visual,"loading-map");
+  if (!reduced) { await h.advance(449); assert.equal(h.game.machine.committedMap,"E5"); }
+  await h.advance(reduced ? 0 : 1); assert.equal(h.game.travel.phase,"cross"); assert.equal(h.game.machine.committedMap,"F5");
+  await h.advance(200);
+  if (!reduced) { assert.equal(h.game.travel.phase,"enter"); await h.advance(450); }
+  assert.equal(h.game.machine.visual,"idle"); assert.equal(h.game.travel,null);
+  assert.ok(h.game.arrival); h.close();
+}
+h=mount(createPetMock().api); await h.flush();
+let imageReady;
+h.setImageLoader(()=>new Promise(resolve=>{imageReady=resolve;}));
+void h.game.localScene({action:"map",to:"J10",id:0}); await h.flush();
+await h.advance(900); assert.equal(h.game.machine.committedMap,"E5"); assert.equal(h.game.travel.phase,"exit");
+imageReady(true); await h.flush(); assert.equal(h.game.travel.phase,"cross");
+await h.advance(650); assert.equal(h.game.machine.visual,"idle"); h.close();
+for (const failure of ["error", "timeout", "pause", "unmount"]) {
+  h=mount(createPetMock().api); await h.flush();
+  h.setImageLoader((src,signal)=>failure==="error" ? Promise.resolve(false) : new Promise(resolve=>signal.addEventListener("abort",()=>resolve(false),{once:true})));
+  void h.game.localScene({action:"map",direction:"n",id:0}); await h.flush();
+  if(failure==="pause") { h.game.pause(); await h.flush(); h.game.resume(); }
+  if(failure==="unmount") h.close();
+  await h.advance(2500);
+  assert.equal(h.game.machine.committedMap,"E5");
+  if(failure!=="unmount") { assert.equal(h.game.machine.visual,"idle"); assert.equal(h.game.travel,null); h.close(); }
+}
+console.log("Pet travel: exit, ready gate, crossfade, entry, reduced motion, failures and cancellation passed.");

@@ -1,4 +1,14 @@
+import { SHOP } from "./pet-catalog";
 export const MAX_XP = 9280;
+
+export function nextGoal(xp: number, coins: number, owned: readonly string[]) {
+  const p = progressOf(xp);
+  const item = SHOP.filter((item) => !owned.includes(item.id)).sort((a, b) => a.price! - b.price!)[0];
+  const coinGap = item ? Math.max(0, item.price! - coins) : Infinity;
+  const xpGap = p.needed ? p.needed - p.current : Infinity;
+  if (item && coinGap <= xpGap) return `${item.name}까지 ${coinGap}코인`;
+  return Number.isFinite(xpGap) ? `다음 레벨까지 ${xpGap} XP` : "도감을 더 채워 봐요";
+}
 export const levelXP = (level: number) => 10 * (level - 1) * (level + 2);
 export function levelOf(xp: number) {
   return Math.min(30, Math.max(1, Math.floor((Math.sqrt(9 + Math.max(0, xp) * 0.4) - 1) / 2)));

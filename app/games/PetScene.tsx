@@ -8,7 +8,8 @@ import { ART, BALL, BOWL } from "@/lib/domine/pet-art";
 import { line, PRIEST_LINES } from "@/lib/domine/pet-lines";
 import { backgroundAt, PETS, PRIEST, DOGHOUSE, type PetId } from "@/lib/domine/pet-photos";
 import { mapBackground, SHOPS, type SceneCue } from "@/lib/domine/pet-maps";
-import { DEFAULT_CELL, DIRECTIONS, neighborCell, worldCell } from "@/lib/domine/pet-world";
+import { DEFAULT_CELL, DIRECTIONS, neighborCell, worldCell, type MapTravel } from "@/lib/domine/pet-world";
+import { travelEdge } from "@/lib/domine/pet-geometry";
 import { DOG_W, PetDog } from "./PetDog";
 
 import { buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
@@ -34,6 +35,8 @@ function Ball({ scale = 1, toy }: { scale?: number; toy?: string | null }) {
 }
 
 type Props = {
+  travel?: MapTravel | null;
+  arrivalId?: number;
   stage: PetStage;
   face: PetFace;
   light: number;
@@ -96,14 +99,40 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onLocal, locked = false, speaker = "dog", paused = false, wearable, toy }: Props) {
+export const PetScene = memo(function PetScene({ travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onLocal, locked = false, speaker = "dog", paused = false, wearable, toy }: Props) {
   const cell = worldCell(cellId);
   const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
   const ask = asking?.from === cell.id ? neighborCell(cell.id, asking.direction) : null;
   const map = cell.theme;
   const shadowId = useId();
   const [animated, setS] = useState<ScenePose>({ ...restingPose(map) });
-  const s = cue && !paused ? animated : restingPose(map);
+  const [idleMotion, setIdleMotion] = useState<string | null>(null);
+  const [reduced, setReduced] = useState(false);
+  const departure = useRef(restingPose(map));
+  const base = cue && !paused && !travel ? animated : restingPose(map);
+  const still = reduced ? { ...base, x: restingPose(map).x, y: restingPose(map).y, dir: 1 as const } : base;
+  const s = !locked && !paused && idleMotion ? { ...still, motion: idleMotion } : still;
+  useLayoutEffect(() => { if (!travel) departure.current = s; }, [s, travel]);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let timer: ReturnType<typeof setTimeout>;
+    let first = true;
+    const schedule = (event?: Event) => {
+      if (event) first = true;
+      clearTimeout(timer); setIdleMotion(null); setReduced(media.matches);
+      if (locked || paused || media.matches || document.hidden) return;
+      timer = setTimeout(() => {
+        const motions = ["pet-idle-wag", "pet-idle-tilt", "pet-hop", "pet-idle-step", "pet-sit", "pet-lie"];
+        setIdleMotion(motions[Math.floor(Math.random() * motions.length)]);
+        first = false;
+        timer = setTimeout(schedule, 1200);
+      }, 6000 + Math.random() * 8000 - (first ? 0 : 1200));
+    };
+    schedule();
+    media.addEventListener("change", schedule);
+    document.addEventListener("visibilitychange", schedule);
+    return () => { clearTimeout(timer); media.removeEventListener("change", schedule); document.removeEventListener("visibilitychange", schedule); };
+  }, [locked, paused]);
   const latest = useRef({ onSay, onDone });
   useLayoutEffect(() => { latest.current = { onSay, onDone }; }, [onSay, onDone]);
   const period = backgroundAt(hour);
@@ -129,7 +158,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
   useEffect(() => {
     if (!cue || paused || cue.action === "map") return;
     const config = PETS[petId];
-    const plan = buildScenePlan(cue, { map, width: DOG_W[stage] * config.scale * sceneScale, ratio: config.ratio }, Math.random);
+    const plan = buildScenePlan(cue, { map, width: DOG_W[stage] * config.scale * sceneScale, ratio: config.ratio, origin: departure.current }, Math.random);
     const started = performance.now();
     let raf = 0, previous = -1, spoken = -1, cancelled = false;
     const tick = () => {
@@ -152,10 +181,17 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
     };
     if (cue.action === "priest") latest.current.onSay(PRIEST_LINES[Math.floor(Math.random() * PRIEST_LINES.length)], "priest");
     if (cue.action === "sleep") latest.current.onSay("잠시 눈을 붙일게요…");
-    raf = window.requestAnimationFrame(tick);
+    tick();
     return () => { cancelled = true; window.cancelAnimationFrame(raf); };
   }, [cue, map, petId, stage, sceneScale, paused]);
 
+  const edge = travel ? travelEdge(travel.direction, travel.phase === "enter") : null;
+  const center = travel?.phase === "exit" ? departure.current : s;
+  const travelStyle = edge ? {
+    "--edge": `translate(${edge.x}px, ${edge.y}px) scale(${edge.dir * edge.scale}, ${edge.scale})`,
+    "--center": `translate(${center.x}px, ${center.y}px) scale(${edge.dir * depth(center.y)}, ${depth(center.y)})`,
+    "--edge-opacity": edge.opacity,
+  } as React.CSSProperties : undefined;
   const c = skyAt(hour);
   const body = bodyAt(hour);
   const sc = depth(s.y);
@@ -167,7 +203,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
   });
 
   return (
-    <div className="pet-scene relative h-full w-full" data-paused={paused}>
+    <div className="pet-scene relative h-full w-full" data-paused={paused} data-travel={travel?.phase} data-reduced={travel?.reduced}>
     <div className="pet-scene-picture">
     <svg
       viewBox="0 6 160 90"
@@ -243,8 +279,10 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
         </g>
       ) : null}
 
+      {travel?.phase === "cross" && <image className="pet-background-cross" href={mapBackground(worldCell(travel.from).theme, hour)} x="0" y="6" width="160" height="90" preserveAspectRatio="none" pointerEvents="none" />}
+
       {/* 도미 (가로 위치·방향·깊이는 transition 으로 부드럽게) */}
-      <g style={move(s.x, s.y, s.dur, ` scale(${s.dir * sc}, ${sc})`)}>
+      <g key={travel ? `${travel.id}-${travel.phase}` : reduced ? `actor-${cue?.id}` : "actor"} data-pet-actor className={travel ? `pet-travel pet-travel-${travel.phase}` : reduced && cue ? "pet-action-fade" : undefined} style={travelStyle ?? move(s.x, s.y, s.dur, ` scale(${s.dir * sc}, ${sc})`)}>
         <ellipse cx="0" cy={1.8 * sceneScale} rx={w * 0.5} ry={5 * sceneScale} fill={`url(#${shadowId})`} />
         <ellipse cx="0" cy={sceneScale} rx={w * 0.3} ry={1.5 * sceneScale} fill={`url(#${shadowId})`} />
         {s.carry ? (
@@ -259,7 +297,8 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
           scale={sceneScale}
           stage={stage}
           face={face}
-          motion={s.motion}
+          motion={travel ? "pet-trot" : s.motion}
+          disabled={locked}
           light={light}
           collar={collar}
           photos={photos}
@@ -326,7 +365,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
         ) : null}
       </g>
 
-      {toy && !s.ball && !s.carry && <g transform={`translate(${map === "home" ? 88 : 128} 81)`}><Ball toy={toy} /></g>}
+      {!travel && toy && !s.ball && !s.carry && <g transform={`translate(${map === "home" ? 88 : 128} 81)`}><Ball toy={toy} /></g>}
       {/* 도구·공·손 */}
       <g style={{ filter: `brightness(${light}) drop-shadow(0 0.5px 0.5px #17231d40)` }}>
       {s.ball ? (
@@ -354,12 +393,12 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       className="absolute flex min-h-11 w-[23%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded text-[clamp(11px,3vw,16px)] font-semibold text-[#30271e] focus-visible:outline-2 disabled:opacity-60"
       style={{ left: `${shop.x}%`, top: `${shop.y}%` }} aria-label={`${shop.name} 앞으로 가기`} disabled={locked}
       onClick={() => onLocal?.({ action: "shop", shop: index, id: Date.now() })}>{shop.name}</button>)}
-    {bubble && <SpeechBubble text={bubble} label={speaker === "priest" ? "신부님의 말" : `${PETS[petId].name}의 말`}
+    {!travel && bubble && <SpeechBubble text={bubble} label={speaker === "priest" ? "신부님의 말" : `${PETS[petId].name}의 말`}
       x={speaker === "priest" ? 18 : s.x + s.dir * w * sc * 0.25}
       y={speaker === "priest" ? 31 : s.y - h * sc} duration={s.dur} />}
     </div>
     <div className="pet-scene-picture pet-scene-ui">
-      <div key={cell.id} className="pet-location" aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
+      <div key={arrivalId ?? 0} className={`pet-location${arrivalId && !travel ? " pet-location-arrived" : ""}`} aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
       <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기">MAP</button>
       {DIRECTIONS.map((direction) => {
         const destination = neighborCell(cell.id, direction);

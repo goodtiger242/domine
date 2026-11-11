@@ -250,3 +250,8 @@ export const ACHIEVEMENTS = [
     "condition": "레벨 30"
   }
 ] as const;
+
+export function catalogHint(item: CatalogEntry) {
+  const places: Record<string, string> = { church: "성당 마당", field: "들판", street: "상가 거리", park: "공원 숲길", home: "집 마당" };
+  return `${item.map ? places[item.map] ?? "동네" : "어디서든"} · ${item.condition === "발견" ? "시간 무관" : item.condition}`;
+}

@@ -1,5 +1,17 @@
 import { PET_MAPS, type PetMap } from "./pet-maps";
+import type { Direction } from "./pet-world";
 export type Point = { x: number; y: number };
+// The envelope includes the largest dog, clothes and the 1.35x foreground scale.
+export function travelEdge(direction: Direction, entering = false) {
+  const edge = entering ? ({ n: "s", s: "n", e: "w", w: "e" } as const)[direction] : direction;
+  return {
+    x: edge === "e" ? 200 : edge === "w" ? -40 : 80,
+    y: edge === "n" ? -30 : edge === "s" ? 160 : 82,
+    scale: edge === "n" ? .55 : edge === "s" ? 1.35 : 1,
+    opacity: edge === "n" ? 0 : 1,
+    dir: direction === "w" ? -1 : 1,
+  };
+}
 export type SafeZone = { left: number; right: number; top: number; bottom: number };
 export const SAFE_ZONES = {
   ...Object.fromEntries(PET_MAPS.map(({ id }) => [id, { left: 22, right: 138, top: 77, bottom: 84 } ])),
