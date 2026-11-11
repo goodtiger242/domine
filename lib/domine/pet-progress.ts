@@ -12,11 +12,12 @@ export const ACTION_REWARDS = {
   feed: [8, 4], treat: [6, 3], pet: [5, 2], play: [10, 5],
   walk: [10, 6], brush: [8, 4], bath: [10, 5], train: [10, 5],
 } as const;
-export function rewardEligible(now: number, lastAction: number | null, lastAny: number | null, daily: number) {
-  return daily < 40 && (lastAction === null || now - lastAction >= 60000) && (lastAny === null || now - lastAny >= 10000);
+export function rewardEligible(now: number, lastAny: number | null, daily: number) {
+  return daily < 120 && (lastAny === null || now - lastAny >= 3000);
 }
-export type Reward = { xp: number; coins: number; levelCoins: number; newEntries: string[]; newBadges: string[] };
+export type Reward = { xp: number; coins: number; levelCoins: number; newEntries: string[]; newBadges: string[]; skipped?: "TOO_FAST" | "DAILY_CAP" };
 export function rewardDisplay(reward?: Reward) {
   const coins = (reward?.coins ?? 0) + (reward?.levelCoins ?? 0);
-  return { coins, xp: reward?.xp ?? 0, quiet: coins === 0 && !reward?.xp };
+  const notice = reward?.skipped === "TOO_FAST" ? "조금 천천히 눌러 주세요" : reward?.skipped === "DAILY_CAP" ? "오늘 보상은 모두 받았어요" : "";
+  return { coins, xp: reward?.xp ?? 0, quiet: coins === 0 && !reward?.xp, notice };
 }

@@ -15,11 +15,15 @@ for (let l = 2; l <= 30; l++) {
 }
 assert.equal(levelOf(-1),1); assert.equal(levelOf(99999),30); assert.equal(levelOf(700),8);
 assert.deepEqual(progressOf(99999),{ level:30,value:9280,current:0,needed:0 });
-assert.deepEqual(rewardDisplay({xp:8,coins:4,levelCoins:14}),{xp:8,coins:18,quiet:false});
-assert.deepEqual(rewardDisplay(),{xp:0,coins:0,quiet:true});
-assert.equal(rewardEligible(60000,0,50000,39),true);
-for (const [last, any, daily] of [[1,0,0],[0,50001,0],[0,0,40]]) assert.equal(rewardEligible(60000,last,any,daily),false);
-assert.equal(rewardEligible(0,null,null,0),true);
+assert.deepEqual(rewardDisplay({xp:8,coins:4,levelCoins:14}),{xp:8,coins:18,quiet:false,notice:""});
+assert.deepEqual(rewardDisplay(),{xp:0,coins:0,quiet:true,notice:""});
+for (const [skipped, notice] of [["TOO_FAST","조금 천천히 눌러 주세요"],["DAILY_CAP","오늘 보상은 모두 받았어요"]]) {
+  assert.deepEqual(rewardDisplay({xp:0,coins:0,levelCoins:0,skipped}),{xp:0,coins:0,quiet:true,notice});
+}
+assert.equal(rewardEligible(3000,0,119),true);
+assert.equal(rewardEligible(2999,0,0),false);
+assert.equal(rewardEligible(60000,0,120),false);
+assert.equal(rewardEligible(0,null,0),true);
 for (const raw of ["", "아".repeat(9),"!!!","a:b","a b"]) assert.equal(normalizeNickname(raw),null);
 assert.equal(normalizeNickname(" 가나 "),"가나"); assert.equal(normalizeNickname("가".normalize("NFD")),"가");
 assert.equal(normalizeNickname("a".repeat(8)),"aaaaaaaa");
@@ -99,8 +103,23 @@ assert.equal(paid.player.level,2); assert.equal(paid.player.coins,118); assert.e
 const replay=await mock.api.execute(identity,command); assert.deepEqual(replay,paid); assert.equal(mock.state().player.coins,118);
 assert.equal((await mock.api.execute(identity,{...command,action:"walk"})).code,"REQUEST_CONFLICT");
 assert.equal((await mock.api.state({...identity,secret:"b".repeat(64)},1)).code,"AUTH_FAILED");
-assert.equal((await mock.api.execute(identity,{...command,requestId:"reward-zero"})).reward.coins,0);
-mock.advance(60000); assert.equal((await mock.api.execute(identity,{...command,requestId:"reward-next"})).reward.coins,4);
+const skippedCommand={...command,action:"play",requestId:"reward-zero"};
+const skippedReward=await mock.api.execute(identity,skippedCommand);
+assert.equal(skippedReward.reward.coins,0); assert.equal(skippedReward.reward.skipped,"TOO_FAST");
+mock.advance(2999);
+assert.equal((await mock.api.execute(identity,{...command,requestId:"before-boundary"})).reward.skipped,"TOO_FAST");
+mock.advance(1);
+assert.equal((await mock.api.execute(identity,{...command,requestId:"reward-next"})).reward.coins,4,"same action pays again after 3 seconds");
+assert.deepEqual(await mock.api.execute(identity,skippedCommand),skippedReward,"replaying a skipped action cannot pay later");
+for(let n=2;n<120;n++) {
+  mock.advance(3000);
+  assert.equal((await mock.api.execute(identity,{...command,requestId:`daily-${n}`})).reward.coins,4);
+}
+assert.equal(mock.state().daily.reward_actions,120);
+const cappedCoins=mock.state().player.coins;
+mock.advance(3000);
+assert.equal((await mock.api.execute(identity,{...command,requestId:"daily-cap"})).reward.skipped,"DAILY_CAP");
+assert.equal(mock.state().player.coins,cappedCoins);
 const wallet=createPetMock();await wallet.api.register(identity);
 const buys=await Promise.all(["062","063"].map(item=>wallet.api.execute(identity,{kind:"purchase",item,requestId:item})));
 assert.equal(buys.filter(r=>r.ok).length,1); assert.equal(wallet.state().player.coins,40);
@@ -121,6 +140,29 @@ assert.ok(!/last_submit_at\s*>/.test(sql),"No per-player care submission cooldow
 assert.ok(sql.includes("pg_advisory_xact_lock(20261111,120000)"));
 assert.ok(sql.includes("payload_hash<>payload")); assert.ok(sql.includes("ticket.finished_at is not null"));
 assert.ok(sql.includes("c.slot=command_v6.slot"));
+const v7=readFileSync("supabase/migrations/20261111210000_domine_pet_v7.sql","utf8");
+assert.ok(v7.trim().endsWith("commit;")); assert.equal((v7.match(/^begin;/gm)||[]).length,1);
+assert.ok(!/\b(drop|truncate|delete\s+from)\b/i.test(v7));
+assert.match(v7,/on conflict\(id\) do nothing;\s+if found then/);
+assert.match(v7,/least\(9280,coalesce\(sum\(xp\),0\)\).*coalesce\(sum\(coins\),0\)/);
+assert.match(v7,/distinct on \(e.pet_id,e.slot\)/);
+assert.match(v7,/o.payload_hash=extensions.digest\(jsonb_build_object\('pet',e.pet_id,'slot',e.slot,'item',e.item_id\)/);
+const commandSQL=v7.slice(v7.indexOf("create or replace function domine_pet_v6.command_v6"));
+const poolLock=commandSQL.indexOf("select * into strict wallet from domine_pet_v7.pool where id=1 for update");
+assert.ok(poolLock>commandSQL.indexOf("from domine_pet_v6.player where nickname_key="));
+assert.ok(poolLock<commandSQL.indexOf("wallet.coins<item.price"));
+assert.ok(poolLock<commandSQL.indexOf("old_level:=domine_pet_v6.level_v6(wallet.xp)"));
+assert.ok(!/update domine_pet_v6.player set (xp|coins)|domine_pet_v6\.(inventory|equipment|daily)/.test(commandSQL));
+assert.ok(!/last_reward_at>now\(\)-interval '(10|60) seconds'/.test(commandSQL));
+assert.equal((v7.match(/\(op.result->>'version'\)::bigint<=p.version/g)||[]).length,2,"command retries and operation lookups replace pre-pool snapshots");
+assert.match(v7,/\(result->>'version'\)::bigint<=p.version/ ,"completed pre-pool tickets cannot replay personal balances");
+for(const rule of ["day.reward_actions>=120", "interval '3 seconds'", "day.explore_starts>=60", "day.explore_finishes<30", "day.walk_claims>=4", "interval '150 seconds'", "sum(10+2*g)", "'skipped',skipped"]) assert.ok(commandSQL.includes(rule),rule);
+assert.equal((v7.match(/enable row level security/g)||[]).length,4);
+for(const grant of sql.match(/^grant execute .+;$/gm)) assert.ok(v7.includes(grant));
+const v7Snapshot=v7.slice(v7.indexOf("create or replace function domine_pet_v6.snapshot_v6"),v7.indexOf("create or replace function domine_pet_v6.badges_v6"));
+const v6Snapshot=sql.slice(sql.indexOf("create or replace function domine_pet_v6.snapshot_v6"),sql.indexOf("create or replace function domine_pet_v6.badges_v6"));
+const jsonKeys=(source)=>[...source.matchAll(/'([a-zA-Z_]+)',/g)].map(m=>m[1]);
+assert.deepEqual(jsonKeys(v7Snapshot),jsonKeys(v6Snapshot),"snapshot JSON keys remain v6-compatible");
 const alpha=spawnSync("python",["-c",`
 import tempfile,subprocess
 from pathlib import Path

@@ -1,7 +1,7 @@
 import type { PetApi, PetCommand, V6Result } from "../../lib/domine/pet-rpc";
 import type { PetIdentity } from "../../lib/domine/pet-identity";
 import type { PetState } from "../../lib/domine/pet";
-import { ACTION_REWARDS, levelOf, rewardEligible } from "../../lib/domine/pet-progress";
+import { ACTION_REWARDS, levelOf, rewardEligible, type Reward } from "../../lib/domine/pet-progress";
 import { SHOP } from "../../lib/domine/pet-catalog";
 
 export function createPetMock(options: { missing?: boolean; delayMs?: number } = {}) {
@@ -10,7 +10,7 @@ export function createPetMock(options: { missing?: boolean; delayMs?: number } =
   const inventory: string[] = [], album: string[] = [], badges: string[] = [];
   const equipment: NonNullable<V6Result["equipment"]> = [], calls: string[] = [];
   const operations = new Map<string, { input: string; result: V6Result }>();
-  const clocks = new Map<string,number>(); let last: number | null = null, daily=0;
+  let last: number | null = null, daily=0;
   let ticket: V6Result["ticket"] = null;
   const snapshot = (): V6Result => ({ ok:true,code:"OK",serverNow:new Date(now).toISOString(),version,player:{xp,level:levelOf(xp),coins},inventory:[...inventory],album:[...album],badges:[...badges],equipment:equipment.map(e=>({...e})),daily:{reward_actions:daily,explore_finishes:0,walk_claims:0},ticket,season:"ordinary",shared:{applied:false,reason:"공동 수치는 충분해요",pet:{...shared}} });
   const failure = (code: string): V6Result => ["AUTH_FAILED", "NICKNAME_TAKEN"].includes(code)
@@ -28,8 +28,10 @@ export function createPetMock(options: { missing?: boolean; delayMs?: number } =
       const serialized=JSON.stringify(command), existing=operations.get(command.requestId);
       if(existing) return existing.input===serialized ? existing.result : failure("REQUEST_CONFLICT");
       let code="OK", gain=0, money=0, levelCoins=0; const entries:string[]=[],freshBadges:string[]=[];
-      if(command.kind==="action" && rewardEligible(now,clocks.get(command.action)??null,last,daily)) {
-        [gain,money]=ACTION_REWARDS[command.action]; clocks.set(command.action,now);last=now;daily++;
+      let skipped: Reward["skipped"];
+      if(command.kind==="action" && !rewardEligible(now,last,daily)) skipped=daily>=120?"DAILY_CAP":"TOO_FAST";
+      if(command.kind==="action" && !skipped) {
+        [gain,money]=ACTION_REWARDS[command.action]; last=now;daily++;
         if(!badges.includes("A01")){badges.push("A01");freshBadges.push("A01");}
       } else if(command.kind==="purchase") {
         const item=SHOP.find(item=>item.id===command.item);
@@ -48,7 +50,7 @@ export function createPetMock(options: { missing?: boolean; delayMs?: number } =
       const previous=levelOf(xp); xp=Math.min(9280,xp+gain);
       for(let level=previous+1;level<=levelOf(xp);level++)levelCoins+=10+level*2;
       coins+=money+levelCoins;version++;
-      const result={...snapshot(),ok:code==="OK",code,requestId:command.requestId,reward:{xp:gain,coins:money,levelCoins,newEntries:entries,newBadges:freshBadges}};
+      const result={...snapshot(),ok:code==="OK",code,requestId:command.requestId,reward:{xp:gain,coins:money,levelCoins,newEntries:entries,newBadges:freshBadges,...(skipped?{skipped}:{})}};
       operations.set(command.requestId,{input:serialized,result});
       // Commit first, then delay delivery to exercise response-loss recovery.
       if(options.delayMs) await new Promise(r=>setTimeout(r,options.delayMs));
