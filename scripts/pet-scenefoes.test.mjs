@@ -19,9 +19,10 @@ test("1000구간: 30% 출현, 65/25/10 분포, 같은 개체·레벨·변형 그
   for (let slot = 0; slot < 1000; slot++) {
     const spawns = view.spawnsFor("F5", 1, slot);
     counts[spawns.length]++;
-    assert.deepEqual(spawns.map(e => e.fighter), view.spawnsFor("F5", 30, slot).map(e => e.fighter));
+    assert.deepEqual(spawns.map(e => e.individual.id), view.spawnsFor("F5", 30, slot).map(e => e.individual.id));
+    assert.deepEqual(spawns, view.spawnsFor("F5", 1, slot));
   }
-  // Player metadata differs; the actual individual/fighter stays the same.
+  // Same animals for everyone; their level follows our dog's level.
 });
 
 test("출몰 수·범위·안전 칸·네임드 우선·승리 개체만 숨기기", () => {
@@ -29,8 +30,7 @@ test("출몰 수·범위·안전 칸·네임드 우선·승리 개체만 숨기�
   for (let slot = 0; slot < 1000; slot++) {
     const spawns = view.spawnsFor("F5", 1, slot); counts[spawns.length]++;
     for (const foe of spawns) {
-      const [low, high] = levelRange("F5");
-      assert.ok(foe.level >= Math.max(1, (low + high) / 2 - 3) && foe.level <= (low + high) / 2 + 3);
+      assert.ok(foe.level >= 1 && foe.level <= 6, "near our level");
       assert.ok(foe.name.endsWith(` ${foe.individual.name}`) && foe.name.length <= `${BREED_BY_ID[foe.individual.breedId].name} ${foe.individual.name}`.length);
       assert.equal(foe.given, foe.individual.name);
       const variants = BREED_BY_ID[foe.individual.breedId].variants;
@@ -75,7 +75,9 @@ test("중앙 결과는 큐당 1.2초, 기술명은 해당 동물, 하단 중복 
   const cues = view.battleCues(events, { player: "도미", opponent: "진돗개 철수" });
   assert.equal(cues[0].moveName, "가볍게 밀기"); assert.equal(cues[0].side, "player"); assert.equal(cues[0].duration, 1200);
   const results = cues.filter(c => c.result);
-  assert.deepEqual(results.map(c => c.result), ["크리티컬!", "효과가 컸다!", "유독 잘 통했다!", "빗나갔다!", "되받아쳤다!", "막아 냈다! 기력 +1"]);
+  assert.deepEqual(results.slice(0, 4).map(c => c.result), ["크리티컬!", "효과가 컸다!", "유독 잘 통했다!", "빗나갔다!"]);
+  assert.equal(results.length, 5, "방어와 무관한 특성 기력은 막기 성공으로 표시하지 않는다");
+  assert.ok(view.DEFENSE_RESULTS.counter.success.includes(results[4].result));
   assert.ok(results.every(c => c.duration >= 1000 && c.duration <= 1400 && !c.text));
 });
 
@@ -93,11 +95,7 @@ test("기세 표시·결정기 비용·상대 대사 최대 1번·없는 상황�
   assert.equal(view.encounterLine(foe, "does-not-exist", 1), "");
   assert.ok(view.encounterLine(foe, "flee", 1));
   assert.equal(view.encounterLine(foe, "enter", 1), view.encounterLine(foe, "enter", 1));
-  for (const action of engine.availableActions(state, "opponent")) {
-    const clue = view.opponentClue({ ...state, opponentAction: action });
-    assert.ok(!clue.includes(view.actionLabel(action)));
-  }
-  assert.equal(view.opponentClue({ ...state, aiTier: "boss" }), "");
+  assert.equal(view.opponentClue, undefined, "the opponent's next move is never hinted");
 });
 
 test("390×844·1600×900: 동물·이름표·조작·HUD·말풍선 좌표 분리", () => {

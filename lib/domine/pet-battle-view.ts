@@ -1,6 +1,7 @@
 import { buildFighter } from "./battle/engine";
 import { BREED_BY_ID as ENGINE_BREEDS, ITEM_BY_ID, MOVE_BY_ID } from "./battle/data";
-import { seedFor } from "./battle/rng";
+import { random, seedFor } from "./battle/rng";
+import { LINES } from "./pet-lines";
 import { previewDamage, moveFor, REST_ENERGY, matchup } from "./battle/rules";
 import { pickSpawns } from "./king/spawn";
 import { shortBreedName } from "./breed-short";
@@ -59,11 +60,6 @@ export function encounterLine(encounter: Encounter, moment: string, seed: number
     variant: individual.species === "cat" ? individual.owner ? "house" : "stray" : BREED_BY_ID[individual.breedId].size,
     tone: (["polite", "cocky", "grumpy", "shy", "playful"] as const)[individual.seed % 5] };
   return rivalLine(species, key, opts);
-}
-export function opponentClue(state: BattleState) {
-  if (state.opponent.boss || state.aiTier === "boss" || state.aiTier === "king" || state.opponent.aiTier === "boss" || state.opponent.aiTier === "king") return "";
-  const move = moveFor(state.opponentAction);
-  return move?.mode === "charge" ? "숨을 크게 들이쉰다" : move?.kind === "defense" ? "몸을 낮추고 발을 모은다" : move?.kind === "attack" ? "앞발에 무게를 싣는다" : "호흡을 가다듬는다";
 }
 export function speciesBadges(encounter: Encounter) {
   const species = encounter.individual.species, size = BREED_BY_ID[encounter.individual.breedId].size;
@@ -169,13 +165,93 @@ export type BattleCue = {
   seenMove?: string; critical?: boolean;
   fx?: "hit" | "hit-good" | "heal" | "buff" | "debuff" | "dizzy" | "sleepy" | "shield";
   side?: Side; amount?: number; outcome?: Outcome;
+  playerText?: string; playerMoment?: "start" | "success" | "failure" | "broken";
+  defenseResult?: boolean;
 };
+
+export const DEFENSE_RESULTS = {
+  guard: {
+    success: ["막아 냈다!", "단단히 버텼다!", "앞발로 받아 냈다!", "공격을 눌러 냈다!", "든든히 지켜 냈다!", "충격을 줄였다!"],
+    failure: ["막을 공격이 없었다…", "막을 때를 놓쳤다…", "방패만 들고 있었다…", "막기는 다음 기회에…", "막으려다 헛짚었다…", "막을 준비만 끝났다…"],
+    broken: ["흔들기에 막기가 풀렸다!", "흔들려 앞발이 벌어졌다!", "흔들기에 방패가 뚫렸다!", "흔들려 막기를 놓쳤다!", "흔들기에 수비가 무너졌다!", "흔들려 막던 힘이 풀렸다!"],
+  },
+  counter: {
+    success: ["되받아쳤다!", "공격을 돌려줬다!", "받아치기가 통했다!", "반격으로 한 수 돌려줬다!", "파고들어 되쳤다!", "상대 힘으로 반격했다!"],
+    failure: ["받아칠 기회를 놓쳤다…", "반격할 틈이 없었다…", "받아치기가 헛돌았다…", "반격 준비가 빗나갔다…", "되칠 박자를 놓쳤다…", "받아치기는 다음 기회에…"],
+    broken: ["흔들기에 반격이 풀렸다!", "흔들려 받아치기가 깨졌다!", "흔들기에 반격 틈을 뺏겼다!", "흔들려 되칠 힘을 잃었다!", "흔들기에 반격 자세 붕괴!", "흔들려 받아칠 발이 꼬였다!"],
+  },
+  evade: {
+    success: ["흘려 냈다!", "공격의 힘을 뺐다!", "힘을 빼며 흘렸다!", "흘리기가 통했다!", "옆으로 흘려보냈다!", "공격 기세를 꺾었다!"],
+    failure: ["흘릴 때를 놓쳤다…", "흘릴 공격이 안 왔다…", "흘리기가 헛돌았다…", "흘리기는 다음 기회에…", "흘리려다 헛짚었다…", "흘릴 박자가 어긋났다…"],
+    broken: ["흔들기에 흘리기가 깨졌다!", "흔들려 피할 길이 막혔다!", "흔들기에 발놀림이 꼬였다!", "흔들려 흘릴 틈을 놓쳤다!", "흔들기에 회피 자세 붕괴!", "흔들려 흘릴 힘이 풀렸다!"],
+  },
+  stance: {
+    success: ["태세로 충격을 눌렀다!", "버티기 태세가 지켰다!", "태세를 지켜 버텼다!", "꼿꼿한 태세로 받아 냈다!", "버티는 자세가 통했다!", "태세로 상대 수를 막았다!"],
+    failure: ["태세만 조용히 유지했다…", "버틸 차례가 오지 않았다…", "태세를 잡고 기다렸다…", "버티기는 다음 기회에…", "태세를 쓸 틈이 없었다…", "버틸 준비만 끝났다…"],
+    broken: ["흔들기에 태세가 깨졌다!", "흔들려 버티기가 풀렸다!", "흔들기에 자세가 무너졌다!", "흔들려 버틸 중심을 잃었다!", "흔들기에 버티던 발이 꼬였다!", "흔들려 태세를 놓쳤다!"],
+  },
+} as const;
+
+function defenseCues(events: readonly BattleEvent[], seed: number, last: string, state?: BattleState): BattleCue[] {
+  const cues: BattleCue[] = [];
+  if (events.some(e => e.type === "end" && e.outcome === "quit")) return cues;
+  for (const side of ["player", "opponent"] as const) {
+    const start = events.findIndex(e => e.type === "action" && e.side === side && moveFor(e.action)?.kind === "defense");
+    const action = events[start];
+    const prior = state?.[side].defense;
+    const explicit = events.find(e => (e.type === "counter" || e.type === "evade") && e.side === side);
+    const kind = action?.type === "action" ? moveFor(action.action)?.defense ?? "guard"
+      : prior && prior.expires >= (events[0]?.round ?? state!.round) ? prior.kind
+      : explicit?.type === "counter" || explicit?.type === "evade" ? explicit.type : undefined;
+    if (!kind) continue;
+    const relevant = events.slice(Math.max(0, start));
+    const broken = relevant.some(e => (e.type === "break" || e.type === "hit" && MOVE_BY_ID[e.moveId]?.breaksDefense) && e.target === side);
+    const trigger = relevant.find(e => (e.type === "counter" || e.type === "evade") && e.side === side && e.type === kind);
+    const reduced = relevant.some(e => (e.type === "hit" && !MOVE_BY_ID[e.moveId]?.breaksDefense || kind === "stance" && e.type === "counter") && e.target === side);
+    const blocked = relevant.some(e => e.type === "status" && e.side === side && e.change === "blocked");
+    const success = !!trigger || (kind === "guard" || kind === "stance") && reduced || kind === "stance" && blocked;
+    const moment = broken ? "broken" : success ? "success" : "failure";
+    let suffix = "";
+    if (moment === "success" && kind === "guard") {
+      const gain = relevant.reduce((total, e, index) => {
+        if (e.type !== "energy" || e.side !== side || e.reason !== "trait") return total;
+        let next = index + 1;
+        while (relevant[next]?.type === "energy") next++;
+        const reward = relevant[next];
+        return total + (reward?.type === "momentum" && reward.side === side ? e.amount : 0);
+      }, 0);
+      if (gain > 0) suffix = ` 기력 +${gain}`;
+    }
+    if (moment === "success" && kind === "evade" && trigger) {
+      const drain = events[events.indexOf(trigger) - 1];
+      if (drain?.type === "energy" && drain.side !== side && drain.amount < 0) suffix = ` 상대 기력 −${-drain.amount}`;
+    }
+    if (moment === "failure" && relevant.some(e => e.type === "status" && e.side === side && e.status === "open" && e.change === "applied")) suffix = " 빈틈!";
+    // 수치 이득은 실제 이벤트만 사용한다. 연속 방어·기력 상한도 그대로 반영한다.
+    const pool = DEFENSE_RESULTS[kind][moment].map(text => text + suffix).filter(text => text !== last);
+    const result = pool[Math.floor(random(seedFor(`${events[0]?.round}:${side}:${kind}:${moment}`, seed)).value * pool.length)];
+    cues.push({ result, duration: 1200, defenseResult: true, side,
+      playerMoment: side === "player" ? moment : undefined,
+      rivalMoment: side === "opponent" && moment === "success" ? "defend" : undefined });
+    last = result;
+  }
+  return cues;
+}
 
 // Unknown engine IDs retain the existing fallback until their move data is available.
 export const battleEffectId = (id: string) => BATTLE_MOVE_FX[id] ? id : "push";
 
-export function rivalCues(cues: BattleCue[], encounter: Encounter, next: BattleState, last: string) {
+export function rivalCues(cues: BattleCue[], encounter: Encounter, next: BattleState, last: string, player?: { id: number; last: string }) {
   if (next.outcome === "quit") return { cues, last };
+  let index = cues.findLastIndex(cue => !!cue.playerMoment);
+  const moment = cues[index]?.playerMoment;
+  if (player && moment && random(seedFor(`${next.round}:player-speech`, next.rng)).value < (moment === "success" ? .4 : .3)) {
+    const start = cues.findIndex(cue => cue.playerMoment === "start");
+    if (moment !== "success" && start >= 0 && random(seedFor(`${next.round}:player-start`, next.rng)).value < .5) index = start;
+    const pool = LINES[`battle_${player.id === 1 ? "domi" : "mine"}_${cues[index].playerMoment}`].filter(line => line !== player.last);
+    const line = pool[Math.floor(random(seedFor(`${next.round}:player-line`, next.rng)).value * pool.length)];
+    return { cues: [...cues.slice(0, index + 1), { playerText: line, duration: 1600 }, ...cues.slice(index + 1)], last, lastPlayer: line };
+  }
   const candidates = cues.map((cue, index) => ({ moment: cue.rivalMoment, index }));
   if (next.opponent.hp > 0 && next.opponent.hp <= next.opponent.stats.hp * .25) candidates.unshift({ moment: "low", index: Math.max(0, cues.length - 2) });
   candidates.sort((a, b) => Number(["crit_deal", "crit_take", "finisher", "low"].includes(b.moment ?? "")) - Number(["crit_deal", "crit_take", "finisher", "low"].includes(a.moment ?? "")));
@@ -189,7 +265,7 @@ export function rivalCues(cues: BattleCue[], encounter: Encounter, next: BattleS
 }
 
 // The engine emits effectiveness before damage; only the presentation order changes.
-export function battleCues(events: readonly BattleEvent[], names: Record<Side, string>): BattleCue[] {
+export function battleCues(events: readonly BattleEvent[], names: Record<Side, string>, options: { seed?: number; lastResult?: string; state?: BattleState } = {}): BattleCue[] {
   const cues: BattleCue[] = [];
   let effectiveness: Extract<BattleEvent, { type: "effectiveness" }> | undefined;
   for (const event of events) {
@@ -198,7 +274,8 @@ export function battleCues(events: readonly BattleEvent[], names: Record<Side, s
         const rawId = battleFxId(event.action), id = rawId ? battleEffectId(rawId) : undefined, fx = id ? BATTLE_MOVE_FX[id] : undefined;
         const move = moveFor(event.action);
         cues.push({ moveName: event.action.kind === "quit" ? undefined : actionLabel(event.action), side: event.side, seenMove: rawId, duration: event.action.kind === "quit" ? 0 : 1200,
-          rivalMoment: event.side === "opponent" ? move?.finisher ? "finisher" : move?.kind === "defense" ? "defend" : move?.kind === "attack" ? "attack" : "round" : undefined });
+          playerMoment: event.side === "player" && move?.kind === "defense" ? "start" : undefined,
+          rivalMoment: event.side === "opponent" ? move?.finisher ? "finisher" : move?.kind === "defense" ? "guard" : move?.kind === "attack" ? "attack" : "round" : undefined });
         if (fx && (event.action.kind === "rest" || event.action.kind === "move" && (MOVE_BY_ID[event.action.moveId].kind !== "attack" || MOVE_BY_ID[event.action.moveId].mode === "charge" && event.action.phase !== "release"))) {
           cues.push({ motion: "skill", moveFx: id, side: event.side, duration: fx.duration });
         }
@@ -223,19 +300,19 @@ export function battleCues(events: readonly BattleEvent[], names: Record<Side, s
         break;
       case "energy":
         cues.push({ event, duration: event.amount > 0 ? 300 : 0 });
-        if (event.reason === "trait" && event.amount === 1) cues.push({ result: "막아 냈다! 기력 +1", duration: 1200, rivalMoment: event.side === "opponent" ? "defend" : undefined });
         break;
       case "reveal": cues.push({ event, result: event.affinity === "weak" ? "유독 잘 통했다!" : "잘 버텨 낸다…", duration: 1200 }); break;
-      case "counter": cues.push({ result: "되받아쳤다!", duration: 1200, rivalMoment: event.side === "opponent" ? "defend" : undefined }); break;
-      case "evade": cues.push({ result: "큰 기술을 흘려 냈다! 상대 기력 −2", duration: 1200, rivalMoment: event.side === "opponent" ? "defend" : undefined }); break;
       case "momentum": cues.push({ event, duration: 300, rivalMoment: event.side === "opponent" && event.amount > 0 ? "momentum" : undefined }); break;
       case "finisher": cues.push({ side: event.side, cutin: true, duration: 1200, rivalMoment: event.side === "opponent" ? "finisher" : undefined }); break;
       case "heal": cues.push({ event, motion: "heal", fx: "heal", side: event.side, amount: event.amount, duration: 900 }); break;
-      case "status": cues.push({ event, side: event.side, fx: event.change === "blocked" ? "shield" : event.change === "removed" ? undefined : event.status === "stagger" || event.status === "blur" ? "dizzy" : event.status === "slow" || event.status === "winded" ? "sleepy" : "debuff", duration: 500 }); if (event.status === "open" && event.change === "applied") cues.push({ result: "빈틈을 보였다…", duration: 1200 }); break;
+      case "status": cues.push({ event, side: event.side, fx: event.change === "blocked" ? "shield" : event.change === "removed" ? undefined : event.status === "stagger" || event.status === "blur" ? "dizzy" : event.status === "slow" || event.status === "winded" ? "sleepy" : "debuff", duration: 500 }); if (event.status === "open" && event.change === "applied" && !events.some(e => e.type === "action" && e.side === event.side && moveFor(e.action)?.defense === "counter")) cues.push({ result: "빈틈을 보였다…", duration: 1200 }); break;
       case "buff": cues.push({ event, side: event.side, fx: event.change === "applied" ? "buff" : "debuff", duration: 500 }); break;
       case "shield": cues.push({ event, side: event.side, fx: event.change === "applied" ? "shield" : undefined, duration: 500 }); break;
       case "end": cues.push({ motion: "finish", outcome: event.outcome, duration: 600 }); break;
     }
   }
+  const defense = defenseCues(events, options.seed ?? options.state?.rng ?? 0, options.lastResult ?? "", options.state);
+  const finish = cues.findIndex(cue => cue.motion === "finish");
+  cues.splice(finish < 0 ? cues.length : finish, 0, ...defense);
   return cues;
 }

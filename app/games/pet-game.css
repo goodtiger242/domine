@@ -703,3 +703,5 @@
   .pet-battle-actions [data-group] { height: 46px; min-height: 46px; }
   .pet-battle-skill-name, .pet-battle-rival { padding: 5px 8px; font-size: 13px; line-height: 18px; }
 }
+/* The foe stands high now: its speech goes beside it (left), clear of its HP box. */
+.pet-battle-fighter[data-side=opponent] .pet-battle-rival { bottom: auto; top: 12%; right: calc(100% + 4px); }

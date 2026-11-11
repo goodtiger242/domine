@@ -53,6 +53,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   const attempt = useRef(0);
   const names = { player: PETS[petId].name, opponent: encounter.name };
   const lastRival = useRef("");
+  const lastPlayer = useRef(""), lastDefenseResult = useRef("");
   const start = (roundSeed: number) => createBattle({
     seed: seedFor(`${encounter.cellId}:${petId}:${roundSeed}`, encounter.daySeed),
     player: buildFighter(petId === 1 ? "B001" : "B002", encounter.playerLevel, [], { condition }),
@@ -172,7 +173,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   }
   useEffect(() => {
     if (!playback || paused) return;
-    const delay = typing ? 18 : cue?.text ? 900 : cue?.moveName || cue?.result || cue?.rivalText ? cue.duration ?? 1200 : reduced && cue?.motion && !cue.moveFx ? cue.fx || cue.critical ? 300 : 0 : cue?.duration ?? 0;
+    const delay = typing ? 18 : cue?.text ? 900 : cue?.moveName || cue?.result || cue?.rivalText || cue?.playerText ? cue.duration ?? 1200 : reduced && cue?.motion && !cue.moveFx ? cue.fx || cue.critical ? 300 : 0 : cue?.duration ?? 0;
     const timer = setTimeout(() => {
       if (typing) setPlayback({ ...playback, revealed: playback.revealed + 1 });
       else advance();
@@ -198,8 +199,11 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     const next = stepRound(battle, action);
     if (next.state.outcome === "player") onWin?.();
     playing.current = true; cancelHold(); setPreview(""); setPreviewCost(0); setMenu("main");
-    const spoken = rivalCues(battleCues(next.events, names), encounter, next.state, lastRival.current);
+    const cues = battleCues(next.events, names, { state: battle, lastResult: lastDefenseResult.current });
+    lastDefenseResult.current = cues.findLast(cue => cue.defenseResult)?.result ?? lastDefenseResult.current;
+    const spoken = rivalCues(cues, encounter, next.state, lastRival.current, { id: petId, last: lastPlayer.current });
     lastRival.current = spoken.last;
+    lastPlayer.current = spoken.lastPlayer ?? lastPlayer.current;
     setPlayback(playbackFor(battle, next.state, spoken.cues));
   }
   function bag() {
@@ -210,6 +214,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     setPlayback(playbackFor(battle, battle, [{ text: "가방이 비었어요." }]));
   }
   function restart() {
+    lastPlayer.current = ""; lastDefenseResult.current = "";
     const next = start(++attempt.current); setSeen({ player: [], opponent: [] }); setFilter("all"); setPage(0);
     playing.current = true; cancelHold(); setPreview(""); setPreviewCost(0); setMenu("main"); setBattle(next); setPlayback(introduction(next));
   }
@@ -268,6 +273,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
       </span>}
       {cue?.side === side && cue.amount !== undefined && <strong key={`${shown.round}-${playback?.index}`} className="pet-battle-number" data-critical={cue.critical} data-good={cue.fx === "hit-good"} data-weak={cue.motion === "weak-hit"} data-heal={cue.motion === "heal"} aria-hidden="true">{cue.motion === "heal" ? "+" : "−"}{cue.amount}</strong>}
       {cue?.side === side && cue.moveName && <p key={`${shown.round}-${playback?.index}-name`} className="pet-battle-skill-name" role="status">{cue.moveName}</p>}
+      {side === "player" && cue?.playerText && <p className="pet-battle-rival" style={{ left: 0, right: "auto" }} role="status">{cue.playerText}</p>}
       {side === "opponent" && (cue?.rivalText || finished) && <p className="pet-battle-rival" role="status">{cue?.rivalText || encounterLine(encounter, outcome === "quit" ? "flee" : outcome === "player" ? "lose" : outcome === "opponent" ? "win" : "round", seedFor(String(shown.round), encounter.individual.seed), lastRival.current)}</p>}
     </div>;
   }

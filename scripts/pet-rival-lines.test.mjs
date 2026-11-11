@@ -8,7 +8,7 @@ const legacyMoments = ["enter", "taunt", "attack", "hit", "crit_deal", "crit_tak
 const newMoments = ["flee", "defend", "miss", "effective", "ineffective", "momentum", "finisher", "round"];
 const moments = [...legacyMoments, ...newMoments];
 const lifecycle = ["enter", "win", "lose", "flee"];
-const battle = ["defend", "miss", "effective", "ineffective", "momentum", "finisher", "round", "taunt", "attack", "hit", "low", "charge", "rest", "item"];
+const battle = ["defend", "guard", "miss", "effective", "ineffective", "momentum", "finisher", "round", "taunt", "attack", "hit", "low", "charge", "rest", "item"];
 const tones = ["polite", "cocky", "grumpy", "shy", "playful"];
 const variants = ["dog:small", "dog:large", "dog:native", "cat:stray", "cat:house"];
 const allRows = [...Object.values(RIVAL_LINES), ...Object.values(RIVAL_VARIANT_LINES), ...Object.values(RIVAL_TONE_LINES).flatMap(row => Object.values(row))];
@@ -150,7 +150,7 @@ test("긴 이름이나 줄바꿈을 넣어도 말풍선 글자 수와 한 줄 �
 test("발화 확률: 등장·승패·도망 100%, 결정기·기세 80%, 크리티컬 70%, 전투 30%, 기타 25%", () => {
   for (const moment of moments) {
     const expected = lifecycle.includes(moment) ? 1 : ["finisher", "momentum"].includes(moment) ? 0.8
-      : ["crit_deal", "crit_take"].includes(moment) ? 0.7 : battle.includes(moment) ? 0.3 : 0.25;
+      : ["crit_deal", "crit_take"].includes(moment) ? 0.7 : battle.includes(moment) && moment !== "guard" ? 0.3 : 0.25;
     let spoken = 0;
     for (let seed = 0; seed < 10000; seed++) {
       const result = shouldSpeak(moment, seed);
@@ -165,7 +165,7 @@ test("발화 확률: 등장·승패·도망 100%, 결정기·기세 80%, 크리�
 });
 
 
-test("모든 종·성격의 인사·승패·도망 4줄, 전투 14상황 2줄 이상", () => {
+test("모든 종·성격의 인사·승패·도망 4줄, 전투 15상황 2줄 이상", () => {
   assert.deepEqual(Object.keys(RIVAL_TONE_LINES), species);
   for (const kind of species) {
     assert.deepEqual(Object.keys(RIVAL_TONE_LINES[kind]), tones, kind);

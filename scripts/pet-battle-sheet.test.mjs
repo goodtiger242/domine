@@ -237,6 +237,35 @@ for (const move of [...MOVES, PUSH, { id: "rest", name: "숨 고르기" }]) test
   h.unmount();
 });
 
+for (const petId of [1, 2]) test(`방어 성공: 강아지 ${petId} 말풍선은 결과 다음에 1.6초, 상대 대사와 겹치지 않음`, t => {
+  const e = encounter(), view = loadTS("lib/domine/pet-battle-view.ts");
+  let state, expected;
+  for (let rng = 0; rng < 100 && !expected; rng++) {
+    state = initialFor(e, petId); state.rng = rng;
+    state.player.moves = ["T43"]; state.opponent.moves = ["T01"];
+    state.opponentAction = { kind: "move", moveId: "T01" };
+    const next = engine.stepRound(state, { kind: "move", moveId: "T43" });
+    const cues = battleCues(next.events, { player: "친구", opponent: e.name }, { state });
+    if (cues.some(c => c.playerMoment === "success")) expected = view.rivalCues(cues, e, next.state, "", { id: petId, last: "" }).lastPlayer;
+  }
+  assert.ok(expected);
+  const h = mount(t, { encounter: e, petId, stage: "adult", onClose() {} }, state, true);
+  h.settle(); h.click("기술"); h.click("마당 지키기");
+  const bubbles = () => nodes(h.tree, n => n.props.className === "pet-battle-rival");
+  let sawResult = false;
+  for (let i = 0; i < 1000 && !bubbles().some(n => text(n) === expected); i++) {
+    sawResult ||= nodes(h.tree, n => n.props.className === "pet-battle-center-result").length > 0;
+    h.nextTimer();
+  }
+  assert.ok(sawResult);
+  assert.equal(bubbles().length, 1); assert.equal(text(bubbles()[0]), expected);
+  assert.deepEqual(bubbles()[0].props.style, { left: 0, right: "auto" });
+  assert.equal(nodes(h.tree, n => n.props.className === "pet-battle-center-result").length, 0);
+  h.advance(1599); assert.equal(text(bubbles()[0]), expected);
+  h.advance(1); assert.equal(bubbles().length, 0);
+  h.settle(); h.unmount();
+});
+
 test("이동 줄이기에도 기술 아이콘과 대사를 읽을 시간이 남는다", t => {
   const h = mount(t, { encounter: encounter(), petId: 1, stage: "adult", onClose() {} }, undefined, true);
   h.settle(); h.click("숨 고르기");
