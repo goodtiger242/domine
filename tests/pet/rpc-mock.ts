@@ -28,7 +28,12 @@ export function createPetMock(options: { missing?: boolean; v9?: boolean; delayM
     capabilities: async()=>options.missing ? false : {version:6,sharedEconomy:true,explorationThemes:24,v9:options.v9!==false,v10:true,perPetShop:true,history:true},
     history: async()=> { calls.push("history"); return history.filter(row=>Date.parse(row.at)>=now-14*86400000).slice(-30).reverse().map(row=>({...row})); },
     legacy: async(pet,nickname,action)=> { calls.push(action ? "legacy-action" : "legacy-state"); return { data: action ? {ok:true} : {...shared,name:pet===1?"도미":"미네"},error:null,petId:pet,legacy:false }; },
-    register: async(i)=> { calls.push("register"); if(owner&&!authorized(i)) return failure("NICKNAME_TAKEN"); owner=i; return snapshot(); },
+    register: async(i)=> {
+      calls.push("register");
+      if (!/^[가-힣a-zA-Z0-9]{1,8}$/.test(i.nickname) || !/^[0-9a-f]{64}$/.test(i.secret)) return failure("INVALID_INPUT");
+      if(owner&&!authorized(i)) return failure("NICKNAME_TAKEN");
+      owner={...i}; return snapshot();
+    },
     state: async(i,pet)=> { calls.push("state"); return authorized(i)?snapshot(pet):failure("AUTH_FAILED"); },
     operation: async(i,id)=> { calls.push("operation"); return authorized(i) ? operations.get(id)?.result ?? failure("NOT_FOUND") : failure("AUTH_FAILED"); },
     execute: async(i,command:PetCommand)=> {

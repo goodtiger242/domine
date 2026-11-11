@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { loadTS } from "./pet-test-loader.mjs";
 const { levelOf, levelXP, progressOf, rewardEligible, rewardDisplay } = loadTS("lib/domine/pet-progress.ts");
-const { normalizeNickname, parseTransfer, createSecret, saveIdentity, readIdentity, registrationConfirmed } = loadTS("lib/domine/pet-identity.ts");
+const { normalizeNickname, secretForName, PET_LEGAL_NAMES, saveIdentity, registrationConfirmed } = loadTS("lib/domine/pet-identity.ts");
 const { gameReducer: reduce, initialMachine, visualLocked } = loadTS("lib/domine/pet-machine.ts");
 const { SAFE_ZONES, actorBounds, clampActor, buildBallPath, sampleBall } = loadTS("lib/domine/pet-geometry.ts");
 const { buildScenePlan, sampleScenePlan } = loadTS("lib/domine/pet-scene-plan.ts");
@@ -25,12 +26,20 @@ assert.equal(rewardEligible(3000,0,119),true);
 assert.equal(rewardEligible(2999,0,0),false);
 assert.equal(rewardEligible(60000,0,120),false);
 assert.equal(rewardEligible(0,null,0),true);
-for (const raw of ["", "아".repeat(9),"!!!","a:b","a b"]) assert.equal(normalizeNickname(raw),null);
-assert.equal(normalizeNickname(" 가나 "),"가나"); assert.equal(normalizeNickname("가".normalize("NFD")),"가");
-assert.equal(normalizeNickname("a".repeat(8)),"aaaaaaaa");
-assert.match(createSecret(),/^[0-9a-f]{64}$/); assert.notEqual(createSecret(),createSecret());
-assert.equal(parseTransfer("Nick:"+"a".repeat(64)).nickname,"Nick");
-assert.equal(parseTransfer("Nick:"+"A".repeat(64)),null); assert.equal(parseTransfer("x:y:z"),null);
+assert.equal(PET_LEGAL_NAMES.length,21);
+assert.equal(new Set(PET_LEGAL_NAMES).size,21);
+assert.deepEqual(PET_LEGAL_NAMES,[...PET_LEGAL_NAMES].sort((a,b)=>a.localeCompare(b,"ko")));
+for (const name of PET_LEGAL_NAMES) { assert.match(name,/^[가-힣a-zA-Z0-9]{1,8}$/); assert.equal(normalizeNickname(name),name); }
+for (const raw of ["", "아".repeat(9),"!!!","a:b","a b","옛별명","이태원","안제오 루카"]) {
+  assert.equal(normalizeNickname(raw),null);
+  await assert.rejects(secretForName(raw),/INVALID_INPUT/);
+}
+const token=await secretForName("김경석");
+assert.match(token,/^[0-9a-f]{64}$/);
+assert.equal(token,createHash("sha256").update("domine-pet-v1:김경석").digest("hex"));
+assert.equal(await secretForName(" 김 경석\t".normalize("NFD")),token);
+assert.equal(await secretForName("김경석"),token);
+assert.notEqual(await secretForName("김보영"),token);
 let s=reduce(initialMachine,{type:"act",id:1,now:100,duration:2400});
 assert.equal(s.deadlineAt,3000); assert.ok(visualLocked(s));
 assert.equal(reduce(s,{type:"done",id:0}),s);
@@ -81,22 +90,17 @@ const api=createPetApi(async(name,args)=>{calls.push({name,args});return respons
 response={data:null,error:{code:"PGRST202",message:"missing"}}; assert.equal(await api.capabilities(),false);
 for(const code of ["42501","500","NETWORK_ERROR"]) {response={data:null,error:{code,message:"error"}}; await assert.rejects(api.capabilities());}
 response={data:{version:6},error:null};assert.deepEqual(await api.capabilities(),{version:6,sharedEconomy:false,explorationThemes:5,v9:false,v10:false,perPetShop:false,history:false});
-const identity={nickname:"테스트",secret:"a".repeat(64)};
+const identity={nickname:"김경석",secret:token};
 const command={kind:"action",pet:2,action:"feed",requestId:"00000000-0000-4000-8000-000000000001"};
 const storage=new Map();
 globalThis.localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)};
 saveIdentity(identity);
-assert.deepEqual(readIdentity(identity.nickname),identity);
-assert.equal(registrationConfirmed(identity.nickname),false,"persisting a token is not server confirmation");
+assert.deepEqual([...storage],[["domine-pet-nick",identity.nickname]]);
+assert.equal(registrationConfirmed(identity.nickname),false,"saving a name is not server confirmation");
 saveIdentity(identity,true);
 assert.equal(registrationConfirmed(identity.nickname),true);
 saveIdentity(identity);
-assert.equal(registrationConfirmed(identity.nickname),true,"same-token retry preserves confirmation");
-const imported={...identity,secret:"b".repeat(64)};
-saveIdentity(imported);
-assert.equal(registrationConfirmed(identity.nickname),false,"a replacement token must be verified");
-saveIdentity(imported,true);
-assert.equal(registrationConfirmed(identity.nickname),true,"verified imports are confirmed");
+assert.equal(registrationConfirmed(identity.nickname),true,"same-name retry preserves confirmation");
 delete globalThis.localStorage;
 const newRegion={kind:"explore_begin",map:"farm",source:"map",requestId:"new-region"};
 const beforeRegion=calls.length;

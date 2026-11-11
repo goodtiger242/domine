@@ -70,7 +70,7 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
       const item = SHOP.find(item => item.slot === slot && equipped(item));
       return <div className="pet-equipped-row" key={slot}><span>{slot === "wearable" ? "옷" : "장난감"}</span>{item ? <><PetItemIcon key={item.id} item={item} /><strong>{item.name}</strong><button type="button" disabled={blocked} aria-label={`${item.name} 착용 해제`} onClick={() => void act(item)}>해제</button></> : <span>없음</span>}</div>;
     })}</section>}
-    {bag && !state?.inventory && <p className="pet-sheet-note" role="status">{disabled ? "가방을 불러오는 중…" : "기록 메뉴에서 별명을 연결해 주세요."}</p>}
+    {bag && !state?.inventory && <p className="pet-sheet-note" role="status">{disabled ? "가방을 불러오는 중…" : "기록 메뉴에서 이름을 선택해 주세요."}</p>}
     {bag && state?.inventory?.length === 0 && <p className="pet-sheet-note">아직 가진 물건이 없어요. 상점에서 코인으로 살 수 있어요.</p>}
     <div className="pet-catalog-grid pet-shop-grid">{SHOP.filter(item => bag ? owned(item) : category === "전체" || item.category === category).map(item => <button type="button" key={item.id} className="pet-catalog-card" data-equipped={!!equipped(item)} aria-pressed={bag ? !!equipped(item) : undefined} disabled={bag && blocked} onClick={() => { if (bag) { void act(item); return; } setSelected(item); setDone(""); setAsked(null); setConfirm(false); }}>
       <PetItemIcon item={item} /><strong>{item.name}</strong><span className={!owned(item) && coins < (item.price ?? 0) ? "pet-price-short" : undefined}>{equipped(item) ? `✓ ${dog} 착용 중` : owned(item) ? `✓ ${dog} 보유` : `${item.price} 코인`}</span>

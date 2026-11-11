@@ -7,18 +7,18 @@ import ts from "typescript";
 import { loadTS } from "./pet-test-loader.mjs";
 
 const require = createRequire(import.meta.url);
-function mount(file, props) {
+function mount(file, props, imports = {}) {
   const slots = [], effects = []; let cursor = 0, tree;
   function effect(fn, deps) { const i = cursor++; if (!slots[i] || deps.some((d, n) => d !== slots[i].deps[n])) { const previous = slots[i]; slots[i] = { deps }; effects.push(() => { previous?.cleanup?.(); slots[i].cleanup = fn(); }); } }
   const hooks = {
     useState(initial) { const i = cursor++; slots[i] ??= { value: typeof initial === "function" ? initial() : initial }; return [slots[i].value, value => { slots[i].value = typeof value === "function" ? value(slots[i].value) : value; }]; },
     useRef(initial) { return slots[cursor++] ??= { current: initial }; },
-    useId: () => "sheet-test", useEffect: effect, useLayoutEffect: effect,
+    useId: () => "sheet-test", useEffect: effect, useLayoutEffect: effect, useCallback: fn => fn,
   };
   const source = ts.transpileModule(readFileSync(`app/games/${file}.tsx`, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
-  new Function("require", "exports", source)(name => name === "react" ? hooks : name.startsWith("@/") ? loadTS(`${name.slice(2)}.ts`) : name.startsWith("./") ? loadTS(`app/games/${name.slice(2)}.tsx`) : require(name), exports);
-  return { render(next = {}) { Object.assign(props, next); cursor = 0; tree = exports.default(props); return tree; }, get tree() { return tree; }, flushEffects() { while (effects.length) effects.shift()(); }, unmount() { slots.forEach(slot => slot?.cleanup?.()); } };
+  new Function("require", "exports", source)(name => imports[name] ?? (name === "react" ? hooks : name.startsWith("@/") ? loadTS(`${name.slice(2)}.ts`) : name.startsWith("./") ? loadTS(`app/games/${name.slice(2)}.tsx`) : require(name)), exports);
+  return { render(next = {}) { Object.assign(props, next); cursor = 0; tree = (exports.default ?? exports.PetGame)(props); return tree; }, get tree() { return tree; }, flushEffects() { while (effects.length) effects.shift()(); }, unmount() { slots.forEach(slot => slot?.cleanup?.()); } };
 }
 function nodes(node, match) {
   if (Array.isArray(node)) return node.flatMap(child => nodes(child, match));
@@ -27,6 +27,36 @@ function nodes(node, match) {
 }
 const text = node => typeof node === "string" || typeof node === "number" ? String(node) : Array.isArray(node) ? node.map(text).join("") : text(node?.props?.children ?? "");
 const button = (tree, label) => nodes(tree, n => n.type === "button" && text(n) === label)[0];
+const { PET_LEGAL_NAMES } = loadTS("lib/domine/pet-identity.ts");
+const game = {
+  machine: { command: "idle", visual: "idle", committedMap: "E5" }, shared: null, personal: null,
+  nickname: "김경석", registered: true, capability: "ready", features: { v9: true }, petId: 1, multiPet: true,
+  message: "", api: {}, pause() {}, resume() {}, clearIdentity() { this.nickname = ""; },
+  async connect(name) { this.nickname = name; },
+};
+// Render the real game handlers with scene/network dependencies replaced by inert components.
+const gameView = mount("PetGame", {}, {
+  "./usePetController": { usePetController: () => game }, "next/dynamic": { default: () => "section" },
+  "./PetScene": { PetScene: () => null }, "./PetProgress": {}, "./PetFeedback": {}, "./pet-game.css": {},
+});
+gameView.render(); button(gameView.tree, "내 이름 선택").props.onClick(); gameView.render();
+const nameButtons = () => nodes(gameView.tree, n => n.type === "button" && PET_LEGAL_NAMES.includes(text(n)));
+assert.deepEqual(nameButtons().map(text), PET_LEGAL_NAMES);
+assert.equal(button(gameView.tree, "김경석").props["aria-pressed"], true);
+const search = nodes(gameView.tree, n => n.type === "input")[0];
+assert.equal(nodes(gameView.tree, n => n.type === "input").length, 1, "only search input remains");
+assert.equal(search.props.type, "search");
+search.props.onChange({ target: { value: "경석" } }); gameView.render();
+assert.deepEqual(nameButtons().map(text), ["김경석"]);
+search.props.onChange({ target: { value: "ㄱㄱㅅ" } }); gameView.render(); assert.equal(nameButtons().length, 0);
+search.props.onChange({ target: { value: "" } }); gameView.render();
+button(gameView.tree, "김보영").props.onClick(); await Promise.resolve(); gameView.render();
+assert.equal(game.nickname, "김보영"); assert.equal(button(gameView.tree, "김보영").props["aria-pressed"], true);
+button(gameView.tree, "선택 해제").props.onClick.call(game); gameView.render(); assert.equal(game.nickname, "");
+assert.equal(nameButtons().some(n => n.props["aria-pressed"]), false);
+const gameCss = readFileSync("app/games/pet-game.css", "utf8");
+assert.match(gameCss, /\.pet-name-grid button\s*\{[^}]*min-height: 44px/);
+console.log("Pet name selection: 21 sorted chips, partial search, selected state, connect and clear passed.");
 const cards = tree => nodes(tree.props.children, n => n.props.className === "pet-catalog-card");
 const state = { ok: true, code: "OK", serverNow: "", coins: 100, player: { coins: 100, xp: 0, level: 1 }, inventory: [], equipment: [] };
 let calls = [], release;

@@ -1,3 +1,4 @@
+import { setImmediate as nextTurn } from "node:timers/promises";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
@@ -5,7 +6,8 @@ import { loadTS } from "./pet-test-loader.mjs";
 
 const { createPetMock } = loadTS("tests/pet/rpc-mock.ts");
 const { PetRpcError } = loadTS("lib/domine/pet-rpc.ts");
-const identity = { nickname: "테스트", secret: "a".repeat(64) };
+const { secretForName } = loadTS("lib/domine/pet-identity.ts");
+const identity = { nickname: "김경석", secret: await secretForName("김경석") };
 const source = ts.transpileModule(readFileSync("app/games/usePetController.ts", "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
@@ -57,7 +59,7 @@ function mount(api, saved = [], reduced = false) {
     for(let n=0;n<30;n++) {
       if(dirty) { dirty=false;cursor=0;game=exports.usePetController(api); }
       while(effects.length) effects.shift()();
-      await Promise.resolve();
+      await nextTurn();
     }
     assert.equal(dirty,false,"controller settles without an effect loop");
   }
@@ -75,16 +77,16 @@ function mount(api, saved = [], reduced = false) {
     close(){for(const slot of slots) slot?.cleanup?.();},
   };
 }
-const savedToken = [ ["domine-pet-nick",identity.nickname], [`domine-pet-identity:${identity.nickname}`,identity.secret] ];
+const savedToken = [["domine-pet-nick",identity.nickname]];
 let mock=createPetMock(), h=mount(mock.api);
 await h.flush();assert.equal(h.game.registered,false);
 h.game.care("feed");await h.flush();
 assert.equal(h.game.machine.visual,"acting");
-assert.equal(h.game.message,"구경 중이에요 · 별명을 등록하면 코인이 쌓여요");
+assert.equal(h.game.message,"구경 중이에요 · 내 이름을 선택하면 코인이 쌓여요");
 assert.ok(!mock.calls.includes("action"));h.close();
 
 mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
-assert.equal(mock.calls.filter(c=>c==="register").length,1,"unconfirmed saved token retries registration");
+assert.equal(mock.calls.filter(c=>c==="register").length,1,"unconfirmed saved name retries registration");
 assert.equal(h.game.identity.secret,identity.secret);
 assert.equal(h.game.registered,true);assert.equal(h.storage.get(`domine-pet-reg:${identity.nickname}`),"1");h.close();
 
@@ -94,17 +96,47 @@ assert.equal(mock.calls.filter(c=>c==="register").length,2);h.close();
 
 mock=createPetMock();await mock.api.register({...identity,secret:"b".repeat(64)});h=mount(mock.api,savedToken);await h.flush();
 assert.equal(h.game.registered,false);assert.ok(!h.storage.has(`domine-pet-reg:${identity.nickname}`));
-assert.equal(h.game.message,"이미 쓰는 별명이에요. 다른 기기의 이전 코드를 입력하거나 다른 별명을 고르세요");
-await h.game.connect(`${identity.nickname}:${"b".repeat(64)}`,true);await h.flush();
-assert.equal(h.game.registered,true);assert.equal(h.storage.get(`domine-pet-reg:${identity.nickname}`),"1");h.close();
+assert.equal(h.game.message,"이름을 다시 선택해 주세요");h.close();
+
+// Old random tokens are ignored, including when the name has a confirmation flag.
+mock=createPetMock();await mock.api.register(identity);
+h=mount(mock.api,[...savedToken,[`domine-pet-identity:${identity.nickname}`,"b".repeat(64)],[`domine-pet-reg:${identity.nickname}`,"1"]]);await h.flush();
+assert.equal(h.game.identity.secret,identity.secret);assert.equal(h.game.registered,true);
+assert.equal(mock.calls.filter(c=>c==="register").length,1,"confirmed name reads state without registering again");h.close();
+
+// A stale confirmation is cleared after authentication fails, allowing registration on retry.
+mock=createPetMock();h=mount(mock.api,[...savedToken,[`domine-pet-reg:${identity.nickname}`,"1"]]);await h.flush();
+assert.equal(h.game.message,"이름을 다시 선택해 주세요");assert.equal(h.game.registered,false);
+await h.game.checkCapabilities();await h.flush();assert.equal(h.game.registered,true);h.close();
+
+for (const missing of [false,true]) {
+  mock=createPetMock({missing});h=mount(mock.api,[["domine-pet-nick","옛별명"],["domine-pet-identity:옛별명","a".repeat(64)],["domine-pet-reg:옛별명","1"]]);await h.flush();
+  assert.equal(h.game.nickname,"");assert.equal(h.game.identity,null);assert.equal(h.game.registered,false);
+  assert.equal(h.game.message,"이름을 선택해 주세요");assert.ok(!mock.calls.includes("register"));assert.ok(!mock.calls.includes("state"));
+  for (const invalid of ["옛별명","a!","123456789",`${identity.nickname}:${identity.secret}`]) {
+    const before=mock.calls.length;await h.game.connect(invalid);await h.flush();assert.equal(mock.calls.length,before);
+  }
+  h.game.care("feed");await h.flush();assert.ok(!mock.calls.includes("legacy-action"));h.close();
+}
+
+// Two clean device stores join one server record, including coins and inventory.
+mock=createPetMock();h=mount(mock.api);await h.flush();await h.game.connect(identity.nickname);await h.flush();
+await h.game.execute({kind:"purchase",pet:1,item:"061",requestId:"device-one"});await h.flush();
+const firstRecord=h.game.personal;h.close();
+h=mount(mock.api);await h.flush();await h.game.connect(identity.nickname);await h.flush();
+assert.equal(h.game.identity.secret,identity.secret);assert.equal(h.game.personal.coins,firstRecord.coins);
+assert.deepEqual(h.game.personal.inventory,["061"]);assert.equal(mock.calls.filter(c=>c==="register").length,2);
+assert.ok([...h.storage.keys()].every(key=>!key.startsWith("domine-pet-identity:")));
+h.game.clearIdentity();await h.flush();assert.equal(h.game.nickname,"");assert.equal(h.game.identity,null);assert.equal(h.game.personal,null);assert.equal(h.game.registered,false);assert.ok(!h.storage.has("domine-pet-nick"));
+await h.game.connect(identity.nickname);await h.flush();assert.deepEqual(h.game.personal.inventory,["061"]);h.close();
 
 mock=createPetMock();const register=mock.api.register;
 mock.api.register=async i=>{await register(i);throw new TypeError("response lost");};
 h=mount(mock.api);await h.flush();await h.game.connect(identity.nickname);await h.flush();
-const savedSecret=h.storage.get(`domine-pet-identity:${identity.nickname}`);
-assert.ok(savedSecret);assert.ok(!h.storage.has(`domine-pet-reg:${identity.nickname}`));
+assert.equal(h.storage.get("domine-pet-nick"),identity.nickname);
+assert.ok(!h.storage.has(`domine-pet-identity:${identity.nickname}`));assert.ok(!h.storage.has(`domine-pet-reg:${identity.nickname}`));
 mock.api.register=register;await h.game.connect(identity.nickname);await h.flush();
-assert.equal(h.game.identity.secret,savedSecret);assert.equal(h.game.registered,true);h.close();
+assert.equal(h.game.identity.secret,identity.secret);assert.equal(h.game.registered,true);h.close();
 
 mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
 const command={kind:"action",pet:1,action:"feed",requestId:"error"};

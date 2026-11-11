@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createPetApi, acceptsResult, PetRpcError, supportsExploration, type PetApi, type PetCapabilities, type PetCommand, type V6Result } from "@/lib/domine/pet-rpc";
 import { createClient } from "@/lib/supabase/client";
-import { createSecret, normalizeNickname, parseTransfer, readIdentity, registrationConfirmed, saveIdentity, storageAvailable, type PetIdentity } from "@/lib/domine/pet-identity";
+import { secretForName, normalizeNickname, registrationConfirmed, saveIdentity, storageAvailable, type PetIdentity } from "@/lib/domine/pet-identity";
 import { rewardDisplay } from "@/lib/domine/pet-progress";
 import { gameReducer, initialMachine, visualLocked, type GameEvent } from "@/lib/domine/pet-machine";
 import { mapBackground, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
@@ -23,8 +23,8 @@ function sceneDelay(ms: number, signal: AbortSignal) {
 }
 const safeGet = (key: string) => { try { return localStorage.getItem(key) ?? ""; } catch { return ""; } };
 const errorText: Record<string, string> = {
-  AUTH_FAILED: "이미 쓰는 별명이에요. 다른 기기의 이전 코드를 입력하거나 다른 별명을 고르세요",
-  NICKNAME_TAKEN: "이미 쓰는 별명이에요. 다른 기기의 이전 코드를 입력하거나 다른 별명을 고르세요",
+  AUTH_FAILED: "이름을 다시 선택해 주세요",
+  NICKNAME_TAKEN: "이름을 다시 선택해 주세요",
   SERVER_UPDATE_REQUIRED: "서버 업데이트 대기 중(새 지역 탐험은 아직)",
   INSUFFICIENT_COINS: "코인이 조금 더 필요해요.", NOT_OWNED: "먼저 구매해 주세요.",
   INVALID_INPUT: "입력 내용을 확인해 주세요.", REQUEST_CONFLICT: "요청이 달라 기록을 확인하지 못했어요.",
@@ -241,12 +241,12 @@ export function usePetController(injectedApi?: PetApi) {
   const care = useCallback((action: PetAction | "sleep") => {
     if (visualLocked(machineRef.current)) return;
     void localScene({ action, id: 0 });
-    if (!registeredRef.current) setMessage("구경 중이에요 · 별명을 등록하면 코인이 쌓여요");
+    if (!registeredRef.current) setMessage("구경 중이에요 · 내 이름을 선택하면 코인이 쌓여요");
     if (action === "sleep") return;
     const i = identityRef.current;
     if (i && registeredRef.current && capabilityRef.current === "ready") {
       void execute({ kind: "action", pet: petRef.current, action, requestId: crypto.randomUUID() });
-    } else if (nickRef.current && (capabilityRef.current === "missing" || (!i && capabilityRef.current === "ready"))) {
+    } else if (nickRef.current && capabilityRef.current === "missing") {
       const selected = petRef.current, g = generation.current;
       void api.legacy(selected, nickRef.current, action, legacy.current)
         .then(() => { if (current(g, i, selected)) void refresh(); })
@@ -254,13 +254,12 @@ export function usePetController(injectedApi?: PetApi) {
     }
   }, [api, current, execute, localScene, refresh]);
 
-  const connect = useCallback(async (raw: string, transfer = false) => {
+  const connect = useCallback(async (raw: string) => {
     if (registrationPending.current) return;
     setMessage("");
-    const imported = transfer ? parseTransfer(raw) : null;
-    const nick = transfer ? imported?.nickname : normalizeNickname(raw);
-    if (!nick) { setMessage(transfer ? "이전 코드 형식을 확인해 주세요." : "별명은 한글·영문·숫자 1~8자로 입력해 주세요."); return; }
-    if (pending.current && (nick.toLowerCase() !== identityRef.current?.nickname.toLowerCase() || (imported && imported.secret !== identityRef.current?.secret))) return;
+    const nick = normalizeNickname(raw);
+    if (!nick) { setMessage("청년회 명단에서 이름을 선택해 주세요."); return; }
+    if (pending.current && nick !== identityRef.current?.nickname) return;
     if (capabilityRef.current === "missing") {
       nickRef.current = nick; setNickname(nick);
       try { localStorage.setItem("domine-pet-nick", nick); } catch { /* Shared care works without storage. */ }
@@ -276,26 +275,31 @@ export function usePetController(injectedApi?: PetApi) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
-      const saved = readIdentity(nick);
-      const candidate = imported ?? saved ?? { nickname: nick, secret: createSecret() };
-      // Persist before registration so a lost response cannot lose the new credential.
-      if (!imported && !saved) saveIdentity(candidate);
-      const result = imported ? await api.state(candidate, selected, controller.signal) : await api.register(candidate, controller.signal);
+      const candidate = { nickname: nick, secret: await secretForName(nick) };
       if (!current(g, previousIdentity, selected) || controller.signal.aborted) return;
-      if (!result.ok) { setMessage(errorText[result.code] ?? "등록을 완료하지 못했어요."); return; }
+      saveIdentity(candidate);
+      if (!previousIdentity) { nickRef.current = nick; setNickname(nick); }
+      const result = registrationConfirmed(nick)
+        ? await api.state(candidate, selected, controller.signal)
+        : await api.register(candidate, controller.signal);
+      if (!current(g, previousIdentity, selected) || controller.signal.aborted) return;
+      if (!result.ok) {
+        localStorage.removeItem(`domine-pet-reg:${nick.toLowerCase()}`);
+        setMessage(errorText[result.code] ?? "등록을 완료하지 못했어요."); return;
+      }
       saveIdentity(candidate, true);
       registeredRef.current = true; setRegistered(true);
       setRewardNotice("");
       ++generation.current; ++readSequence.current;
       identityRef.current = candidate; setIdentity(candidate); nickRef.current = nick; setNickname(nick);
-      personalRef.current = null; apply(result); dispatch({ type: "reset" }); setCue(null);
+      personalRef.current = null; setPersonal(null); setFeedback(null); apply(result); dispatch({ type: "reset" }); setCue(null);
       const savedCommand = safeGet(pendingKey(candidate));
       if (savedCommand) {
         const command = JSON.parse(savedCommand) as PetCommand;
         if (command.requestId && command.kind) { pending.current = command; dispatch({ type: "request", id: command.requestId }); dispatch({ type: "uncertain", id: command.requestId }); }
       }
       void refresh();
-    } catch { if (current(g, previousIdentity, selected)) setMessage("연결 또는 저장을 완료하지 못했어요. 같은 별명으로 다시 확인해 주세요."); }
+    } catch { if (current(g, previousIdentity, selected)) setMessage("연결 또는 저장을 완료하지 못했어요. 같은 이름으로 다시 확인해 주세요."); }
     finally { clearTimeout(timer); registrationPending.current = false; }
   }, [api, apply, current, dispatch, refresh]);
 
@@ -305,16 +309,16 @@ export function usePetController(injectedApi?: PetApi) {
       if (!alive.current) return;
       capabilityRef.current = supported ? "ready" : "missing"; setCapability(capabilityRef.current);
       featuresRef.current = supported || null; setFeatures(featuresRef.current);
-      // Retry with the saved token until the server has confirmed registration.
+      // Retry the selected name until the server has confirmed registration.
       if (supported && !registeredRef.current && nickRef.current) await connect(nickRef.current);
       await refresh();
     } catch { if (alive.current) { capabilityRef.current = "error"; setCapability("error"); setMessage("개인 기록 연결을 확인하지 못했어요."); } }
   }, [api, refresh, connect]);
   useEffect(() => {
     alive.current = true;
-    const nick = safeGet("domine-pet-nick"); nickRef.current = nick; setNickname(nick);
-    try { identityRef.current = readIdentity(nick); setIdentity(identityRef.current); } catch { /* No personal storage. */ }
-    registeredRef.current = !!identityRef.current && registrationConfirmed(nick); setRegistered(registeredRef.current);
+    const stored = safeGet("domine-pet-nick"), nick = normalizeNickname(stored) ?? "";
+    nickRef.current = nick; setNickname(nick);
+    if (stored && !nick) setMessage("이름을 선택해 주세요");
     const selected: PetId = safeGet("domine-pet-selected") === "2" ? 2 : 1; petRef.current = selected; setPetId(selected);
     let saved: string | null = null;
     try { saved = localStorage.getItem("domine-pet-cell"); } catch { /* Default location. */ }
@@ -327,12 +331,6 @@ export function usePetController(injectedApi?: PetApi) {
       if (!alive.current || controller.signal.aborted) return;
       visit(map); setWorldReady(true);
     });
-    if (identityRef.current) {
-      try {
-        const saved = safeGet(pendingKey(identityRef.current));
-        if (saved) { pending.current = JSON.parse(saved); dispatch({ type: "request", id: pending.current!.requestId }); dispatch({ type: "uncertain", id: pending.current!.requestId }); }
-      } catch { setMessage("이 기기의 미확인 요청을 읽지 못했어요."); }
-    }
     void checkCapabilities();
     return () => {
       alive.current = false;
@@ -415,9 +413,23 @@ export function usePetController(injectedApi?: PetApi) {
     try { localStorage.setItem("domine-pet-selected", String(id)); } catch { /* Optional preference. */ }
     void refresh();
   }
+  function clearIdentity() {
+    try { localStorage.removeItem("domine-pet-nick"); }
+    catch { setMessage("이 기기에 이름 선택 해제를 저장하지 못했어요."); return; }
+    ++generation.current; ++readSequence.current;
+    abort.current?.abort(); mapAbort.current?.abort();
+    pending.current = null;
+    identityRef.current = null; setIdentity(null);
+    nickRef.current = ""; setNickname("");
+    registeredRef.current = false; setRegistered(false);
+    personalRef.current = null; setPersonal(null); setFeedback(null); setRewardNotice(""); setCue(null);
+    dispatch({ type: "reset" });
+    setMessage("이름을 선택해 주세요");
+    void refresh();
+  }
   const done = useCallback((id: number, sleep?: boolean) => dispatch({ type: "done", id, sleep }), [dispatch]);
   return { host, api, machine, active, shared, personal, feedback, message, rewardNotice, setMessage, capability, features, registered, identity, nickname, petId, multiPet, cue, visited, arrival, travel, worldReady,
-    care, localScene, done, connect, selectPet, execute, refresh, checkCapabilities,
+    care, localScene, done, connect, clearIdentity, selectPet, execute, refresh, checkCapabilities,
     retry: () => { if (pending.current) void execute(pending.current, true); },
     pause: () => { ++generation.current; abort.current?.abort(); mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },
     resume: () => { if (activeRef.current) { dispatch({ type: "resume" }); void refresh(); } },
