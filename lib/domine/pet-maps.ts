@@ -32,7 +32,7 @@ export const DEFAULT_MAP: PetMap = "church";
 export type SceneAction = PetAction | "sleep";
 export type SceneCue = { id: number } & (
   { action: SceneAction | "tap" | "priest" } |
-  { action: "map"; direction: "n" | "s" | "e" | "w" } |
+  { action: "map"; direction?: "n" | "s" | "e" | "w"; to?: string } |
   { action: "shop"; shop: number }
 );
 

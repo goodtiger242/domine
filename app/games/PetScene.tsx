@@ -356,16 +356,18 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       x={speaker === "priest" ? 18 : s.x + s.dir * w * sc * 0.25}
       y={speaker === "priest" ? 31 : s.y - h * sc} duration={s.dur} />}
     </div>
-    <div key={cell.id} className="pet-location" aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
-    <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기">MAP</button>
-    {DIRECTIONS.map((direction) => {
-      const destination = neighborCell(cell.id, direction);
-      return destination && <button key={direction} type="button" className={`pet-direction pet-direction-${direction}`}
-        aria-label={`${destination.name}(으)로 이동`} disabled={locked}
-        onClick={() => onLocal?.({ action: "map", direction, id: Date.now() })}>
-        <span aria-hidden="true">{{ n: "↑", s: "↓", e: "→", w: "←" }[direction]}</span><small>{destination.name}</small>
-      </button>;
-    })}
+    <div className="pet-scene-picture pet-scene-ui">
+      <div key={cell.id} className="pet-location" aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
+      <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기">MAP</button>
+      {DIRECTIONS.map((direction) => {
+        const destination = neighborCell(cell.id, direction);
+        return destination && <button key={direction} type="button" className={`pet-direction pet-direction-${direction}`}
+          aria-label={`${destination.name}(으)로 이동`} disabled={locked} title={destination.name}
+          onClick={() => onLocal?.({ action: "map", direction, id: Date.now() })}>
+          <span aria-hidden="true">{{ n: "↑", s: "↓", e: "→", w: "←" }[direction]}</span>
+        </button>;
+      })}
+    </div>
     </div>
   );
 });

@@ -1,7 +1,7 @@
 import type { PetMap, SceneCue } from "./pet-maps";
 
 export type WorldCell = { id: string; name: string; theme: PetMap; kind: string };
-export type Direction = Extract<SceneCue, { action: "map" }>["direction"];
+export type Direction = NonNullable<Extract<SceneCue, { action: "map" }>["direction"]>;
 export const DIRECTIONS = ["n", "s", "e", "w"] as const;
 export const DEFAULT_CELL = "E5";
 

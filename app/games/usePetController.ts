@@ -159,8 +159,8 @@ export function usePetController(injectedApi?: PetApi) {
     vibrate(10);
     const id = ++idCounter.current;
     if (next.action === "map") {
-      const cell = neighborCell(currentCell.id, next.direction);
-      if (!cell) return;
+      const cell = next.to ? worldCell(next.to) : next.direction ? neighborCell(currentCell.id, next.direction) : null;
+      if (!cell || cell.id === currentCell.id) return;
       const g = generation.current;
       dispatch({ type: "map", map: cell.id, id });
       const controller = new AbortController(); mapAbort.current?.abort(); mapAbort.current = controller;
@@ -240,8 +240,10 @@ export function usePetController(injectedApi?: PetApi) {
       if (!alive.current) return;
       capabilityRef.current = supported ? "ready" : "missing"; setCapability(capabilityRef.current);
       await refresh();
+      // 예전에 별명만 저장한 기기: 비밀 토큰을 자동으로 만들어 등록해야 코인·경험치가 쌓인다.
+      if (supported && !identityRef.current && nickRef.current) void connect(nickRef.current);
     } catch { if (alive.current) { capabilityRef.current = "error"; setCapability("error"); setMessage("개인 기록 연결을 확인하지 못했어요."); } }
-  }, [api, refresh]);
+  }, [api, refresh, connect]);
   useEffect(() => {
     alive.current = true;
     const nick = safeGet("domine-pet-nick"); nickRef.current = nick; setNickname(nick);

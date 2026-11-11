@@ -107,7 +107,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     <nav className="pet-menu" aria-label="개인 진행"><button type="button" onClick={() => open("shop")}>상점</button><button type="button" onClick={() => open("album")}>도감</button><button type="button" onClick={() => open("achievements")}>업적</button></nav>
     <p className="sr-only" role="status">{game.message || notice}</p>
     {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close}
-      onMove={(direction) => { close(); void game.localScene({ action: "map", direction, id: 0 }); }} />}
+      onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
     {sheet === "shop" && <PetShopSheet state={personal} petId={game.petId} disabled={disabled} notice={notice} execute={game.execute} onClose={close} />}
     {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}
     {sheet === "achievements" && <PetAchievementSheet badges={personal?.badges ?? []} notice={notice} onClose={close} />}

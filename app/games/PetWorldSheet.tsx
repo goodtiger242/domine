@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { PetMap } from "@/lib/domine/pet-maps";
-import { DIRECTIONS, PET_WORLD, neighborCell, worldCell, type Direction } from "@/lib/domine/pet-world";
+import { PET_WORLD, worldCell } from "@/lib/domine/pet-world";
 import PetSheet from "./PetSheet";
 
 const THEMES: Record<PetMap, [string, string]> = {
@@ -13,22 +13,21 @@ const THEMES: Record<PetMap, [string, string]> = {
 };
 
 export default function PetWorldSheet({ current, visited, onMove, onClose }: {
-  current: string; visited: string[]; onMove: (direction: Direction) => void; onClose: () => void;
+  current: string; visited: string[]; onMove: (to: string) => void; onClose: () => void;
 }) {
   const [selected, setSelected] = useState(current);
   const cell = worldCell(selected);
   return <PetSheet title="우리 동네 지도" onClose={onClose}>
-    <p className="pet-sheet-note">인접한 네 칸으로 한 칸씩 이동해요. 먼 칸은 이름만 확인할 수 있어요.<br />🐕 현재 위치 · ✓ 다녀온 곳 · 진한 테두리: 이동 가능</p>
+    <p className="pet-sheet-note">가고 싶은 칸을 누르면 바로 이동해요.<br />🐕 현재 위치 · ✓ 다녀온 곳</p>
     <div className="pet-world-scroll" tabIndex={0} aria-label="동네 지도, 좁은 화면에서는 좌우로 스크롤">
       <div className="pet-world-grid" role="group" aria-label="서쪽 A열부터 동쪽 J열, 북쪽 1행부터 남쪽 10행">
         {PET_WORLD.map((place) => {
-          const direction = DIRECTIONS.find((dir) => neighborCell(current, dir)?.id === place.id);
           const here = place.id === current, seen = visited.includes(place.id);
           return <button type="button" key={place.id} style={{ backgroundColor: THEMES[place.theme][1] }}
-            aria-label={`${place.id} ${place.name}${here ? ", 현재 위치" : direction ? ", 이동 가능" : ", 이름 확인"}${seen ? ", 방문함" : ""}`}
+            aria-label={`${place.id} ${place.name}${here ? ", 현재 위치" : ", 이동"}${seen ? ", 방문함" : ""}`}
             aria-current={here ? "location" : undefined} aria-pressed={place.id === selected}
-            data-neighbor={!!direction} data-selected={place.id === selected}
-            onClick={() => { setSelected(place.id); if (direction) onMove(direction); }}>
+            data-neighbor={!here} data-selected={place.id === selected}
+            onClick={() => { setSelected(place.id); if (!here) onMove(place.id); }}>
             <span aria-hidden="true">{here ? "🐕" : THEMES[place.theme][0]}</span>
             <small>{place.id}{seen && <i aria-hidden="true">✓</i>}</small>
           </button>;

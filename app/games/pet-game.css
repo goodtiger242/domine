@@ -58,18 +58,20 @@
 .pet-scene[data-paused=true] *, .pet-scene[data-paused=true] { animation-play-state: paused !important; transition: none !important; }
 .pet-stage { height: 400px; aspect-ratio: auto; }
 .pet-scene-picture { position: absolute; top: 120px; left: 50%; width: min(100%, 362px); aspect-ratio: 16 / 9; transform: translateX(-50%); }
-.pet-location { position: absolute; top: 8px; left: 8px; max-width: calc(100% - 90px); padding: 6px 12px; border-radius: 18px; background: #15221cce; color: white; pointer-events: none; }
-.pet-location strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 15px; font-weight: 800; line-height: 1.3; word-break: keep-all; overflow-wrap: anywhere; }
-.pet-location small { display: block; font-size: 10px; line-height: 1.2; opacity: .85; }
-.pet-map-button, .pet-direction { position: absolute; z-index: 1; color: white; background: #15221cda; box-shadow: 0 2px 8px #0006; border: 1px solid #ffffff80; cursor: pointer; }
-.pet-map-button { top: 8px; right: 8px; min-height: 36px; min-width: 60px; padding: 5px 10px; border-radius: 24px; font-size: 13px; font-weight: 800; }
-.pet-direction { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 76px; min-height: 48px; border-radius: 24px; }
-.pet-direction > span { font-size: 27px; font-weight: 800; line-height: 1; }
-.pet-direction small { max-width: 7em; padding: 0 3px; font-size: 11px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pet-direction-n { top: 64px; left: calc(50% - 38px); }
-.pet-direction-s { bottom: 24px; left: calc(50% - 38px); }
-.pet-direction-e { top: 44%; right: 8px; }
-.pet-direction-w { top: 44%; left: 8px; }
+.pet-scene-ui { pointer-events: none; z-index: 1; }
+.pet-scene-ui > * { pointer-events: auto; }
+.pet-location { position: absolute; top: 4px; left: 4px; max-width: calc(100% - 64px); padding: 3px 9px; border-radius: 12px; background: #15221ccc; color: white; pointer-events: none !important; }
+.pet-location strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 800; line-height: 1.3; }
+.pet-location small { display: none; }
+.pet-map-button, .pet-direction { position: absolute; color: white; background: #15221ccc; box-shadow: 0 1px 5px #0006; border: 1px solid #ffffff80; cursor: pointer; }
+.pet-map-button { top: 4px; right: 4px; min-height: 26px; min-width: 44px; padding: 2px 8px; border-radius: 14px; font-size: 11px; font-weight: 800; }
+.pet-direction { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; }
+.pet-direction::after { content: ""; position: absolute; inset: -5px; }
+.pet-direction > span { font-size: 20px; font-weight: 800; line-height: 1; }
+.pet-direction-n { top: 32px; left: calc(50% - 17px); }
+.pet-direction-s { bottom: 4px; left: calc(50% - 17px); }
+.pet-direction-e { top: calc(50% - 17px); right: 4px; }
+.pet-direction-w { top: calc(50% - 17px); left: 4px; }
 .pet-speech-text[data-arrival=true] { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .pet-world-scroll { overflow-x: auto; padding: 3px; }
 .pet-world-grid { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }

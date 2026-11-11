@@ -136,12 +136,12 @@ const renderSheet = () => renderToStaticMarkup(createElement(sheetModule.exports
 }));
 const worldSheet = renderSheet();
 assert.equal((worldSheet.match(/<button /g) ?? []).length,100);
-assert.equal((worldSheet.match(/data-neighbor="true"/g) ?? []).length,4);
+assert.equal((worldSheet.match(/data-neighbor="true"/g) ?? []).length,99);
 assert.ok(worldSheet.includes('aria-current="location"'));
-assert.ok(worldSheet.includes("D5 도미네 집 마당, 이동 가능, 방문함"));
-sheetClicks.get("A1")(); assert.equal(moves.length,0);
+assert.ok(worldSheet.includes("D5 도미네 집 마당, 이동, 방문함"));
+sheetClicks.get("E5")(); assert.equal(moves.length,0);
+sheetClicks.get("A1")(); assert.deepEqual(moves,["A1"]);
 assert.ok(renderSheet().includes("A1 · 도장중학교 · 중학교"));
-sheetClicks.get("E4")(); assert.deepEqual(moves,["n"]);
 const scales = [];
 for (const y of [77, 88]) {
   sceneState = { y, bowl: 110 };
