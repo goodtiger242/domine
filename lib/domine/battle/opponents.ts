@@ -1,5 +1,5 @@
 import { PET_WORLD } from "../pet-world";
-import { buildFighter } from "./rules";
+import { buildFighter, MAX_LEVEL } from "./rules";
 import { random, seedFor } from "./rng";
 import type { Difficulty } from "./types";
 
@@ -24,7 +24,7 @@ const TITLES: Readonly<Record<string, string>> = {
 };
 export function opponentFor(cellId: string, daySeed: number, playerLevel: number) {
   const cell = PET_WORLD.find(c => c.id === cellId);
-  if (!cell || !Number.isSafeInteger(daySeed) || !Number.isInteger(playerLevel) || playerLevel < 1 || playerLevel > 30) throw new Error("지도 칸·날짜 시드·플레이어 레벨을 확인해 주세요.");
+  if (!cell || !Number.isSafeInteger(daySeed) || !Number.isInteger(playerLevel) || playerLevel < 1 || playerLevel > MAX_LEVEL) throw new Error("지도 칸·날짜 시드·플레이어 레벨을 확인해 주세요.");
   const distance = Math.max(Math.abs(cellId.charCodeAt(0) - 69),Math.abs(Number(cellId.slice(1)) - 5));
   const rank = Math.min(5,1 + Math.floor(distance / 2));
   const level = Math.min(30,1 + 2 * distance);
