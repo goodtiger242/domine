@@ -526,7 +526,7 @@
 .pet-battle-round[data-urgency=late] { color: #ffe293; }
 .pet-battle-round[data-urgency=near] { color: #ffba7b; }
 .pet-battle-round[data-urgency=last] { color: #ff8d88; }
-.pet-battle-hud h3 > span { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 1.3; }
+.pet-battle-hud h3 > span { min-width: 0; flex: 1; overflow: hidden; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.15; }
 .pet-battle-info { flex: 0 0 44px; height: 44px; background: transparent; border: 0; color: #fff; font-size: 16px; }
 .pet-battle-health-row { display: flex; align-items: center; gap: 5px; font-size: 12px; line-height: 16px; }
 .pet-battle-health-row > span { white-space: nowrap; }
@@ -629,10 +629,16 @@
 @keyframes pet-foe-idle { 0%, 70%, 100% { transform: scale(1); } 35% { transform: scale(1.02, 1.035); } 78%, 86% { transform: rotate(-3deg); } }
 /* Reserve console space so scene coordinates stay fixed while choosing a move. */
 .pet-battle-console { min-height: 296px; }
-.pet-battle-fighter[data-side=opponent] { top: 47%; }
-.pet-battle-fighter[data-side=player] { bottom: 126px; }
+/* Depth: the foe stands farther away (higher, smaller) on the right; ours is close at the bottom left. */
+.pet-battle-fighter[data-side=opponent] { top: 22%; right: 3%; width: 36%; }
+.pet-battle-fighter[data-side=player] { bottom: 18px; left: 0; width: 44%; }
+.pet-battle-hud[data-side=player] { width: 50%; }
+@media (min-width: 700px) {
+  .pet-battle-fighter[data-side=opponent] { top: 20%; width: 32%; }
+  .pet-battle-fighter[data-side=player] { bottom: 16px; width: 40%; }
+}
 .pet-battle-banner { top: 8%; }
-.pet-battle-momentum { height: 4px; margin-top: 6px; overflow: hidden; border-radius: 4px; background: #4a4538; }
+.pet-battle-momentum { height: 6px; margin-top: 6px; overflow: hidden; border-radius: 4px; background: #4a4538; }
 .pet-battle-momentum span { display: block; height: 100%; transform-origin: left; background: #e6ba4d; transition: transform .3s; }
 .pet-battle-momentum[data-full=true] { box-shadow: 0 0 8px #ffd773; }
 .pet-battle-clue { position: absolute; top: calc(100% + 4px); left: 0; width: 100%; margin: 0; padding: 5px 8px; border-radius: 8px; background: #17283eed; color: #ffe9b0; font-size: 12px; }

@@ -8,7 +8,7 @@ import { MAX_ENERGY, MAX_ROUNDS, REST_ENERGY, critChance, effectiveStat, moveFor
 import { seedFor } from "@/lib/domine/battle/rng";
 import type { Action, BattleState, Condition, Side, Stat, Trait } from "@/lib/domine/battle/types";
 import { BREED_BY_ID as KING_BREEDS } from "@/lib/domine/king/species";
-import { actionCost, actionLabel, battleCues, compactEffect, costBadge, encounterLine, moveDamage, moveDetail, movePages, opponentClue, rivalCues, speciesBadges, GROUP_LABEL, HINT_LABEL, hpColor, MOVE_KIND, moveEffect, showBattleEvent, STAT_LABEL, STATUS_LABEL, TAG_LABEL, type BattleCue, type Encounter, type MoveFilter } from "@/lib/domine/pet-battle-view";
+import { actionCost, actionLabel, battleCues, compactEffect, costBadge, encounterLine, moveDamage, moveDetail, movePages, rivalCues, speciesBadges, GROUP_LABEL, HINT_LABEL, hpColor, MOVE_KIND, moveEffect, showBattleEvent, STAT_LABEL, STATUS_LABEL, TAG_LABEL, type BattleCue, type Encounter, type MoveFilter } from "@/lib/domine/pet-battle-view";
 import { battleAssets, battleMoveFx, fxSheets } from "@/lib/domine/pet-battle-fx";
 import type { FxSheet } from "@/lib/domine/pet-fx-sheets";
 import { PETS, type PetId } from "@/lib/domine/pet-photos";
@@ -243,7 +243,6 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
         </span>
       </div>
       <div className="pet-battle-momentum" role="progressbar" aria-label={`${names[side]} 기세`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={actor.momentum ?? 0} data-full={(actor.momentum ?? 0) >= 100}><span style={{ transform: `scaleX(${(actor.momentum ?? 0) / 100})` }} /></div>
-      {side === "opponent" && !playback && !finished && opponentClue(battle) && <p className="pet-battle-clue">단서 · {opponentClue(battle)}</p>}
     </section>;
   }
   function fighter(side: Side) {
