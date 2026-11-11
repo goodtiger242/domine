@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { createPetApi, acceptsResult, type PetApi, type PetCommand, type V6Result } from "@/lib/domine/pet-rpc";
+import { createPetApi, acceptsResult, PetRpcError, supportsExploration, type PetApi, type PetCapabilities, type PetCommand, type V6Result } from "@/lib/domine/pet-rpc";
 import { createClient } from "@/lib/supabase/client";
-import { createSecret, normalizeNickname, parseTransfer, readIdentity, saveIdentity, storageAvailable, type PetIdentity } from "@/lib/domine/pet-identity";
+import { createSecret, normalizeNickname, parseTransfer, readIdentity, registrationConfirmed, saveIdentity, storageAvailable, type PetIdentity } from "@/lib/domine/pet-identity";
+import { rewardDisplay } from "@/lib/domine/pet-progress";
 import { gameReducer, initialMachine, visualLocked, type GameEvent } from "@/lib/domine/pet-machine";
 import { mapBackground, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
 import { DIRECTIONS, neighborCell, savedCell, visitedCells, worldCell } from "@/lib/domine/pet-world";
@@ -14,8 +15,9 @@ import type { PetAction, PetState } from "@/lib/domine/pet";
 
 const safeGet = (key: string) => { try { return localStorage.getItem(key) ?? ""; } catch { return ""; } };
 const errorText: Record<string, string> = {
-  AUTH_FAILED: "기록을 확인할 수 없어요. 기존 기기의 이전 코드를 사용해 주세요.",
-  NICKNAME_TAKEN: "이미 등록된 별명이에요. 이전 코드를 사용하거나 다른 별명을 정해 주세요.",
+  AUTH_FAILED: "이미 쓰는 별명이에요. 다른 기기의 이전 코드를 입력하거나 다른 별명을 고르세요",
+  NICKNAME_TAKEN: "이미 쓰는 별명이에요. 다른 기기의 이전 코드를 입력하거나 다른 별명을 고르세요",
+  SERVER_UPDATE_REQUIRED: "서버 업데이트 대기 중(새 지역 탐험은 아직)",
   INSUFFICIENT_COINS: "코인이 조금 더 필요해요.", NOT_OWNED: "먼저 구매해 주세요.",
   INVALID_INPUT: "입력 내용을 확인해 주세요.", REQUEST_CONFLICT: "요청이 달라 기록을 확인하지 못했어요.",
   RATE_LIMITED: "개인 기록은 잠시 후 다시 확인해 주세요. 놀이는 계속할 수 있어요.",
@@ -34,6 +36,10 @@ export function usePetController(injectedApi?: PetApi) {
   }, []);
   const [capability, setCapability] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const capabilityRef = useRef(capability);
+  const [features, setFeatures] = useState<PetCapabilities | null>(null);
+  const featuresRef = useRef<PetCapabilities | null>(null);
+  const [registered, setRegistered] = useState(false);
+  const registeredRef = useRef(false);
   const [identity, setIdentity] = useState<PetIdentity | null>(null);
   const identityRef = useRef<PetIdentity | null>(null);
   const [nickname, setNickname] = useState("");
@@ -45,6 +51,7 @@ export function usePetController(injectedApi?: PetApi) {
   const personalRef = useRef<V6Result | null>(null);
   const [feedback, setFeedback] = useState<{ id: number; result: V6Result; previousLevel: number } | null>(null);
   const [message, setMessage] = useState("");
+  const [rewardNotice, setRewardNotice] = useState("");
   const [cue, setCue] = useState<SceneCue | null>(null);
   const [visited, setVisited] = useState<string[]>([]);
   const [arrival, setArrival] = useState<{ id: number; text: string } | null>(null);
@@ -69,6 +76,8 @@ export function usePetController(injectedApi?: PetApi) {
       setPersonal(result);
       if (show && result.reward && (result.version ?? 0) > (prior?.version ?? -1)) {
         setFeedback({ id: ++idCounter.current, result, previousLevel: prior?.player?.level ?? 1 });
+        if (result.reward.skipped === "DAILY_CAP") setRewardNotice(rewardDisplay(result.reward).notice);
+        else if (result.reward.xp + result.reward.coins + result.reward.levelCoins > 0) setRewardNotice("");
         if ((result.player?.level ?? 1) > (prior?.player?.level ?? 1)) vibrate([15, 40, 20]);
         else if (result.reward.newEntries.length) vibrate(20);
         else if (result.reward.coins + result.reward.levelCoins > 0) vibrate(15);
@@ -78,7 +87,7 @@ export function usePetController(injectedApi?: PetApi) {
   const refresh = useCallback(async () => {
     const g = generation.current, selected = petRef.current, i = identityRef.current, seq = ++readSequence.current;
     try {
-      if (capabilityRef.current === "ready" && i) {
+      if (capabilityRef.current === "ready" && i && registeredRef.current) {
         const result = await api.state(i, selected);
         if (!current(g, i, selected) || seq !== readSequence.current) return;
         if (!result.ok) { setMessage(errorText[result.code] ?? "개인 기록을 확인하지 못했어요."); return; }
@@ -97,7 +106,11 @@ export function usePetController(injectedApi?: PetApi) {
 
   const execute = useCallback(async (command: PetCommand, retry = false) => {
     const i = identityRef.current;
-    if (!i || capabilityRef.current !== "ready" || (pending.current && !retry)) return;
+    if (!i || !registeredRef.current || capabilityRef.current !== "ready") return;
+    if (pending.current && !retry) { setMessage("보상 확인 중이라 이번엔 코인이 없어요"); return; }
+    if (!retry && command.kind === "explore_begin" && !supportsExploration(featuresRef.current?.v9 === true, command.map)) {
+      setMessage(errorText.SERVER_UPDATE_REQUIRED); return;
+    }
     const g = generation.current, selected = petRef.current;
     if (retry && pending.current?.requestId !== command.requestId) return;
     try { localStorage.setItem(pendingKey(i), JSON.stringify(command)); }
@@ -111,12 +124,13 @@ export function usePetController(injectedApi?: PetApi) {
       if (!current(g, i, selected) || pending.current?.requestId !== command.requestId) return;
       controller.abort(); dispatch({ type: "uncertain", id: command.requestId });
     }, 8000);
+    let mutationAttempted = !retry;
     try {
       let result: V6Result;
       if (retry) {
         result = await api.operation(i, command.requestId);
         if (!current(g, i, selected) || controller.signal.aborted) return;
-        if (result.code === "NOT_FOUND") result = await api.execute(i, command, controller.signal);
+        if (result.code === "NOT_FOUND") { mutationAttempted = true; result = await api.execute(i, command, controller.signal); }
       } else result = await api.execute(i, command, controller.signal);
       if (!current(g, i, selected) || controller.signal.aborted || pending.current?.requestId !== command.requestId) return;
       // A lookup rate limit does not establish whether an earlier mutation committed.
@@ -130,15 +144,22 @@ export function usePetController(injectedApi?: PetApi) {
       if (!result.ok && !["ALREADY_OWNED", "TOO_EARLY", "EXPIRED"].includes(result.code)) setMessage(errorText[result.code] ?? "개인 기록을 확인하지 못했어요.");
       else setMessage("");
       if (result.ok && command.kind === "purchase") vibrate(15);
-    } catch {
-      if (current(g, i, selected)) dispatch({ type: "uncertain", id: command.requestId });
+    } catch (error) {
+      if (!current(g, i, selected) || pending.current?.requestId !== command.requestId) return;
+      // A failed lookup cannot establish whether the original mutation committed.
+      if (mutationAttempted && error instanceof PetRpcError && error.definitive) {
+        pending.current = null;
+        try { localStorage.removeItem(pendingKey(i)); } catch { /* Same ID remains safe to replay. */ }
+        dispatch({ type: "settled", id: command.requestId });
+        setMessage("서버 점검 중이에요. 잠시 후 다시 해 주세요");
+      } else dispatch({ type: "uncertain", id: command.requestId });
     } finally {
       if (abort.current === controller && commandTimer.current) clearTimeout(commandTimer.current);
     }
   }, [api, apply, current, dispatch]);
 
   const startExploration = useCallback((map: PetMap, source: "map" | "walk") => {
-    if (!pending.current) void execute({ kind: "explore_begin", map, source, requestId: crypto.randomUUID() });
+    void execute({ kind: "explore_begin", map, source, requestId: crypto.randomUUID() });
   }, [execute]);
   const visit = useCallback((id: string) => {
     setVisited((previous) => {
@@ -180,10 +201,11 @@ export function usePetController(injectedApi?: PetApi) {
   const care = useCallback((action: PetAction | "sleep") => {
     if (visualLocked(machineRef.current)) return;
     void localScene({ action, id: 0 });
+    if (!registeredRef.current) setMessage("구경 중이에요 · 별명을 등록하면 코인이 쌓여요");
     if (action === "sleep") return;
     const i = identityRef.current;
-    if (i && capabilityRef.current === "ready") {
-      if (!pending.current) void execute({ kind: "action", pet: petRef.current, action, requestId: crypto.randomUUID() });
+    if (i && registeredRef.current && capabilityRef.current === "ready") {
+      void execute({ kind: "action", pet: petRef.current, action, requestId: crypto.randomUUID() });
     } else if (nickRef.current && (capabilityRef.current === "missing" || (!i && capabilityRef.current === "ready"))) {
       const selected = petRef.current, g = generation.current;
       void api.legacy(selected, nickRef.current, action, legacy.current)
@@ -193,11 +215,12 @@ export function usePetController(injectedApi?: PetApi) {
   }, [api, current, execute, localScene, refresh]);
 
   const connect = useCallback(async (raw: string, transfer = false) => {
-    if (registrationPending.current || pending.current) return;
+    if (registrationPending.current) return;
     setMessage("");
     const imported = transfer ? parseTransfer(raw) : null;
     const nick = transfer ? imported?.nickname : normalizeNickname(raw);
     if (!nick) { setMessage(transfer ? "이전 코드 형식을 확인해 주세요." : "별명은 한글·영문·숫자 1~8자로 입력해 주세요."); return; }
+    if (pending.current && (nick.toLowerCase() !== identityRef.current?.nickname.toLowerCase() || (imported && imported.secret !== identityRef.current?.secret))) return;
     if (capabilityRef.current === "missing") {
       nickRef.current = nick; setNickname(nick);
       try { localStorage.setItem("domine-pet-nick", nick); } catch { /* Shared care works without storage. */ }
@@ -220,7 +243,9 @@ export function usePetController(injectedApi?: PetApi) {
       const result = imported ? await api.state(candidate, selected, controller.signal) : await api.register(candidate, controller.signal);
       if (!current(g, previousIdentity, selected) || controller.signal.aborted) return;
       if (!result.ok) { setMessage(errorText[result.code] ?? "등록을 완료하지 못했어요."); return; }
-      saveIdentity(candidate);
+      saveIdentity(candidate, true);
+      registeredRef.current = true; setRegistered(true);
+      setRewardNotice("");
       ++generation.current; ++readSequence.current;
       identityRef.current = candidate; setIdentity(candidate); nickRef.current = nick; setNickname(nick);
       personalRef.current = null; apply(result); dispatch({ type: "reset" }); setCue(null);
@@ -239,15 +264,17 @@ export function usePetController(injectedApi?: PetApi) {
       const supported = await api.capabilities();
       if (!alive.current) return;
       capabilityRef.current = supported ? "ready" : "missing"; setCapability(capabilityRef.current);
+      featuresRef.current = supported || null; setFeatures(featuresRef.current);
+      // Retry with the saved token until the server has confirmed registration.
+      if (supported && !registeredRef.current && nickRef.current) await connect(nickRef.current);
       await refresh();
-      // 예전에 별명만 저장한 기기: 비밀 토큰을 자동으로 만들어 등록해야 코인·경험치가 쌓인다.
-      if (supported && !identityRef.current && nickRef.current) void connect(nickRef.current);
     } catch { if (alive.current) { capabilityRef.current = "error"; setCapability("error"); setMessage("개인 기록 연결을 확인하지 못했어요."); } }
   }, [api, refresh, connect]);
   useEffect(() => {
     alive.current = true;
     const nick = safeGet("domine-pet-nick"); nickRef.current = nick; setNickname(nick);
     try { identityRef.current = readIdentity(nick); setIdentity(identityRef.current); } catch { /* No personal storage. */ }
+    registeredRef.current = !!identityRef.current && registrationConfirmed(nick); setRegistered(registeredRef.current);
     const selected: PetId = safeGet("domine-pet-selected") === "2" ? 2 : 1; petRef.current = selected; setPetId(selected);
     let saved: string | null = null;
     try { saved = localStorage.getItem("domine-pet-cell"); } catch { /* Default location. */ }
@@ -276,6 +303,12 @@ export function usePetController(injectedApi?: PetApi) {
       abort.current?.abort(); mapAbort.current?.abort(); if (commandTimer.current) clearTimeout(commandTimer.current);
     };
   }, [checkCapabilities, dispatch, visit]);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(null), 2500);
+    return () => clearTimeout(timer);
+  }, [feedback]);
 
   useEffect(() => {
     if (!worldReady || !active || machine.visual !== "idle") return;
@@ -339,7 +372,7 @@ export function usePetController(injectedApi?: PetApi) {
     void refresh();
   }
   const done = useCallback((id: number, sleep?: boolean) => dispatch({ type: "done", id, sleep }), [dispatch]);
-  return { host, api, machine, active, shared, personal, feedback, message, setMessage, capability, identity, nickname, petId, multiPet, cue, visited, arrival, worldReady,
+  return { host, api, machine, active, shared, personal, feedback, message, rewardNotice, setMessage, capability, features, registered, identity, nickname, petId, multiPet, cue, visited, arrival, worldReady,
     care, localScene, done, connect, selectPet, execute, refresh, checkCapabilities,
     retry: () => { if (pending.current) void execute(pending.current, true); },
     pause: () => { ++generation.current; abort.current?.abort(); mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },

@@ -50,10 +50,10 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   const cell = worldCell(machine.committedMap);
   const groups = availableActionGroups(actionsForMap(PET_ACTIONS, cell.theme));
   const selected = groups.find((g) => g.category === category) ?? groups[0];
-  const locked = !game.worldReady || visualLocked(machine), disabled = !game.identity || game.capability !== "ready" || machine.command !== "idle";
+  const locked = !game.worldReady || visualLocked(machine), disabled = !game.registered || game.capability !== "ready" || machine.command !== "idle";
   const notice = game.capability === "missing" ? "개인 진행 준비 중 · 기존 돌보기는 계속할 수 있어요."
     : game.capability === "error" ? "개인 기록 연결을 확인하지 못했어요. 기록 메뉴에서 다시 확인해 주세요."
-    : !game.identity ? "기록 메뉴에서 별명을 등록하면 개인 진행이 저장돼요." : game.message;
+    : !game.registered ? "기록 메뉴에서 별명을 등록하면 코인이 쌓여요." : game.message;
   const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeech({ text, speaker }), []);
   useEffect(() => { if (game.arrival) say(game.arrival.text); }, [game.arrival, say]);
   useEffect(() => { setHour(new Date().getHours()); }, []);
@@ -79,6 +79,14 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       {game.capability === "missing" && <span className="pet-preparing">준비 중</span>}
       {machine.command === "uncertain" && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>
+    {!game.registered && <button type="button" className="pet-register-button" onClick={() => open("record")}>별명 등록하고 코인 모으기</button>}
+    <div className="pet-progress-note" role="status">
+      {machine.command === "pending" && <p>보상 확인 중…</p>}
+      {machine.command === "uncertain" && <p>응답을 확인하지 못했어요. 결과 확인을 눌러 주세요.</p>}
+      {game.rewardNotice && <p>{game.rewardNotice}</p>}
+      {(game.message || notice) && <p>{game.message || notice}</p>}
+    </div>
+    {game.capability === "ready" && !game.features?.v9 && <p className="pet-progress-note">서버 업데이트 대기 중(새 지역 탐험은 아직)</p>}
     <div className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
       {game.worldReady ? <PetScene key={game.petId} petId={game.petId} cellId={cell.id} onMap={() => open("map")} onLocal={game.localScene} locked={locked}
         paused={!game.active || !!sheet || machine.visual === "paused"} stage={stage} face={face} hour={hour}
@@ -105,7 +113,6 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       </button>)}
     </div>)}
     <nav className="pet-menu" aria-label="개인 진행"><button type="button" onClick={() => open("shop")}>상점</button><button type="button" onClick={() => open("album")}>도감</button><button type="button" onClick={() => open("achievements")}>업적</button></nav>
-    <p className="sr-only" role="status">{game.message || notice}</p>
     {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
     {sheet === "shop" && <PetShopSheet state={personal} petId={game.petId} disabled={disabled} notice={notice} execute={game.execute} onClose={close} />}

@@ -87,7 +87,7 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   }, [text, x, y, duration]);
   return (
     <div ref={layer} className="pointer-events-none absolute inset-0">
-      <p ref={bubble} className="pet-speech" role="status" aria-label={label} aria-atomic="true"
+      <p ref={bubble} className="pet-speech" aria-label={label}
         style={{ visibility: "hidden" }}>
         <span key={text} className="pet-speech-text" data-arrival={text.endsWith("에 왔어요")}>{text}</span>
         <span aria-hidden="true" className="pet-speech-tail" />
@@ -98,6 +98,8 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
 
 export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onLocal, locked = false, speaker = "dog", paused = false, wearable, toy }: Props) {
   const cell = worldCell(cellId);
+  const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
+  const ask = asking?.from === cell.id ? neighborCell(cell.id, asking.direction) : null;
   const map = cell.theme;
   const shadowId = useId();
   const [animated, setS] = useState<ScenePose>({ ...restingPose(map) });
@@ -363,10 +365,15 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
         const destination = neighborCell(cell.id, direction);
         return destination && <button key={direction} type="button" className={`pet-direction pet-direction-${direction}`}
           aria-label={`${destination.name}(으)로 이동`} disabled={locked} title={destination.name}
-          onClick={() => onLocal?.({ action: "map", direction, id: Date.now() })}>
+          onClick={() => setAsking({ from: cell.id, direction })}>
           <span aria-hidden="true">{{ n: "↑", s: "↓", e: "→", w: "←" }[direction]}</span>
         </button>;
       })}
+      {ask && asking && !locked && <div className="pet-move-confirm" role="alertdialog" aria-label={`${ask.name}(으)로 이동할까요?`}>
+        <p><strong>{ask.name}</strong>(으)로 갈까요?</p>
+        <div><button type="button" onClick={() => setAsking(null)}>아니요</button>
+          <button type="button" data-primary onClick={() => { const direction = asking.direction; setAsking(null); onLocal?.({ action: "map", direction, id: Date.now() }); }}>이동</button></div>
+      </div>}
     </div>
     </div>
   );

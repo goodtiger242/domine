@@ -124,7 +124,7 @@ new Function("require", "exports", sheetSource)((name) => {
   if (name === "react/jsx-runtime") {
     const runtime = require(name);
     const wrap = (fn) => (type, props, key) => {
-      if (type === "button") sheetClicks.set(key, props.onClick);
+      if (type === "button") sheetClicks.set(key ?? props.children, props.onClick);
       return fn(type, props, key);
     };
     return { ...runtime, jsx: wrap(runtime.jsx), jsxs: wrap(runtime.jsxs) };
@@ -140,8 +140,10 @@ assert.equal((worldSheet.match(/data-neighbor="true"/g) ?? []).length,99);
 assert.ok(worldSheet.includes('aria-current="location"'));
 assert.ok(worldSheet.includes("D5 도미네 집 마당, 이동, 방문함"));
 sheetClicks.get("E5")(); assert.equal(moves.length,0);
-sheetClicks.get("A1")(); assert.deepEqual(moves,["A1"]);
+sheetClicks.get("A1")(); assert.deepEqual(moves,[]);
 assert.ok(renderSheet().includes("A1 · 도장중학교 · 중학교"));
+sheetClicks.get("아니요")(); assert.equal(selectedCell,"E5"); assert.deepEqual(moves,[]);
+sheetClicks.get("A1")(); renderSheet(); sheetClicks.get("이동하기")(); assert.deepEqual(moves,["A1"]);
 const scales = [];
 for (const y of [77, 88]) {
   sceneState = { y, bowl: 110 };

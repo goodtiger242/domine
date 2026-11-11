@@ -18,7 +18,7 @@ export default function PetWorldSheet({ current, visited, onMove, onClose }: {
   const [selected, setSelected] = useState(current);
   const cell = worldCell(selected);
   return <PetSheet title="우리 동네 지도" onClose={onClose}>
-    <p className="pet-sheet-note">가고 싶은 칸을 누르면 바로 이동해요.<br />🐕 현재 위치 · ✓ 다녀온 곳</p>
+    <p className="pet-sheet-note">가고 싶은 칸을 누르면 이름이 나오고, 이동할지 물어봐요.<br />🐕 현재 위치 · ✓ 다녀온 곳</p>
     <div className="pet-world-scroll" tabIndex={0} aria-label="동네 지도, 좁은 화면에서는 좌우로 스크롤">
       <div className="pet-world-grid" role="group" aria-label="서쪽 A열부터 동쪽 J열, 북쪽 1행부터 남쪽 10행">
         {PET_WORLD.map((place) => {
@@ -27,13 +27,19 @@ export default function PetWorldSheet({ current, visited, onMove, onClose }: {
             aria-label={`${place.id} ${place.name}${here ? ", 현재 위치" : ", 이동"}${seen ? ", 방문함" : ""}`}
             aria-current={here ? "location" : undefined} aria-pressed={place.id === selected}
             data-neighbor={!here} data-selected={place.id === selected}
-            onClick={() => { setSelected(place.id); if (!here) onMove(place.id); }}>
+            onClick={() => setSelected(place.id)}>
             <span aria-hidden="true">{here ? "🐕" : THEMES[place.theme][0]}</span>
             <small>{place.id}{seen && <i aria-hidden="true">✓</i>}</small>
           </button>;
         })}
       </div>
     </div>
+    {selected !== current && <div className="pet-world-confirm" role="alertdialog" aria-label={`${cell.name}(으)로 이동할까요?`}>
+      <p><strong>{THEMES[cell.theme][0]} {cell.name}</strong><small>{cell.id} · {cell.kind}</small></p>
+      <p>이곳으로 이동할까요?</p>
+      <div><button type="button" onClick={() => setSelected(current)}>아니요</button>
+        <button type="button" data-primary onClick={() => onMove(cell.id)}>이동하기</button></div>
+    </div>}
     <p className="pet-world-info" role="status">{cell.id} · {cell.name} · {cell.kind}</p>
     <p className="pet-sheet-note">실제 동네를 압축한 게임 지도예요. A5 들판과 D5 집 마당은 가상 장소예요.</p>
   </PetSheet>;

@@ -2,13 +2,27 @@
 import { useState } from "react";
 import { SHOP, type CatalogEntry } from "@/lib/domine/pet-catalog";
 import type { PetCommand, V6Result } from "@/lib/domine/pet-rpc";
-import type { PetId } from "@/lib/domine/pet-photos";
+import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import PetSheet from "./PetSheet";
 import PetItemIcon from "./PetItemIcon";
 export default function PetShopSheet({ state, petId, disabled, notice, execute, onClose }: {
   state: V6Result | null; petId: PetId; disabled: boolean; notice: string; execute: (c: PetCommand) => Promise<void>; onClose: () => void;
 }) {
   const [selected, setSelected] = useState<CatalogEntry | null>(null);
+  const [done, setDone] = useState("");
+  const dog = PETS[petId].name;
+  async function buy(item: CatalogEntry) {
+    const coins = state?.player?.coins ?? 0, price = item.price ?? 0;
+    if (coins < price) { setDone(`코인이 부족해요 · 보유 ${coins} / 필요 ${price} (${price - coins}코인 더 필요)`); return; }
+    setDone("");
+    await execute({ kind: "purchase", item: item.id, requestId: crypto.randomUUID() });
+  }
+  async function wear(item: CatalogEntry) {
+    const on = !equipped(item);
+    setDone("");
+    await execute({ kind: "equip", pet: petId, slot: item.slot!, item: on ? item.id : null, requestId: crypto.randomUUID() });
+    setDone(on ? `${dog}에게 착용했어요` : `${dog}의 착용을 해제했어요`);
+  }
   const owned = (item: CatalogEntry) => state?.inventory?.includes(item.id);
   const equipped = (item: CatalogEntry) => state?.equipment?.some((e) => e.pet_id === petId && e.item_id === item.id);
   return <PetSheet title={selected?.name ?? "상점"} onClose={onClose} onBack={() => { if (!selected) return false; setSelected(null); return true; }}>
@@ -18,10 +32,13 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
       <PetItemIcon item={selected} />
       <h3>{selected.name}</h3><p>{selected.price} 코인 · {selected.category}</p>
       {owned(selected) && <span className="pet-purchase-check" role="status">✓ 함께 모은 소지품</span>}
-      {owned(selected) ? <button type="button" disabled={disabled} onClick={() => void execute({ kind: "equip", pet: petId, slot: selected.slot!, item: equipped(selected) ? null : selected.id, requestId: crypto.randomUUID() })}>
-        {equipped(selected) ? "✓ 착용 중 · 해제" : "착용하기"}
-      </button> : <button type="button" disabled={disabled} onClick={() => void execute({ kind: "purchase", item: selected.id, requestId: crypto.randomUUID() })}>구매 · {selected.price} 코인</button>}
-    </div> : <div className="pet-catalog-grid">{SHOP.map((item) => <button type="button" key={item.id} className="pet-catalog-card" onClick={() => setSelected(item)}>
+      {owned(selected) && <span className="pet-purchase-check" role="status">{equipped(selected) ? `✓ ${dog}가 착용 중이에요` : `${dog}는 아직 안 입었어요`}</span>}
+      {done && owned(selected) && <span className="pet-purchase-check" role="status">{done}</span>}
+      {owned(selected) ? <button type="button" disabled={disabled} onClick={() => void wear(selected)}>
+        {equipped(selected) ? "착용 해제" : `${dog}에게 착용하기`}
+      </button> : <button type="button" disabled={disabled} onClick={() => buy(selected)}>구매 · {selected.price} 코인</button>}
+      {!owned(selected) && done && <span className="pet-purchase-check" role="alert">{done}</span>}
+    </div> : <div className="pet-catalog-grid">{SHOP.map((item) => <button type="button" key={item.id} className="pet-catalog-card" onClick={() => { setSelected(item); setDone(""); }}>
       <PetItemIcon item={item} /><strong>{item.name}</strong><span>{equipped(item) ? "✓ 착용 중" : owned(item) ? "✓ 보유" : `${item.price} 코인`}</span>
     </button>)}</div>}
   </PetSheet>;

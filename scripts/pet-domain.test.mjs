@@ -3,12 +3,12 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { loadTS } from "./pet-test-loader.mjs";
 const { levelOf, levelXP, progressOf, rewardEligible, rewardDisplay } = loadTS("lib/domine/pet-progress.ts");
-const { normalizeNickname, parseTransfer, createSecret } = loadTS("lib/domine/pet-identity.ts");
+const { normalizeNickname, parseTransfer, createSecret, saveIdentity, readIdentity, registrationConfirmed } = loadTS("lib/domine/pet-identity.ts");
 const { gameReducer: reduce, initialMachine, visualLocked } = loadTS("lib/domine/pet-machine.ts");
 const { SAFE_ZONES, actorBounds, clampActor, buildBallPath, sampleBall } = loadTS("lib/domine/pet-geometry.ts");
 const { buildScenePlan, sampleScenePlan } = loadTS("lib/domine/pet-scene-plan.ts");
 const { CATALOG, SHOP, ACHIEVEMENTS } = loadTS("lib/domine/pet-catalog.ts");
-const { createPetApi, acceptsResult } = loadTS("lib/domine/pet-rpc.ts");
+const { createPetApi, acceptsResult, PetRpcError } = loadTS("lib/domine/pet-rpc.ts");
 for (let l = 2; l <= 30; l++) {
   assert.equal(levelOf(levelXP(l)-1), l-1); assert.equal(levelOf(levelXP(l)), l); assert.equal(levelOf(levelXP(l)+1), l);
   assert.equal(levelXP(l)-levelXP(l-1), 20*l);
@@ -17,9 +17,10 @@ assert.equal(levelOf(-1),1); assert.equal(levelOf(99999),30); assert.equal(level
 assert.deepEqual(progressOf(99999),{ level:30,value:9280,current:0,needed:0 });
 assert.deepEqual(rewardDisplay({xp:8,coins:4,levelCoins:14}),{xp:8,coins:18,quiet:false,notice:""});
 assert.deepEqual(rewardDisplay(),{xp:0,coins:0,quiet:true,notice:""});
-for (const [skipped, notice] of [["TOO_FAST","조금 천천히 눌러 주세요"],["DAILY_CAP","오늘 보상은 모두 받았어요"]]) {
+for (const [skipped, notice] of [["TOO_FAST","조금 천천히 눌러 주세요"],["DAILY_CAP","오늘 보상 한도를 채웠어요(내일 다시)"]]) {
   assert.deepEqual(rewardDisplay({xp:0,coins:0,levelCoins:0,skipped}),{xp:0,coins:0,quiet:true,notice});
 }
+assert.equal(rewardDisplay({skipped:"TOO_FAST",retryAfterSeconds:2}).notice,"2초 뒤에 코인이 들어와요");
 assert.equal(rewardEligible(3000,0,119),true);
 assert.equal(rewardEligible(2999,0,0),false);
 assert.equal(rewardEligible(60000,0,120),false);
@@ -79,13 +80,35 @@ const calls=[]; let response;
 const api=createPetApi(async(name,args)=>{calls.push({name,args});return response;});
 response={data:null,error:{code:"PGRST202",message:"missing"}}; assert.equal(await api.capabilities(),false);
 for(const code of ["42501","500","NETWORK_ERROR"]) {response={data:null,error:{code,message:"error"}}; await assert.rejects(api.capabilities());}
-response={data:{version:6},error:null};assert.equal(await api.capabilities(),true);
+response={data:{version:6},error:null};assert.deepEqual(await api.capabilities(),{version:6,sharedEconomy:false,explorationThemes:5,v9:false});
 const identity={nickname:"테스트",secret:"a".repeat(64)};
 const command={kind:"action",pet:2,action:"feed",requestId:"00000000-0000-4000-8000-000000000001"};
+const storage=new Map();
+globalThis.localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)};
+saveIdentity(identity);
+assert.deepEqual(readIdentity(identity.nickname),identity);
+assert.equal(registrationConfirmed(identity.nickname),false,"persisting a token is not server confirmation");
+saveIdentity(identity,true);
+assert.equal(registrationConfirmed(identity.nickname),true);
+saveIdentity(identity);
+assert.equal(registrationConfirmed(identity.nickname),true,"same-token retry preserves confirmation");
+const imported={...identity,secret:"b".repeat(64)};
+saveIdentity(imported);
+assert.equal(registrationConfirmed(identity.nickname),false,"a replacement token must be verified");
+saveIdentity(imported,true);
+assert.equal(registrationConfirmed(identity.nickname),true,"verified imports are confirmed");
+delete globalThis.localStorage;
+const newRegion={kind:"explore_begin",map:"farm",source:"map",requestId:"new-region"};
+const beforeRegion=calls.length;
+assert.equal((await api.execute(identity,newRegion)).code,"SERVER_UPDATE_REQUIRED");
+assert.equal(calls.length,beforeRegion,"new themes must not reach an old server");
+response={data:{version:6,sharedEconomy:true,explorationThemes:24,v9:true},error:null};
+assert.deepEqual(await api.capabilities(),response.data);
 response={data:{ok:true,code:"OK",serverNow:"2026-11-11T00:00:00Z",version:1,player:{xp:8,level:1,coins:4}},error:null};
 await api.execute(identity,command); await api.execute(identity,command);
 assert.deepEqual(calls.at(-1),calls.at(-2)); assert.equal(calls.at(-1).name,"domine_pet_action_v6");
 assert.equal(calls.at(-1).args.p_pet,2); assert.ok(!("xp" in calls.at(-1).args));
+await api.execute(identity,newRegion); assert.equal(calls.at(-1).name,"domine_pet_explore_begin_v6");
 await api.execute(identity,{kind:"equip",pet:1,slot:"wearable",item:null,requestId:command.requestId}); assert.equal(calls.at(-1).args.p_item,null);
 await api.operation(identity,command.requestId); assert.equal(calls.at(-1).name,"domine_pet_operation_v6");
 const controller=new AbortController(); let receivedSignal;
@@ -94,6 +117,15 @@ await abortable.register(identity,controller.signal); assert.equal(receivedSigna
 await abortable.state(identity,2,controller.signal); assert.equal(receivedSignal,controller.signal);
 response={data:null,error:{code:"PGRST202",message:"missing"}};
 const before=calls.length; await assert.rejects(api.execute(identity,command)); assert.equal(calls.length,before+1,"v6 mutation errors never replay through legacy");
+for(const error of [{code:"23514",message:"check"},{code:"42P01",message:"table"},{code:"PGRST202",message:"schema"},{code:"500",message:"server"}]) {
+  response={data:null,error}; await assert.rejects(api.execute(identity,command),e=>e instanceof PetRpcError && e.definitive);
+}
+for(const status of [400,503]) {
+  response={data:null,error:{message:"server failed"},status}; await assert.rejects(api.execute(identity,command),e=>e.definitive);
+}
+response={data:null,error:{code:"",message:"Failed to fetch"},status:0};
+await assert.rejects(api.execute(identity,command),e=>e instanceof PetRpcError && !e.definitive);
+await assert.rejects(createPetApi(async()=>{throw new TypeError("Failed to fetch");}).execute(identity,command),TypeError);
 assert.equal(acceptsResult({version:8},{version:7,player:{}}),false); assert.equal(acceptsResult({version:8},{version:8,player:{}}),true);
 assert.equal(acceptsResult({version:8},{version:9}),false);
 const { createPetMock } = loadTS("tests/pet/rpc-mock.ts");
@@ -106,8 +138,9 @@ assert.equal((await mock.api.state({...identity,secret:"b".repeat(64)},1)).code,
 const skippedCommand={...command,action:"play",requestId:"reward-zero"};
 const skippedReward=await mock.api.execute(identity,skippedCommand);
 assert.equal(skippedReward.reward.coins,0); assert.equal(skippedReward.reward.skipped,"TOO_FAST");
+assert.equal(skippedReward.reward.retryAfterSeconds,3);
 mock.advance(2999);
-assert.equal((await mock.api.execute(identity,{...command,requestId:"before-boundary"})).reward.skipped,"TOO_FAST");
+assert.equal((await mock.api.execute(identity,{...command,requestId:"before-boundary"})).reward.retryAfterSeconds,1);
 mock.advance(1);
 assert.equal((await mock.api.execute(identity,{...command,requestId:"reward-next"})).reward.coins,4,"same action pays again after 3 seconds");
 assert.deepEqual(await mock.api.execute(identity,skippedCommand),skippedReward,"replaying a skipped action cannot pay later");
@@ -227,6 +260,59 @@ for(const theme of PET_MAPS.slice(5)) {
   const found=await explorer.api.execute(identity,{kind:"explore_finish",ticket:ticket.ticket.id,requestId:"finish"});
   assert.ok(expanded.some(s=>s.id===found.reward.newEntries[0]&&s.maps.includes(theme.id)));
 }
+const explorer=createPetMock(); await explorer.api.register(identity);
+const begin=(map,requestId)=>explorer.api.execute(identity,{kind:"explore_begin",map,source:"map",requestId});
+const first=await begin("farm","first");
+explorer.advance(9000);
+assert.deepEqual((await begin("farm","same")).ticket,first.ticket,"same theme keeps ticket and original clock");
+const tooSoon=await begin("garden","too-soon");
+assert.equal(tooSoon.code,"RATE_LIMITED"); assert.equal(tooSoon.ticket,null,"changing theme cancels the old ticket even during cooldown");
+explorer.advance(1000);
+const next=await begin("garden","ten-seconds");
+assert.ok(next.ok); assert.notEqual(next.ticket.id,first.ticket.id);
+assert.equal((await explorer.api.execute(identity,{kind:"explore_finish",ticket:next.ticket.id,requestId:"early"})).code,"TOO_EARLY");
+explorer.advance(600000);
+const renewed=await begin("garden","expired");
+assert.notEqual(renewed.ticket.id,next.ticket.id,"expired same-theme tickets are replaced");
+for(let n=0;n<=30;n++) {
+  const ticket=await begin("garden",`cap-start-${n}`); explorer.advance(15000);
+  const result=await explorer.api.execute(identity,{kind:"explore_finish",ticket:ticket.ticket.id,requestId:`cap-finish-${n}`});
+  assert.equal(result.reward.skipped,n===30?"DAILY_CAP":undefined);
+  assert.equal(result.ticket,null);
+}
+assert.equal(explorer.state().daily.explore_finishes,30);
+
+const v9=readFileSync("supabase/migrations/20261111250000_domine_pet_v9.sql","utf8");
+assert.match(v9,/^begin;/); assert.ok(v9.trim().endsWith("commit;"));
+assert.ok(!/\b(drop\s+(table|function|schema)|truncate|delete\s+from)\b/i.test(v9));
+for(const [table,name] of [["exploration","exploration_map_id_check"],["counter","counter_metric_check"]]) {
+  assert.ok(v9.includes(`alter table domine_pet_v6.${table} drop constraint if exists ${name};`));
+  assert.ok(v9.includes(`alter table domine_pet_v6.${table} add constraint ${name}`));
+}
+const allowedMaps=v9.match(/check \(map_id in \(([^)]*)\)\)/)[1].match(/[^',]+/g);
+assert.deepEqual(new Set(allowedMaps),new Set(PET_MAPS.map(m=>m.id)));
+const metricPattern=new RegExp(v9.match(/metric ~ '([^']+)'/)[1]);
+const oldMetricPattern=new RegExp(sql.match(/metric ~ '([^']+)'/)[1]);
+for(const map of PET_MAPS) assert.ok(metricPattern.test(`explore_map:${map.id}`));
+for(const metric of ["action:feed","action:treat","action:pet","action:play","action:walk","action:brush","action:bath","action:train","pet:1","pet:2","explore_time:dawn","explore_time:day","explore_time:dusk","explore_time:night",...Array.from({length:12},(_,i)=>`equipped_item:${61+i}`.replace(":",":0"))]) {
+  assert.ok(oldMetricPattern.test(metric)); assert.ok(metricPattern.test(metric),`existing metric ${metric} survives`);
+}
+for(const metric of ["explore_map:unknown","explore_time:noon","pet:3","equipped_item:073","action:sleep"]) assert.ok(!metricPattern.test(metric));
+assert.match(v9,/metric in \('action_total','explore_total','purchase_total'\)/);
+assert.match(v9,/union select item_id from domine_pet_v7.inventory where item_id between '061' and '080'/);
+assert.match(v9,/case when c.id between '061' and '080'\s+then exists\(select 1 from domine_pet_v7.inventory/);
+assert.ok(!v9.includes("count_v6(p_player,'purchase_total')>=1"));
+assert.match(v9,/core_count>=60,exists\(select 1 from domine_pet_v7.inventory/);
+assert.match(v9,/map_id=map\s+and finished_at is null and cancelled_at is null and expires_at>now\(\)/);
+assert.match(v9,/last_time>now\(\)-interval '10 seconds'/);
+assert.match(v9,/explore_time:'\|\|band\);\s+else skipped:='DAILY_CAP'/);
+assert.match(v9,/retry_seconds:=ceil\(extract\(epoch from last_time\+interval '3 seconds'-now\(\)\)\)/);
+assert.ok(v9.includes("jsonb_build_object('retryAfterSeconds',retry_seconds)"));
+assert.match(v9,/"version":6,"sharedEconomy":true,"explorationThemes":24,"v9":true/);
+for(const signature of ["domine_pet_v6.snapshot_v6(uuid,int)","domine_pet_v6.badges_v6(uuid)","domine_pet_v6.command_v6(text,text,uuid,text,jsonb)","public.domine_pet_capabilities_v6()"]) {
+  assert.ok(v9.includes(`revoke all on function ${signature} from public,anon,authenticated;`));
+}
+assert.ok(v9.includes("grant execute on function public.domine_pet_capabilities_v6() to anon,authenticated;"));
 const alpha=spawnSync("python",["-c",`
 import tempfile,subprocess
 from pathlib import Path

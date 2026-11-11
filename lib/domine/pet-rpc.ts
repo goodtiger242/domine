@@ -5,7 +5,7 @@ import type { PetMap } from "./pet-maps";
 import type { PetState } from "./pet";
 import type { Reward } from "./pet-progress";
 
-type Result = { data: unknown; error: { code?: string; message: string } | null };
+type Result = { data: unknown; error: { code?: string; message: string } | null; status?: number };
 type Rpc = (name: string, args: Record<string, string | number>) => PromiseLike<Result>;
 
 /** 없는 함수에 한해서만 구버전으로 돌아간다. 미네 돌봄을 도미에게 보내지 않는다. */
@@ -43,9 +43,15 @@ export type V6Result = {
   ticket?: { id: string; map_id: PetMap; eligible_at: string; expires_at: string } | null;
   season?: string; retryAfterSeconds?: number;
 };
+export type PetCapabilities = { version: 6; sharedEconomy: boolean; explorationThemes: number; v9: boolean };
+export class PetRpcError extends Error {
+  definitive: boolean;
+  constructor(code: string, definitive: boolean) { super(code); this.definitive = definitive; }
+}
+export const supportsExploration = (v9: boolean, map: PetMap) => v9 || ["church", "field", "street", "park", "home"].includes(map);
 export interface PetApi {
   legacy(pet: PetId, nickname: string, action?: PetAction, legacy?: boolean): ReturnType<typeof petRequest>;
-  capabilities(): Promise<boolean>;
+  capabilities(): Promise<PetCapabilities | false>;
   register(identity: PetIdentity, signal?: AbortSignal): Promise<V6Result>;
   state(identity: PetIdentity, pet: PetId, signal?: AbortSignal): Promise<V6Result>;
   execute(identity: PetIdentity, command: PetCommand, signal?: AbortSignal): Promise<V6Result>;
@@ -53,9 +59,10 @@ export interface PetApi {
 }
 type V6Rpc = (name: string, args: Record<string, string | number | null>, signal?: AbortSignal) => PromiseLike<Result>;
 export function createPetApi(rpc: V6Rpc): PetApi {
+  let v9 = false;
   const call = async (name: string, args: Record<string, string | number | null>, signal?: AbortSignal) => {
-    const { data, error } = await rpc(`domine_pet_${name}_v6`, args, signal);
-    if (error) throw new Error(error.code ?? "NETWORK_ERROR");
+    const { data, error, status } = await rpc(`domine_pet_${name}_v6`, args, signal);
+    if (error) throw new PetRpcError(error.code || "NETWORK_ERROR", (status ?? 0) >= 400 || /^(?:[0-9A-Z]{5}|PGRST\d{3}|[45]\d{2})$/.test(error.code ?? ""));
     if (!data || typeof data !== "object" || !("ok" in data)) throw new Error("INVALID_RESPONSE");
     return data as V6Result;
   };
@@ -63,16 +70,22 @@ export function createPetApi(rpc: V6Rpc): PetApi {
   return {
     legacy: (pet, nickname, action, legacy) => petRequest((name, args) => rpc(name, args), pet, nickname, action, legacy),
     async capabilities() {
+      v9 = false;
       const { data, error } = await rpc("domine_pet_capabilities_v6", {});
       if (error?.code === "PGRST202") return false;
       if (error) throw new Error(error.code ?? "NETWORK_ERROR");
       if (!data || (data as { version?: number }).version !== 6) throw new Error("INVALID_RESPONSE");
-      return true;
+      const flags = data as Partial<PetCapabilities>;
+      v9 = flags.v9 === true;
+      return { version: 6, sharedEconomy: flags.sharedEconomy === true, explorationThemes: flags.explorationThemes ?? 5, v9 };
     },
     register: (i, signal) => call("register", auth(i), signal),
     state: (i, pet, signal) => call("state", { ...auth(i), p_pet: pet }, signal),
     operation: (i, id) => call("operation", { ...auth(i), p_request_id: id }),
     execute(i, command, signal) {
+      if (command.kind === "explore_begin" && !supportsExploration(v9, command.map)) {
+        return Promise.resolve({ ok: false, code: "SERVER_UPDATE_REQUIRED", serverNow: new Date().toISOString() });
+      }
       const args: Record<string, string | number | null> = { ...auth(i), p_request_id: command.requestId };
       switch (command.kind) {
         case "action": Object.assign(args, { p_pet: command.pet, p_action: command.action }); break;

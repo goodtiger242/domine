@@ -1,0 +1,150 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import ts from "typescript";
+import { loadTS } from "./pet-test-loader.mjs";
+
+const { createPetMock } = loadTS("tests/pet/rpc-mock.ts");
+const { PetRpcError } = loadTS("lib/domine/pet-rpc.ts");
+const identity = { nickname: "테스트", secret: "a".repeat(64) };
+const source = ts.transpileModule(readFileSync("app/games/usePetController.ts", "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+
+// Exercise the real controller with deterministic hooks/timers and no browser or database.
+function mount(api, saved = []) {
+  const storage = new Map(saved), slots = [], effects = [], timers = new Map();
+  let cursor = 0, dirty = true, game, now = 0, timerId = 0;
+  globalThis.localStorage = { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) };
+  globalThis.document = { hidden: false, addEventListener() {}, removeEventListener() {} };
+  globalThis.window = { addEventListener() {}, removeEventListener() {}, setTimeout: (...args) => setTimeout(...args), clearTimeout: id => clearTimeout(id) };
+  globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
+  globalThis.setTimeout = (fn,ms) => { const id=++timerId; timers.set(id,{fn,at:now+ms}); return id; };
+  globalThis.clearTimeout = id => timers.delete(id);
+  globalThis.setInterval = () => 0;
+  globalThis.clearInterval = () => {};
+  Date.now = () => now;
+  const changed = (a,b) => !a || !b || a.some((v,i)=>!Object.is(v,b[i]));
+  const hooks = {
+    useState(initial) {
+      const n=cursor++;
+      if (!slots[n]) {
+        slots[n]={value:typeof initial==="function"?initial():initial};
+        slots[n].set=value=>{ const next=typeof value==="function"?value(slots[n].value):value; if(!Object.is(next,slots[n].value)){slots[n].value=next;dirty=true;} };
+      }
+      return [slots[n].value,slots[n].set];
+    },
+    useReducer(reducer,initial) {
+      const [value,set]=hooks.useState(initial), n=cursor-1;
+      slots[n].dispatch ??= event=>set(value=>reducer(value,event));
+      return [value,slots[n].dispatch];
+    },
+    useRef(value) { const n=cursor++; return slots[n] ??= {current:value}; },
+    useCallback(fn,deps) { const n=cursor++; if(changed(slots[n]?.deps,deps)) slots[n]={value:fn,deps}; return slots[n].value; },
+    useEffect(fn,deps) {
+      const n=cursor++;
+      if(changed(slots[n]?.deps,deps)) { const previous=slots[n]; slots[n]={deps}; effects.push(()=>{previous?.cleanup?.();slots[n].cleanup=fn();}); }
+    },
+  };
+  const exports={};
+  new Function("require","exports",source)(name=>{
+    if(name==="react") return hooks;
+    if(name==="@/lib/supabase/client") return {createClient:()=>({})};
+    if(name==="@/lib/domine/pet-assets") return {prepareImage:async()=>{},vibrate:()=>{}};
+    return loadTS(`${name.slice(2)}.ts`);
+  },exports);
+  async function flush() {
+    for(let n=0;n<30;n++) {
+      if(dirty) { dirty=false;cursor=0;game=exports.usePetController(api); }
+      while(effects.length) effects.shift()();
+      await Promise.resolve();
+    }
+    assert.equal(dirty,false,"controller settles without an effect loop");
+  }
+  return {
+    get game(){return game;},storage,flush,
+    async advance(ms) {
+      const end=now+ms;
+      for(;;) {
+        const next=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];
+        if(!next) break;
+        now=next[1].at;timers.delete(next[0]);next[1].fn();await flush();
+      }
+      now=end;await flush();
+    },
+    close(){for(const slot of slots) slot?.cleanup?.();},
+  };
+}
+const savedToken = [ ["domine-pet-nick",identity.nickname], [`domine-pet-identity:${identity.nickname}`,identity.secret] ];
+let mock=createPetMock(), h=mount(mock.api);
+await h.flush();assert.equal(h.game.registered,false);
+h.game.care("feed");await h.flush();
+assert.equal(h.game.machine.visual,"acting");
+assert.equal(h.game.message,"구경 중이에요 · 별명을 등록하면 코인이 쌓여요");
+assert.ok(!mock.calls.includes("action"));h.close();
+
+mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+assert.equal(mock.calls.filter(c=>c==="register").length,1,"unconfirmed saved token retries registration");
+assert.equal(h.game.identity.secret,identity.secret);
+assert.equal(h.game.registered,true);assert.equal(h.storage.get(`domine-pet-reg:${identity.nickname}`),"1");h.close();
+
+mock=createPetMock();await mock.api.register(identity);h=mount(mock.api,savedToken);await h.flush();
+assert.equal(h.game.registered,true,"already registered with the same token is success");
+assert.equal(mock.calls.filter(c=>c==="register").length,2);h.close();
+
+mock=createPetMock();await mock.api.register({...identity,secret:"b".repeat(64)});h=mount(mock.api,savedToken);await h.flush();
+assert.equal(h.game.registered,false);assert.ok(!h.storage.has(`domine-pet-reg:${identity.nickname}`));
+assert.equal(h.game.message,"이미 쓰는 별명이에요. 다른 기기의 이전 코드를 입력하거나 다른 별명을 고르세요");
+await h.game.connect(`${identity.nickname}:${"b".repeat(64)}`,true);await h.flush();
+assert.equal(h.game.registered,true);assert.equal(h.storage.get(`domine-pet-reg:${identity.nickname}`),"1");h.close();
+
+mock=createPetMock();const register=mock.api.register;
+mock.api.register=async i=>{await register(i);throw new TypeError("response lost");};
+h=mount(mock.api);await h.flush();await h.game.connect(identity.nickname);await h.flush();
+const savedSecret=h.storage.get(`domine-pet-identity:${identity.nickname}`);
+assert.ok(savedSecret);assert.ok(!h.storage.has(`domine-pet-reg:${identity.nickname}`));
+mock.api.register=register;await h.game.connect(identity.nickname);await h.flush();
+assert.equal(h.game.identity.secret,savedSecret);assert.equal(h.game.registered,true);h.close();
+
+mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+const command={kind:"action",pet:1,action:"feed",requestId:"error"};
+const execute=mock.api.execute;
+mock.api.execute=async()=>{throw new PetRpcError("23514",true);};
+await h.game.execute(command);await h.flush();
+assert.equal(h.game.machine.command,"idle");assert.ok(!h.storage.has(`domine-pet-pending:${identity.nickname}`));
+assert.equal(h.game.message,"서버 점검 중이에요. 잠시 후 다시 해 주세요");
+mock.api.execute=async()=>{throw new TypeError("Failed to fetch");};
+await h.game.execute({...command,requestId:"network"});await h.flush();
+assert.equal(h.game.machine.command,"uncertain");assert.ok(h.storage.has(`domine-pet-pending:${identity.nickname}`));
+mock.api.execute=execute;h.game.retry();await h.flush();
+assert.equal(h.game.machine.command,"idle");assert.equal(h.game.personal.player.coins,118);
+
+mock.api.execute=()=>new Promise(()=>{});
+void h.game.execute({...command,requestId:"timeout"});await h.flush();
+assert.equal(h.game.machine.command,"pending");
+h.game.care("pet");await h.flush();assert.equal(h.game.machine.visual,"acting");
+assert.equal(h.game.message,"보상 확인 중이라 이번엔 코인이 없어요");
+await h.advance(8000);assert.equal(h.game.machine.command,"uncertain");
+mock.api.operation=async()=>{throw new PetRpcError("42P01",true);};
+h.game.retry();await h.flush();assert.equal(h.game.machine.command,"uncertain","lookup failures cannot discard an unresolved mutation");h.close();
+
+mock=createPetMock({v9:false});h=mount(mock.api,savedToken);await h.flush();
+await h.game.execute({kind:"explore_begin",map:"farm",source:"map",requestId:"old-server"});await h.flush();
+assert.ok(!mock.calls.includes("explore_begin"));assert.equal(h.game.machine.command,"idle");
+assert.equal(h.game.message,"서버 업데이트 대기 중(새 지역 탐험은 아직)");h.close();
+
+mock=createPetMock({v9:false});await mock.api.register(identity);
+h=mount(mock.api,[...savedToken,[`domine-pet-reg:${identity.nickname}`,"1"],[`domine-pet-pending:${identity.nickname}`,JSON.stringify({kind:"explore_begin",map:"farm",source:"map",requestId:"old-pending"})]]);
+await h.flush();assert.equal(h.game.machine.command,"uncertain");
+h.game.retry();await h.flush();assert.ok(mock.calls.includes("operation"));
+assert.equal(h.game.machine.command,"idle","old pending themes can still look up and settle without sending to the old server");h.close();
+
+mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+mock.api.execute=async()=>({...mock.state(),version:1,reward:{xp:0,coins:0,levelCoins:0,newEntries:[],newBadges:[],skipped:"DAILY_CAP"}});
+await h.game.execute(command);await h.flush();
+assert.equal(h.game.rewardNotice,"오늘 보상 한도를 채웠어요(내일 다시)");
+await h.advance(2499);assert.ok(h.game.feedback);
+await h.advance(1);assert.equal(h.game.feedback,null);assert.ok(h.game.rewardNotice);
+await h.game.refresh();await h.flush();assert.ok(h.game.rewardNotice,"polling does not clear the daily cap");
+mock.api.execute=async()=>({...mock.state(),version:2,reward:{xp:8,coins:4,levelCoins:0,newEntries:[],newBadges:[]}});
+await h.game.execute({...command,requestId:"success"});await h.flush();assert.equal(h.game.rewardNotice,"");h.close();
+console.log("Pet controller: registration recovery/import, definitive errors, pending/uncertain, old-server gating and persistent cap passed.");
