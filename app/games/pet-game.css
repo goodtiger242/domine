@@ -423,3 +423,27 @@
 .pet-move-toggle[aria-pressed=true] { background: #f5c842; color: #26392e; }
 .pet-shop-plates { max-width: 72%; }
 .pet-location { max-width: calc(100% - 70px); }
+/* 폰 공간 절약: 전장을 넓히고 아래 패널·상태창을 줄인다. */
+.pet-battle-scene { grid-template-rows: 64% 36%; }
+.pet-battle-topline { padding: 8px 12px; }
+.pet-battle-hud { width: 50%; padding: 6px 9px 6px; }
+.pet-battle-hud[data-side=opponent] { top: calc(36px + env(safe-area-inset-top, 0px)); left: 8px; }
+.pet-battle-hud[data-side=player] { bottom: 34px; right: 8px; }
+.pet-battle-hud h3 { margin-bottom: 3px; font-size: 14px; }
+.pet-battle-energy { margin-top: 4px; gap: 3px; }
+.pet-battle-energy i { width: 8px; height: 8px; }
+.pet-battle-fighter[data-side=opponent] { width: 36%; top: 22%; }
+.pet-battle-fighter[data-side=player] { width: 44%; bottom: 12%; }
+.pet-battle-forecast { bottom: 6px; font-size: 12px; }
+.pet-battle-console { grid-template-rows: 64px minmax(0, 1fr); gap: 5px; padding-top: 6px; }
+.pet-battle-message { padding: 5px 10px 12px; }
+.pet-battle-message > small:first-child { display: none; }
+.pet-battle-message > span:not(.pet-battle-sr) { font-size: 15px; }
+.pet-battle-actions { gap: 5px; }
+.pet-battle-actions button, .pet-battle-result-actions button { min-height: 44px; padding: 5px 9px; }
+.pet-battle-command { grid-template-rows: minmax(0, 1fr) auto; }
+.pet-battle-preview:empty { display: none; }
+/* 명령이 닫힌 동안(등장·연출)은 아래를 대사창만 남기고 전장을 넓힌다. */
+.pet-battle-scene:has(.pet-battle-wait) { grid-template-rows: minmax(0, 1fr) auto; }
+.pet-battle-scene:has(.pet-battle-wait) .pet-battle-console { grid-template-rows: 64px; }
+.pet-battle-wait { display: none; }

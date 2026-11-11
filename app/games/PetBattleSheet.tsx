@@ -203,7 +203,7 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose 
                   <button ref={command} type="button" className="pet-battle-back" onClick={() => { cancelHold(); held.current = false; setMenu("main"); setPreview(""); }}>← 뒤로</button>
                 </>}
               </div>
-              <p className="pet-battle-preview" id={previewId} role="status">{preview || (menu === "moves" ? "길게 누르면 예상 피해 · 키보드는 초점으로 확인" : "서로의 움직임을 읽고, 한 수씩 천천히.")}</p>
+              <p className="pet-battle-preview" id={previewId} role="status">{preview}</p>
             </div> : <div className="pet-battle-wait" aria-hidden="true"><span>✦</span><p>{intro ? "만남의 순간" : "친구의 움직임을 지켜봐요"}</p><small>명령은 차례가 끝나면 열려요</small></div>}
           </>}
       </div>
