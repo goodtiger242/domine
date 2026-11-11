@@ -1,9 +1,11 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { ACTION_DONE, ACTION_ICON, ACTION_LABEL, availableActionGroups, collarToday, faceOf, LOCAL_ACTIONS, PET_ACTIONS, stageOf, STAGE_LABEL, timeAgo, type PetCategory, type PetState } from "@/lib/domine/pet";
+import { ACTION_ICON, ACTION_LABEL, availableActionGroups, collarToday, faceOf, LOCAL_ACTIONS, PET_ACTIONS, stageOf, type PetCategory, type PetState } from "@/lib/domine/pet";
 import { line } from "@/lib/domine/pet-lines";
 import { fallingNeeds } from "@/lib/domine/pet-signals";
+import { queueSpeech, type Speech } from "@/lib/domine/pet-bubble";
+import { nextGoal, rewardText } from "@/lib/domine/pet-progress";
 import { actionsForMap } from "@/lib/domine/pet-maps";
 import { worldCell } from "@/lib/domine/pet-world";
 import { PETS, petText } from "@/lib/domine/pet-photos";
@@ -12,7 +14,7 @@ import type { PetApi } from "@/lib/domine/pet-rpc";
 import { visualLocked } from "@/lib/domine/pet-machine";
 import { PetScene } from "./PetScene";
 import PetProgress from "./PetProgress";
-import PetFeedback from "./PetFeedback";
+import PetFeedback, { PetNotice } from "./PetFeedback";
 import { usePetController } from "./usePetController";
 import "./pet-game.css";
 const PetShopSheet = dynamic(() => import("./PetShopSheet"));
@@ -46,8 +48,11 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   const { machine, shared: pet, personal } = game;
   const [sheet, setSheet] = useState<Sheet>(null), [category, setCategory] = useState<PetCategory>("먹이");
   const [nameSearch, setNameSearch] = useState(""), [connecting, setConnecting] = useState(false);
-  const names = PET_LEGAL_NAMES.filter((name) => name.includes(nameSearch.normalize("NFC").trim()));
-  const [speech, setSpeech] = useState<{ text: string; speaker: "dog" | "priest" }>({ text: "", speaker: "dog" });
+  const query = nameSearch.normalize("NFC").trim();
+  const names = query ? PET_LEGAL_NAMES.filter((name) => name.includes(query)).slice(0, 6) : [];
+  const [editingName, setEditingName] = useState(false), [invalidName, setInvalidName] = useState(false);
+  const [speeches, setSpeeches] = useState<Speech[]>([]);
+  const speech = speeches[0];
   const [hour, setHour] = useState(12);
   const tabsId = useId();
   const stage = stageOf(pet?.care_total ?? 0), face = pet ? faceOf(pet, hour >= 21 || hour < 5) : "happy";
@@ -55,12 +60,16 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   const groups = availableActionGroups(actionsForMap(PET_ACTIONS, cell.theme));
   const selected = groups.find((g) => g.category === category) ?? groups[0];
   const locked = !game.worldReady || visualLocked(machine), disabled = !game.registered || game.capability !== "ready" || machine.command !== "idle";
-  const notice = game.capability === "missing" ? "개인 진행 준비 중 · 기존 돌보기는 계속할 수 있어요."
-    : game.capability === "error" ? "개인 기록 연결을 확인하지 못했어요. 기록 메뉴에서 다시 확인해 주세요."
-    : !game.registered ? "내 이름 선택하고 코인 모으기" : game.message;
-  const progressNotice = [machine.command === "pending" ? "보상 확인 중…" : machine.command === "uncertain" ? "응답을 확인하지 못했어요. 결과 확인을 눌러 주세요." : "", game.rewardNotice, game.message || notice,
-    game.capability === "ready" && !game.features?.v9 ? "서버 업데이트 대기 중(새 지역 탐험은 아직)" : ""].filter(Boolean).join(" · ");
-  const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeech({ text, speaker }), []);
+  const notice = game.capability === "missing" ? "우리 강아지 준비 중 · 돌보기는 계속할 수 있어요."
+    : game.capability === "error" ? "우리 강아지 연결을 확인하지 못했어요. 잠시 후 다시 열어 주세요."
+    : !game.registered ? "내 이름을 입력해 주세요" : "";
+  const status = game.message || (machine.command === "uncertain" ? "응답을 확인하지 못했어요. 결과 확인을 눌러 주세요." : "")
+    || notice || (machine.command === "pending" ? "보상 확인 중…" : "") || game.rewardNotice
+    || (game.capability === "ready" && !game.features?.v9 ? "서버 업데이트 대기 중(새 지역 탐험은 아직)" : "");
+  const goal = personal?.player ? nextGoal(personal.player.xp, personal.coins ?? personal.player.coins, personal.inventory ?? []) : "";
+  const progressParts = status ? [status] : [rewardText(game.feedback?.result.reward), goal ? `다음 목표 · ${goal}` : ""];
+  const progressNotice = progressParts.filter(Boolean).join(" · ");
+  const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeeches((queue) => queueSpeech(queue, { text, speaker })), []);
   const needs = useRef<Record<number, { previous: PetState; seen: Set<string>; pending: string[] }>>({});
   useEffect(() => {
     if (!pet) return;
@@ -72,7 +81,14 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       entry.pending = [];
     }
   }, [pet, game.petId, locked, game.active, sheet, say]);
-  useEffect(() => { if (game.arrival) say(game.arrival.text); }, [game.arrival, say]);
+  useEffect(() => {
+    if (game.arrival) setSpeeches((queue) => queueSpeech(queue, { text: game.arrival!.text, speaker: "dog", arrival: true }));
+  }, [game.arrival]);
+  useEffect(() => {
+    if (!speech || !game.active || sheet) return;
+    const timer = setTimeout(() => setSpeeches((queue) => queue.slice(1)), 2400);
+    return () => clearTimeout(timer);
+  }, [speech, game.active, sheet]);
   useEffect(() => { setHour(new Date().getHours()); }, []);
   useEffect(() => {
     if (!game.active || sheet) return;
@@ -80,29 +96,32 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     return () => clearInterval(timer);
   }, [game.active, sheet]);
   function open(next: Sheet) { game.pause(); setSheet(next); }
-  function close() { setNameSearch(""); setSheet(null); game.resume(); }
+  function close() { setNameSearch(""); setInvalidName(false); setEditingName(false); setSheet(null); game.resume(); }
   const equipment = (slot: string) => personal?.equipment?.find((e) => e.pet_id === game.petId && e.slot === slot)?.item_id;
   async function connect(value: string) {
+    const name = value.normalize("NFC").trim();
+    if (!PET_LEGAL_NAMES.includes(name)) { setInvalidName(true); return; }
+    if (connecting) return;
     setConnecting(true);
-    try { await game.connect(value); } finally { setConnecting(false); }
+    try { await game.connect(name); close(); } finally { setConnecting(false); }
   }
   return <div ref={game.host} className="pet-game">
     <div className="pet-title-row">
       <h2 className="t-heading">우리 강아지</h2>
-      <div role="group" aria-label="강아지 선택">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeech({ text: "", speaker: "dog" }); }}>{PETS[id].name}</button>)}</div>
-      <button type="button" className="pet-record-button" onClick={() => open("record")}>내 이름 선택</button>
+      <div role="group" aria-label="강아지 선택">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeeches([]); }}>{PETS[id].name}</button>)}</div>
+      <button type="button" className="pet-record-button" onClick={() => open("record")}>{game.nickname || "내 이름"}</button>
     </div>
     <div className="pet-progress-row">{personal && !personal.player ? <span role="status">{PETS[game.petId].name} 진행 불러오는 중… · 우리 코인(공용) {personal.coins ?? 0}</span> : <PetProgress key={game.petId} name={PETS[game.petId].name} xp={personal?.player?.xp ?? 0} coins={personal?.coins ?? personal?.player?.coins ?? 0} />}
       {game.capability === "missing" && <span className="pet-preparing">준비 중</span>}
       {machine.command === "uncertain" && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>
-    <div className="pet-progress-note" role="status"><button type="button" disabled={!progressNotice} title={progressNotice || undefined} aria-label={progressNotice ? `안내 전체 보기: ${progressNotice}` : "새 안내 없음"} onClick={() => open(game.registered ? "notice" : "record")}>{progressNotice || "\u00a0"}</button></div>
+    <PetNotice key={`${game.petId}-${game.feedback?.id ?? "idle"}`} parts={progressParts} onOpen={() => open(game.registered ? "notice" : "record")} />
     <div className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
       {game.worldReady ? <PetScene key={game.petId} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => open("map")} onLocal={game.localScene} locked={locked}
         paused={!game.active || !!sheet || machine.visual === "paused"} stage={stage} face={face} hour={hour}
         light={hour >= 21 || hour < 5 ? .8 : hour < 7 || hour >= 17 ? .9 : 1} collar={collarToday().hex}
-        cue={game.cue} onSay={say} onDone={game.done} speaker={speech.speaker}
-        bubble={speech.text.endsWith("에 왔어요") ? speech.text : petText(speech.text || "반가워요!", game.petId)} wearable={equipment("wearable")} toy={equipment("toy")} />
+        cue={game.cue} onSay={say} onDone={game.done} speaker={speech?.speaker} needs={pet ?? undefined}
+        bubble={speech?.arrival ? speech.text : petText(speech?.text || "반가워요!", game.petId)} wearable={equipment("wearable")} toy={equipment("toy")} />
         : <p className="p-8 text-center text-sm" role="status">동네를 불러오고 있어요…</p>}
       {pet && <div className="pointer-events-none absolute inset-x-0 bottom-0 flex gap-4 bg-gradient-to-t from-black/55 to-transparent px-3 pb-1 pt-3">
         <Mini label="배부름" icon="🍖" value={pet.fullness} color="#f5c878" /><Mini label="기분" icon="♥" value={pet.mood} color="#ffabbc" /><Mini label="청결" icon="💧" value={pet.clean ?? 80} color="#9ae4f0" />
@@ -129,22 +148,17 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}
     {sheet === "achievements" && <PetAchievementSheet badges={personal?.badges ?? []} notice={notice} onClose={close} />}
     {sheet === "history" && <PetHistorySheet history={game.api.history} onClose={close} />}
-    {(sheet === "record" || sheet === "notice") && <PetSheet title={sheet === "notice" ? "안내" : "내 이름 선택"} onClose={close}
-      footer={sheet === "notice" && !game.registered && <button type="button" className="pet-primary" onClick={() => setSheet("record")}>내 이름 선택하고 코인 모으기</button>}>
+    {(sheet === "record" || sheet === "notice") && <PetSheet title={sheet === "notice" ? "안내" : "내 이름"} onClose={close}>
       {sheet === "notice" ? <p className="pet-sheet-note">{progressNotice || "새 안내가 없어요."}</p> : <>
-      <p className="pet-sheet-note" role="status">{game.message || notice || (game.nickname ? `${game.nickname}님의 개인 기록이에요.` : "이름을 선택해 주세요")}</p>
-      <div className="pet-record-form">
-        <label htmlFor={`${tabsId}-name-search`}>이름 검색</label>
-        <input id={`${tabsId}-name-search`} type="search" value={nameSearch} onChange={(e) => setNameSearch(e.target.value)} autoComplete="off" placeholder="이름의 일부를 입력하세요" />
+      {game.nickname && <p className="pet-current-name">지금: {game.nickname} <button type="button" onClick={() => setEditingName(true)}>다른 이름으로</button></p>}
+      {(!game.nickname || editingName) && <form className="pet-record-form" onSubmit={(event) => { event.preventDefault(); void connect(query); }}>
+        <input id={`${tabsId}-name-search`} aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder="이름" enterKeyHint="go" />
         <div className="pet-name-grid" role="group" aria-label="청년회 이름 선택">
-          {names.map((name) => <button type="button" key={name} aria-pressed={game.nickname === name} disabled={connecting || machine.command !== "idle"} onClick={() => void connect(name)}>{name}</button>)}
+          {names.map((name) => <button type="button" key={name} disabled={connecting || machine.command !== "idle"} onClick={() => void connect(name)}>{name}</button>)}
         </div>
-        {!names.length && <p role="status">일치하는 이름이 없어요.</p>}
-        <button type="button" disabled={connecting || !game.nickname} onClick={game.clearIdentity}>선택 해제</button>
-      </div>
-      <button type="button" onClick={() => void game.checkCapabilities()}>연결 다시 확인</button>
-      {machine.command === "uncertain" && <button type="button" onClick={game.retry}>미확인 요청 결과 확인</button>}
-      {pet && <><p className="pet-sheet-note">{STAGE_LABEL[stage]} · 함께한 돌봄 {pet.care_total}회</p><h3>오늘 돌봐 준 친구들</h3><ul>{pet.today_top.map((r) => <li key={r.nickname}>{r.nickname} · {r.count}번</li>)}</ul><h3>최근 기록</h3><ul>{pet.recent.map((r, i) => <li key={i}>{r.nickname}님이 {ACTION_DONE[r.action]} · {timeAgo(r.created_at)}</li>)}</ul></>}
+        {(invalidName || (!!query && !names.length)) && <p role="status">청년회 명단에 있는 이름을 입력해 주세요</p>}
+        <button type="submit" className="pet-primary" disabled={connecting || !query || machine.command !== "idle"}>시작</button>
+      </form>}
       </>}
     </PetSheet>}
   </div>;

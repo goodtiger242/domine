@@ -4,10 +4,8 @@ export const MAX_XP = 9280;
 export function nextGoal(xp: number, coins: number, owned: readonly string[]) {
   const p = progressOf(xp);
   const item = SHOP.filter((item) => !owned.includes(item.id)).sort((a, b) => a.price! - b.price!)[0];
-  const coinGap = item ? Math.max(0, item.price! - coins) : Infinity;
-  const xpGap = p.needed ? p.needed - p.current : Infinity;
-  if (item && coinGap <= xpGap) return `${item.name}까지 ${coinGap}코인`;
-  return Number.isFinite(xpGap) ? `다음 레벨까지 ${xpGap} XP` : "도감을 더 채워 봐요";
+  if (item) return coins < item.price! ? `${item.name}까지 ${item.price! - coins}코인` : `${item.name}을(를) 살 수 있어요`;
+  return p.needed ? `다음 레벨까지 ${p.needed - p.current} XP` : "";
 }
 export const levelXP = (level: number) => 10 * (level - 1) * (level + 2);
 export function levelOf(xp: number) {
@@ -30,4 +28,27 @@ export function rewardDisplay(reward?: Reward) {
   const coins = (reward?.coins ?? 0) + (reward?.levelCoins ?? 0);
   const notice = reward?.skipped === "TOO_FAST" ? (reward.retryAfterSeconds !== undefined ? `${Math.ceil(reward.retryAfterSeconds)}초 뒤에 코인이 들어와요` : "조금 천천히 눌러 주세요") : reward?.skipped === "DAILY_CAP" ? "오늘 보상 한도를 채웠어요(내일 다시)" : "";
   return { coins, xp: reward?.xp ?? 0, quiet: coins === 0 && !reward?.xp, notice };
+}
+
+export function rewardText(reward?: Reward) {
+  const r = rewardDisplay(reward);
+  return r.notice || [r.coins ? `+${r.coins} 코인` : "", r.xp ? `+${r.xp} XP` : ""].filter(Boolean).join(" · ");
+}
+
+/** 한 줄에 맞으면 합치고, 넘치면 각 안내를 읽을 수 있는 길이로 나눈다. */
+export function noticePages(parts: string[], fits: (text: string) => boolean) {
+  const messages = parts.filter(Boolean);
+  if (!messages.length) return [""];
+  const combined = messages.join(" · ");
+  if (fits(combined)) return [combined];
+  return messages.flatMap((message) => {
+    const pages: string[] = [];
+    let page = "";
+    for (const char of message) {
+      if (page && !fits(page + char)) { pages.push(page); page = ""; }
+      page += char;
+    }
+    if (page) pages.push(page);
+    return pages;
+  });
 }

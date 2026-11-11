@@ -12,16 +12,16 @@ const { PET_WORLD, DIRECTIONS, neighborCell } = loadTS("lib/domine/pet-world.ts"
 import { petRequest } from "../lib/domine/pet-rpc.ts";
 import { bubblePosition } from "../lib/domine/pet-bubble.ts";
 
-for (const width of [318, 348, 370]) {
+for (const width of [318, 348, 370, 390]) {
   const height = width * 9 / 16;
   for (const x of [0, 80, 160]) {
     for (const y of [20, 55, 89]) {
-      for (const [bubbleWidth, bubbleHeight] of [[52, 28], [200, 44], [240, 60]]) {
+      for (const [bubbleWidth, bubbleHeight] of [[52, 28], [200, 44], [Math.min(240, width * .72), 60]]) {
         const p = bubblePosition(x, y, width, height, bubbleWidth, bubbleHeight);
         const left = p.left / 100 * width;
         const top = p.top / 100 * height;
-        assert.ok(left >= 6 - 1e-9 && left + bubbleWidth <= width - 6 + 1e-9, "Bubble stays inside horizontal edges");
-        assert.ok(top >= 6 - 1e-9 && top + bubbleHeight + 8 <= height, "Bubble and tail stay inside vertical edges");
+        assert.ok(left >= width * .14 - 1e-9 && left + bubbleWidth <= width * .86 + 1e-9, "Bubble stays inside horizontal edges");
+        assert.ok(top >= height * .22 - 1e-9 && top + bubbleHeight <= height - 46 + 1e-9, "Bubble and tail stay inside vertical edges");
         assert.ok(p.tail > 0 && p.tail < 100, "Tail stays on bubble");
         if (x === 0) assert.ok(p.tail < 50, "Left-edge tail points left");
         if (x === 80) assert.equal(p.tail, 50, "Centered tail points to dog");

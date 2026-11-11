@@ -35,11 +35,11 @@ assert.deepEqual(fallingNeeds(state(100),state(79),seen),[],"already signalled b
 assert.deepEqual(fallingNeeds(state(79),state(19),seen),["idle_hungry","idle_sad","idle_dirty"]);
 assert.equal(seen.size,12);
 assert.deepEqual(fallingNeeds(state(19),state(100),seen),[]);
-assert.match(nextGoal(39,0,[]),/1 XP/);
+assert.match(nextGoal(39,0,[]),/40??/);
 assert.match(nextGoal(0,39,[]),/1코인/);
-assert.match(nextGoal(0,40,[]),/0코인/);
+assert.match(nextGoal(0,40,[]),/살 수 있어요/);
 assert.match(nextGoal(0,0,SHOP.map(i=>i.id)),/40 XP/);
-assert.equal(nextGoal(MAX_XP,0,SHOP.map(i=>i.id)),"도감을 더 채워 봐요");
+assert.equal(nextGoal(MAX_XP,0,SHOP.map(i=>i.id)),"");
 for (const [map,name] of [["church","성당 마당"],["field","들판"],["street","상가 거리"],["park","공원 숲길"],["home","집 마당"]]) {
   assert.ok(catalogHint(CATALOG.find(i=>i.map===map)).startsWith(`${name} · `));
 }

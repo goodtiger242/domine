@@ -1,6 +1,7 @@
 import type { PetFace, PetStage } from "@/lib/domine/pet";
 import { useState } from "react";
 import { PETS, poseAt, type PetId } from "@/lib/domine/pet-photos";
+import type { TapPoint } from "@/lib/domine/pet-tap";
 
 /**
  * 도미(공동 반려견). 발바닥이 (0,0)이고 오른쪽을 본다.
@@ -22,7 +23,7 @@ type Props = {
   /** 전례색 목줄 */
   collar: string;
   photos: Record<string, boolean>;
-  onTap?: () => void;
+  onTap?: (point: TapPoint) => void;
   disabled?: boolean;
   wearable?: string | null;
 };
@@ -48,19 +49,13 @@ export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, colla
     <g
       className={cls}
       style={{ ["--oy" as string]: `${-height * 0.5}px`, cursor: "pointer" }}
-      onPointerDown={(event) => {
-        if (disabled) return;
-        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        event.currentTarget.animate(reduced ? [{ opacity: .6 }, { opacity: 1 }] : [
-          { transform: "scale(1.12,.90)", offset: 0 },
-          { transform: "translateY(-3px) scale(.92,1.10)", offset: .35 },
-          { transform: "scale(1.12,.90)", offset: .77 },
-          { transform: "scale(1)", offset: 1 },
-        ], { duration: reduced ? 200 : 520, easing: "ease-out" });
-      }}
-      onClick={disabled ? undefined : onTap} aria-disabled={disabled}
+      onClick={disabled ? undefined : (event) => {
+        const matrix = event.currentTarget.getScreenCTM();
+        const point = matrix && event.detail ? new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()) : null;
+        onTap?.(point ? { x: point.x / width + .5, y: (point.y + height - 1.5 * scale) / height } : { x: .5, y: .5 });
+      }} aria-disabled={disabled}
       role="button" tabIndex={0} aria-label={`${config.name} 쓰다듬어 인사하기`}
-      onKeyDown={(event) => { if (!disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onTap?.(); } }}
+      onKeyDown={(event) => { if (!disabled && !event.repeat && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onTap?.({ x: .5, y: .5 }); } }}
     >
       <g className={!motion || ["pet-sit", "pet-lie", "pet-sleep"].includes(motion) ? "pet-breath" : undefined}>
       {failed[src] ? <text y={-height / 3} textAnchor="middle" fontSize={width * 0.6}>🐕</text> : <image

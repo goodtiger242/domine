@@ -28,7 +28,7 @@ const errorText: Record<string, string> = {
   SERVER_UPDATE_REQUIRED: "서버 업데이트 대기 중(새 지역 탐험은 아직)",
   INSUFFICIENT_COINS: "코인이 조금 더 필요해요.", NOT_OWNED: "먼저 구매해 주세요.",
   INVALID_INPUT: "입력 내용을 확인해 주세요.", REQUEST_CONFLICT: "요청이 달라 기록을 확인하지 못했어요.",
-  RATE_LIMITED: "개인 기록은 잠시 후 다시 확인해 주세요. 놀이는 계속할 수 있어요.",
+  RATE_LIMITED: "우리 강아지는 잠시 후 다시 확인해 주세요. 놀이는 계속할 수 있어요.",
 };
 export function usePetController(injectedApi?: PetApi) {
   const [supabase] = useState(createClient);
@@ -101,13 +101,13 @@ export function usePetController(injectedApi?: PetApi) {
       if (capabilityRef.current === "ready" && i && registeredRef.current) {
         const result = await api.state(i, selected);
         if (!current(g, i, selected) || seq !== readSequence.current) return;
-        if (!result.ok) { setMessage(errorText[result.code] ?? "개인 기록을 확인하지 못했어요."); return; }
+        if (!result.ok) { setMessage(errorText[result.code] ?? "우리 강아지 상태를 확인하지 못했어요."); return; }
         apply(result);
         if (result.shared) setShared(result.shared.pet);
       } else {
         const result = await api.legacy(selected, nickRef.current, undefined, legacy.current);
         if (!current(g, i, selected) || seq !== readSequence.current) return;
-        if (result.error) { setMessage("강아지를 불러오지 못했어요. 기록 메뉴에서 다시 확인해 주세요."); return; }
+        if (result.error) { setMessage("강아지를 불러오지 못했어요. 잠시 후 다시 열어 주세요."); return; }
         legacy.current = result.legacy; setMultiPet(!result.legacy);
         if (result.petId !== selected) { petRef.current = result.petId; setPetId(result.petId); }
         setShared(result.data as PetState);
@@ -153,7 +153,7 @@ export function usePetController(injectedApi?: PetApi) {
       ++readSequence.current;
       if (result.pet !== undefined && result.pet !== selected) void refresh();
       if (result.shared && (command.kind === "action" || command.kind === "equip") && command.pet === selected) setShared(result.shared.pet);
-      if (!result.ok && !["ALREADY_OWNED", "TOO_EARLY", "EXPIRED"].includes(result.code)) setMessage(errorText[result.code] ?? "개인 기록을 확인하지 못했어요.");
+      if (!result.ok && !["ALREADY_OWNED", "TOO_EARLY", "EXPIRED"].includes(result.code)) setMessage(errorText[result.code] ?? "우리 강아지 상태를 확인하지 못했어요.");
       else setMessage("");
       if (result.ok && command.kind === "purchase") vibrate(15);
     } catch (error) {
@@ -265,10 +265,10 @@ export function usePetController(injectedApi?: PetApi) {
       try { localStorage.setItem("domine-pet-nick", nick); } catch { /* Shared care works without storage. */ }
       void refresh(); return;
     }
-    if (capabilityRef.current !== "ready") { setMessage("개인 기록 연결을 먼저 확인해 주세요."); return; }
+    if (capabilityRef.current !== "ready") { setMessage("우리 강아지 연결을 확인하지 못했어요. 잠시 후 다시 해 주세요."); return; }
     if (!storageAvailable()) {
       if (!identityRef.current) { nickRef.current = nick; setNickname(nick); void refresh(); }
-      setMessage("기기 저장소를 사용할 수 없어 개인 기록을 시작할 수 없어요. 공동 놀이는 가능해요."); return;
+      setMessage("기기 저장소를 사용할 수 없어 이름을 저장할 수 없어요. 공동 놀이는 가능해요."); return;
     }
     registrationPending.current = true;
     const g = generation.current, previousIdentity = identityRef.current, selected = petRef.current;
@@ -312,7 +312,7 @@ export function usePetController(injectedApi?: PetApi) {
       // Retry the selected name until the server has confirmed registration.
       if (supported && !registeredRef.current && nickRef.current) await connect(nickRef.current);
       await refresh();
-    } catch { if (alive.current) { capabilityRef.current = "error"; setCapability("error"); setMessage("개인 기록 연결을 확인하지 못했어요."); } }
+    } catch { if (alive.current) { capabilityRef.current = "error"; setCapability("error"); setMessage("우리 강아지 연결을 확인하지 못했어요."); } }
   }, [api, refresh, connect]);
   useEffect(() => {
     alive.current = true;
