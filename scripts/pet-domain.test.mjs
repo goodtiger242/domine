@@ -3,29 +3,19 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { loadTS } from "./pet-test-loader.mjs";
-const { levelOf, levelXP, progressOf, rewardEligible, rewardDisplay } = loadTS("lib/domine/pet-progress.ts");
+const { rewardDisplay } = loadTS("lib/domine/pet-progress.ts");
 const { normalizeNickname, secretForName, PET_LEGAL_NAMES, saveIdentity, registrationConfirmed } = loadTS("lib/domine/pet-identity.ts");
 const { gameReducer: reduce, initialMachine, visualLocked } = loadTS("lib/domine/pet-machine.ts");
 const { SAFE_ZONES, actorBounds, clampActor, buildBallPath, sampleBall } = loadTS("lib/domine/pet-geometry.ts");
 const { buildScenePlan, sampleScenePlan } = loadTS("lib/domine/pet-scene-plan.ts");
 const { CATALOG, SHOP, ACHIEVEMENTS } = loadTS("lib/domine/pet-catalog.ts");
 const { createPetApi, acceptsResult, PetRpcError } = loadTS("lib/domine/pet-rpc.ts");
-for (let l = 2; l <= 30; l++) {
-  assert.equal(levelOf(levelXP(l)-1), l-1); assert.equal(levelOf(levelXP(l)), l); assert.equal(levelOf(levelXP(l)+1), l);
-  assert.equal(levelXP(l)-levelXP(l-1), 20*l);
-}
-assert.equal(levelOf(-1),1); assert.equal(levelOf(99999),30); assert.equal(levelOf(700),8);
-assert.deepEqual(progressOf(99999),{ level:30,value:9280,current:0,needed:0 });
 assert.deepEqual(rewardDisplay({xp:8,coins:4,levelCoins:14}),{xp:8,coins:18,quiet:false,notice:""});
 assert.deepEqual(rewardDisplay(),{xp:0,coins:0,quiet:true,notice:""});
 for (const [skipped, notice] of [["TOO_FAST","조금 천천히 눌러 주세요"],["DAILY_CAP",""]]) {
   assert.deepEqual(rewardDisplay({xp:0,coins:0,levelCoins:0,skipped}),{xp:0,coins:0,quiet:true,notice});
 }
 assert.equal(rewardDisplay({skipped:"TOO_FAST",retryAfterSeconds:2}).notice,"조금 천천히 눌러 주세요");
-assert.equal(rewardEligible(3000,0,119),true);
-assert.equal(rewardEligible(2999,0,0),false);
-assert.equal(rewardEligible(60000,0,120),false);
-assert.equal(rewardEligible(0,null,0),true);
 assert.equal(PET_LEGAL_NAMES.length,21);
 assert.equal(new Set(PET_LEGAL_NAMES).size,21);
 assert.deepEqual(PET_LEGAL_NAMES,[...PET_LEGAL_NAMES].sort((a,b)=>a.localeCompare(b,"ko")));
@@ -143,28 +133,16 @@ assert.equal(acceptsResult({version:8},{version:9}),false);
 const { createPetMock } = loadTS("tests/pet/rpc-mock.ts");
 const mock=createPetMock(); await mock.api.register(identity);
 const paid=await mock.api.execute(identity,command);
-assert.equal(paid.player.level,2); assert.equal(paid.player.coins,118); assert.equal(paid.reward.levelCoins,14);
-const replay=await mock.api.execute(identity,command); assert.deepEqual(replay,paid); assert.equal(mock.state().player.coins,118);
+assert.equal(paid.player.level,1); assert.equal(paid.player.coins,100); assert.equal(paid.reward.levelCoins,0);
+const replay=await mock.api.execute(identity,command); assert.deepEqual(replay,paid); assert.equal(mock.state().player.coins,100);
 assert.equal((await mock.api.execute(identity,{...command,action:"walk"})).code,"REQUEST_CONFLICT");
 assert.equal((await mock.api.state({...identity,secret:"b".repeat(64)},1)).code,"AUTH_FAILED");
-const skippedCommand={...command,action:"play",requestId:"reward-zero"};
-const skippedReward=await mock.api.execute(identity,skippedCommand);
-assert.equal(skippedReward.reward.coins,0); assert.equal(skippedReward.reward.skipped,"TOO_FAST");
-assert.equal(skippedReward.reward.retryAfterSeconds,3);
-mock.advance(2999);
-assert.equal((await mock.api.execute(identity,{...command,requestId:"before-boundary"})).reward.retryAfterSeconds,1);
-mock.advance(1);
-assert.equal((await mock.api.execute(identity,{...command,requestId:"reward-next"})).reward.coins,4,"same action pays again after 3 seconds");
-assert.deepEqual(await mock.api.execute(identity,skippedCommand),skippedReward,"replaying a skipped action cannot pay later");
-for(let n=2;n<120;n++) {
-  mock.advance(3000);
-  assert.equal((await mock.api.execute(identity,{...command,requestId:`daily-${n}`})).reward.coins,4);
+for (let n=0;n<121;n++) {
+  const care=await mock.api.execute(identity,{...command,requestId:`care-${n}`});
+  assert.equal(care.reward.xp,0); assert.equal(care.reward.coins,0); assert.equal(care.reward.levelCoins,0);
+  assert.equal(care.reward.skipped,undefined);
 }
-assert.equal(mock.state().daily.reward_actions,120);
-const cappedCoins=mock.state().player.coins;
-mock.advance(3000);
-assert.equal((await mock.api.execute(identity,{...command,requestId:"daily-cap"})).reward.skipped,"DAILY_CAP");
-assert.equal(mock.state().player.coins,cappedCoins);
+assert.equal(mock.state().player.coins,100); assert.equal(mock.state().player.xp,0);
 const wallet=createPetMock();await wallet.api.register(identity);
 const buys=await Promise.all(["062","063"].map(item=>wallet.api.execute(identity,{kind:"purchase",pet:1,item,requestId:item})));
 assert.equal(buys.filter(r=>r.ok).length,1); assert.equal(wallet.state().player.coins,40);
@@ -182,12 +160,12 @@ await purchase(2,"mine-buy");
 assert.deepEqual(perPet.state(2).inventory,["061"]);assert.equal(perPet.state(1).coins,20);assert.equal(perPet.state(2).coins,20);
 assert.equal((await purchase(2,"mine-repeat")).code,"ALREADY_OWNED");
 await perPet.api.execute(identity,{...command,pet:2,requestId:"mine-level"});
-assert.deepEqual(perPet.state(1).levels,{1:1,2:2});assert.equal(perPet.state(1).player.xp,32);assert.equal(perPet.state(2).player.xp,40);
-assert.equal(perPet.state(1).coins,38,"level bonus and action coins enter the shared wallet");
+assert.deepEqual(perPet.state(1).levels,{1:1,2:1});assert.equal(perPet.state(1).player.xp,0);assert.equal(perPet.state(2).player.xp,0);
+assert.equal(perPet.state(1).coins,20,"care cannot mint shared coins");
 const historyBefore=await perPet.api.history();await purchase(2,"mine-buy");
 assert.deepEqual(await perPet.api.history(),historyBefore,"replayed purchases do not log again");
 assert.equal(historyBefore.filter(row=>row.kind==="purchase").length,2);
-assert.ok(historyBefore.some(row=>row.kind==="levelup"&&row.pet===2&&row.detail==="2"));
+assert.ok(!historyBefore.some(row=>row.kind==="levelup"));
 for(const row of historyBefore) assert.deepEqual(Object.keys(row).sort(),["at","detail","kind","nickname","pet"]);
 await perPet.api.execute(identity,{...command,pet:1,requestId:"skipped-history"});
 assert.equal((await perPet.api.history())[0].kind,"action","skipped actions are still recorded");
@@ -198,12 +176,12 @@ await perPet.api.execute(identity,{...command,requestId:"after-retention"});asse
 const rewards=createPetMock();await rewards.api.register(identity);
 const explore=await rewards.api.execute(identity,{kind:"explore_begin",map:"church",source:"map",requestId:"pet-explore"});rewards.advance(15000);
 await rewards.api.execute(identity,{kind:"explore_finish",pet:2,ticket:explore.ticket.id,requestId:"pet-finish"});
-assert.equal(rewards.state(1).player.xp,32);assert.equal(rewards.state(2).player.xp,36);
+assert.equal(rewards.state(1).player.xp,0);assert.equal(rewards.state(2).player.xp,0);
 await rewards.api.execute(identity,{kind:"walk_begin",requestId:"pet-walk"});rewards.advance(150000);
 await rewards.api.execute(identity,{kind:"walk_claim",pet:2,session:"pet-walk",requestId:"pet-claim"});
-assert.equal(rewards.state(1).player.xp,32);assert.equal(rewards.state(2).player.xp,44);
+assert.equal(rewards.state(1).player.xp,0);assert.equal(rewards.state(2).player.xp,0);
 rewards.advance(150000);await rewards.api.execute(identity,{kind:"walk_claim",session:"pet-walk",requestId:"default-pet"});
-assert.equal(rewards.state(1).player.xp,40,"old walk callers default to pet 1");
+assert.equal(rewards.state(1).player.xp,0,"old walk callers default to pet 1");
 
 const purchaseCalls=[];
 const fallbackApi=createPetApi(async(name,args)=>{purchaseCalls.push({name,args});return name.endsWith("v10")?{data:null,error:{code:"PGRST202",message:"missing"}}:{data:{ok:true},error:null};});

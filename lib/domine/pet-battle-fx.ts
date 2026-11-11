@@ -44,7 +44,8 @@ const ORIGINAL_MOVE_FX: Readonly<Record<string, BattleMoveFx>> = {
   rest: { motion: "energy-breath", trail: "energy-dots", elements: ["●", "●", "●", "●"], reaction: "none", duration: 1100, suffix: "천천히 숨 쉬며 기력을 채워요." },
 };
 
-export const moveImage = (id: string) => `/pet/battle/move/${id.toLowerCase()}.webp`;
+// Only the original move art exists; all later techniques use the shared sheets.
+export const moveImage = (id: string) => Object.hasOwn(ORIGINAL_MOVE_FX, id) ? `/pet/battle/move/${id.toLowerCase()}.webp` : undefined;
 const GROUP_FX = {
   rush: { categories: ["impact", "fire"], tint: "grayscale(1) sepia(1) saturate(5) hue-rotate(345deg)" },
   trick: { categories: ["slash", "arcane"], tint: "grayscale(1) sepia(1) saturate(4) hue-rotate(215deg)" },
@@ -79,7 +80,7 @@ export function battleMoveFx(id: string, variation = 0): BattleMoveFx {
 export function battleAssets(moveIds: readonly string[]) {
   return [...new Set([...moveIds, "push", "rest"].flatMap(id => {
     const fx = BATTLE_MOVE_FX[id];
-    return fx ? [fx.image!, ...(fx.sheets ?? []).map(sheet => sheet.path)] : [];
+    return fx ? [...(fx.image ? [fx.image] : []), ...(fx.sheets ?? []).map(sheet => sheet.path)] : [];
   }))];
 }
 

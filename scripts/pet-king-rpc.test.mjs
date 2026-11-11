@@ -15,8 +15,14 @@ function setup(options = {}) {
   return { server, api: createKingApi(server.rpc) };
 }
 const ok = result => { assert.equal(result.supported, true); assert.equal(result.code, "OK"); assert.equal(result.ok, true); return result.data; };
-const startInput = (server, extra = {}) => ({ pet: 1, cell: "E1", individualId: "resident:B001:01",
-  slot: server.slot(), opponentLevel: 10, opponentRank: "resident", opponentName: "Bongdol", ...extra });
+const { INDIVIDUALS } = loadTS("lib/domine/king/individuals.ts");
+const aliases = new Map();
+const startInput = (server, extra = {}) => {
+  const alias = extra.individualId ?? "default";
+  if (!aliases.has(alias)) aliases.set(alias, INDIVIDUALS[aliases.size].id);
+  return { pet: 1, cell: "E1", slot: server.slot(), opponentLevel: 10, opponentRank: "resident", opponentName: "Bongdol",
+    ...extra, individualId: aliases.get(alias) };
+};
 async function state(api, who = alice) { return ok(await api.state(who, id())); }
 async function start(api, server, extra = {}, who = alice) { return ok(await api.start(who, id(), startInput(server, extra))); }
 async function finish(api, server, ticket, extra = {}, who = alice) {
@@ -57,7 +63,7 @@ test("request replay, changed payload conflict and missing RPC fallback", async 
   assert.equal(server.inspect().coins, 970);
   const rejected = id(), noCoins = { pet: 1, item: "P01", quantity: 999 };
   const failure = await api.buyItem(alice, rejected, noCoins);
-  assert.equal(failure.code, "INSUFFICIENT_COINS");
+  assert.equal(failure.code, "INVALID_INPUT");
   assert.deepEqual(await api.buyItem(alice, rejected, noCoins), failure);
   const missing = createKingApi(async () => ({ data: null, error: { code: "PGRST202", message: "not installed" } }));
   assert.deepEqual(await missing.state(alice, id()), { supported: false, ok: false, code: "UNSUPPORTED" });
@@ -92,7 +98,7 @@ test("spawn claims and departures are shared across people and pets, expire by i
   const shared = ok(await api.spawns(bob, id()));
   assert.equal(shared.departed.length, 1);
   assert.equal((await api.start(bob, id(), startInput(server, { pet: 2 }))).code, "SPAWN_DEPARTED");
-  const oldSlot = server.slot(); server.advance(1800000);
+  const oldSlot = server.slot(); server.advance(3600000);
   assert.deepEqual(ok(await api.spawns(bob, id())).departed, []);
   assert.equal((await api.start(bob, id(), startInput(server, { slot: oldSlot }))).code, "SPAWN_EXPIRED");
   assert.ok((await start(api, server, { pet: 2 }, bob)).id);
@@ -389,4 +395,65 @@ test("v18 SQL safety, no care rewards, preserved busy locks and capabilities", (
   assert.match(sql, /pg_get_expr/);
   assert.match(sql, /"busyLock":true,"king":true,"rewardsV18":true/);
   assert.match(sql, /begin;[\s\S]*commit;\s*$/);
+});
+
+test("v21 rejects fake/Lv999 opponents, caps level at +10 and accepts only adjacent slots", async () => {
+  const { api, server } = setup();
+  const input = startInput(server);
+  for (const extra of [{ individualId: "invented", opponentLevel: 999, opponentRank: "king" },
+    { opponentLevel: 999 }, { opponentLevel: 12 }, { individualId: "resident:B001:999" },
+    { individualId: "resident:fake:000" }, { individualId: "N36" }]) {
+    const reply = await api.start(alice, id(), { ...input, ...extra });
+    assert.equal(reply.code, "INVALID_OPPONENT");
+  }
+  assert.equal((await api.start(alice, id(), { ...input, opponentRank: "fake" })).code, "INVALID_INPUT");
+  assert.equal(server.inspect().coins, 1000); assert.equal(server.inspect().pets[1].xp, 0);
+  for (const offset of [-1, 0, 1]) {
+    const ticket = ok(await api.start(alice, id(), { ...input, slot: server.slot() + offset, opponentLevel: 11 }));
+    await finish(api, server, ticket, { outcome: "quit" });
+  }
+  for (const offset of [-2, 2]) assert.equal((await api.start(alice, id(), { ...input, slot: server.slot() + offset })).code, "SPAWN_EXPIRED");
+  const ticket = await start(api, server);
+  const result = await finish(api, server, ticket, { xp: 28944, coins: 4522, opponentLevel: 999, opponentRank: "king" });
+  assert.equal(result.xp, 76); assert.equal(result.coins, 6, "client reward fields never change the ticket reward");
+});
+
+test("v21 polling is read-only and malformed nested responses are rejected", async () => {
+  const { api, server } = setup();
+  const before = server.inspect(), operations = server.operationCount();
+  await Promise.all(Array.from({length:20},()=>api.state(alice)));
+  assert.deepEqual(server.inspect(), before); assert.equal(server.operationCount(), operations);
+  for (const extra of [{ pets: {} }, { tickets: [null] }, { pets: [{ pet:1, xp:0 }] }, { inventory: null, pets: [{ inventory: null }] }, { watching: [null] }]) {
+    const broken = createKingApi(async (name,args) => {
+      const reply = await server.rpc(name,args); reply.data.data = { ...reply.data.data, ...extra }; return reply;
+    });
+    await assert.rejects(broken.state(alice), /INVALID_RESPONSE/);
+  }
+  const legacy = createKingApi(async (name,args) => {
+    const reply = await server.rpc(name,args); delete reply.data.data.resetEpoch; return reply;
+  });
+  assert.ok((await legacy.state(alice)).ok, "v20 snapshots without an epoch still work");
+});
+
+test("v21 SQL validates persisted tickets, bounds rewards, uses battle A30 and does not reset data", () => {
+  const sql=readFileSync("supabase/migrations/20261112500000_domine_pet_v21_settlement.sql","utf8");
+  assert.equal(/[^\x00-\x7f]/.test(sql),false);
+  assert.match(sql,/^begin;[\s\S]*commit;\s*$/);
+  assert.doesNotMatch(sql,/\bdrop\s+(?:table|function|schema)|\bdelete\s+from/i);
+  assert.doesNotMatch(sql,/(?:domine_pet_king_v17|valid_opponent|badges_v6)[.]v_/);
+  assert.match(sql,/p_level not between 1 and least\(999,p_player_level\+10\)/);
+  assert.match(sql,/not domine_pet_v17.valid_opponent\(v_ticket.individual_id/);
+  assert.match(sql,/v_xp:=least\(v_xp/); assert.match(sql,/v_coins:=least\(v_coins/);
+  assert.match(sql,/domine_pet_v17.level_for_xp\(xp\)>=30/);
+  assert.match(sql,/perform domine_pet_v6.badges_v6\(v_player.id\)/);
+  assert.match(sql,/reset_epoch text not null default/);
+  const readPath=sql.slice(sql.indexOf("if p_kind in ('state','spawns','watching')"),sql.indexOf("select w.* into strict v_wallet"));
+  assert.ok(readPath.indexOf("return pg_catalog.jsonb_build_object('ok',true")<readPath.indexOf("for update"));
+  assert.doesNotMatch(readPath,/expire_tickets|insert into/);
+  const { BREEDS } = loadTS("lib/domine/king/species.ts");
+  const seeded=sql.match(/v_breeds text\[\]:=array\[([^\]]+)\]/)[1].match(/'[^']+'/g).map(s=>s.slice(1,-1));
+  assert.deepEqual(seeded,BREEDS.map(b=>b.id),"server pool seed ranges match the client, including appended guests");
+  for (const declaration of sql.matchAll(/\bdeclare\s+([\s\S]*?)\bbegin\b/gi))
+    for (const variable of declaration[1].split(';').map(s=>s.trim()).filter(Boolean)) assert.match(variable,/^v_\w+\s/);
+  for (const body of sql.matchAll(/create or replace function [\s\S]*?\$\$;/g)) assert.match(body[0],/set search_path=''/);
 });

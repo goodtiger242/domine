@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { INDIVIDUALS } from "../../lib/domine/king/individuals";
+import { NAMED } from "../../lib/domine/king/named";
 import type {
   KingAllocation, KingEncounter, KingFeatures, KingPet, KingProgress, KingRank,
   KingRpc, KingSettlement, KingStart, KingTicket, KingCertification, KingRaid,
@@ -6,6 +8,9 @@ import type {
 
 const stats = ["hp", "attack", "defense", "speed", "focus", "calm"] as const;
 const ranks: KingRank[] = ["resident", "veteran", "guest", "chief", "lieutenant", "boss", "gatekeeper", "king"];
+const individuals = new Set([...INDIVIDUALS, ...NAMED].map(i => i.id));
+const validOpponent = (input: KingStart, level: number) => individuals.has(input.individualId)
+  && ranks.includes(input.opponentRank) && input.opponentLevel >= 1 && input.opponentLevel <= Math.min(999, level + 10);
 const prices: Record<string, number> = Object.fromEntries([15, 35, 70, 12, 30, 25, 25, 25, 25, 20, 30, 40, 35, 60]
   .map((price, i) => [`P${String(i + 1).padStart(2, "0")}`, price]));
 const emptyAllocation = (): KingAllocation => ({ hp: 0, attack: 0, defense: 0, speed: 0, focus: 0, calm: 0 });
@@ -110,10 +115,10 @@ export function createKingMock(options: {
     store.departed = store.departed.filter(d => d.slot >= slot() - 1);
   };
   function dispatch(kind: string, input: Record<string, unknown>, nickname: string): unknown {
-    if (kind === "state") return { coins: store.coins, version: store.version, features, pets: [petState(1), petState(2)],
+    if (kind === "state") return { resetEpoch: "20261112-v19", coins: store.coins, version: store.version, features, pets: [petState(1), petState(2)],
       ...spawns(), watching: watching(), encyclopedia: Object.values(store.encounters), certifications: store.certifications,
       raids: Object.values(store.raids).filter(r => r.week === week()), prices,
-      tickets: Object.values(store.tickets).filter(t => t.owner === nickname && Date.parse(t.startedAt) > now - 1800000)
+      tickets: Object.values(store.tickets).filter(t => t.owner === nickname && (t.status === "active" || Date.parse(t.startedAt) > now - 86400000))
         .map(t => ({ ...ticketJson(t), status: t.status, result: t.result })) };
     if (kind === "spawns") return spawns();
     if (kind === "watching") return watching();
@@ -146,6 +151,8 @@ export function createKingMock(options: {
       if (t.status === "settled" || t.status === "cancelled") return t.result;
       if (t.status === "expired") fail("EXPIRED");
       const outcome = text(input.outcome, /^(win|lose|draw|quit)$/) as KingSettlement["outcome"];
+      if (outcome !== "quit" && (!validOpponent(t.input, t.snapshot.level)
+        || Math.abs(t.input.slot - Math.floor(Date.parse(t.startedAt) / 1800000)) > 1)) fail("INVALID_OPPONENT");
       const rounds = integer(input.rounds, outcome === "quit" ? 0 : 1, 60);
       if (now < Date.parse(t.startedAt) + rounds * 1000) fail("TOO_EARLY");
       const used = object(input.usedItems ?? {}), moves = object(input.moveCounts ?? {});
@@ -201,7 +208,8 @@ export function createKingMock(options: {
           store.wins[nickname] = (store.wins[nickname] ?? 0) + 1;
           if (features.items && features.drops && t.seed % 20 === 0) {
             drop = Object.keys(prices).sort()[Math.floor(t.seed / 20) % Object.keys(prices).length];
-            p.inventory[drop] = (p.inventory[drop] ?? 0) + 1;
+            if ((p.inventory[drop] ?? 0) + Object.values(store.tickets).filter(other => other.pet === t.pet && other.status === "active" && other.id !== t.id).reduce((n,other) => n + (other.reserved[drop!] ?? 0),0) < 9) p.inventory[drop] = (p.inventory[drop] ?? 0) + 1;
+            else drop = null;
           }
         }
       }
@@ -229,7 +237,7 @@ export function createKingMock(options: {
         store.history.push({ kind: "levelup", pet: t.pet, nickname, detail: String(p.level) });
       }
       store.history.push({ kind: "battle", pet: t.pet, nickname, detail: `${t.input.opponentName} - ${outcome}` });
-      t.result = { ticket: id, outcome, xp, coins, streak: p.streak, levelBefore, levelAfter: p.level, eligible, contribution, drop };
+      t.result = { ticket: id, outcome, xp, coins, streak: p.streak, levelBefore, levelAfter: p.level, eligible, contribution, drop, progress: petState(t.pet), wallet: { coins: store.coins, version: store.version } };
       t.status = outcome === "quit" ? "cancelled" : "settled";
       return t.result;
     }
@@ -277,8 +285,10 @@ export function createKingMock(options: {
       p.moves = clone(moves as string[]);
     } else if (kind === "buyItem") {
       enabled("items");
-      const quantity = integer(input.quantity, 1), item = String(input.item), price = prices[item];
+      const quantity = integer(input.quantity, 1, 9), item = String(input.item), price = prices[item];
       if (!price) fail("INVALID_ITEM");
+      const reserved = Object.values(store.tickets).filter(t => t.pet === pet && t.status === "active").reduce((n,t) => n + (t.reserved[item] ?? 0),0);
+      if ((p.inventory[item] ?? 0) + reserved + quantity > 9) fail("INVENTORY_CAP");
       if (store.coins < price * quantity) fail("INSUFFICIENT_COINS");
       store.coins -= price * quantity; store.version++;
       p.inventory[item] = (p.inventory[item] ?? 0) + quantity;
@@ -290,7 +300,8 @@ export function createKingMock(options: {
       const opponentRank = input.opponentRank as KingRank, opponentLevel = integer(input.opponentLevel, 1, 999);
       const band = integer(input.slot, 0, Number.MAX_SAFE_INTEGER), mode = input.mode ?? "normal";
       if (!ranks.includes(opponentRank) || !["normal", "raid"].includes(String(mode))) fail("INVALID_INPUT");
-      if (band !== slot()) fail("SPAWN_EXPIRED");
+      if (!validOpponent({ individualId, opponentRank, opponentLevel } as KingStart, before.level)) fail("INVALID_OPPONENT");
+      if (Math.abs(band - slot()) > 1) fail("SPAWN_EXPIRED");
       if (mode === "raid") { enabled("raids"); if (opponentRank !== "boss") fail("INVALID_INPUT"); }
       const matches = (entry: { slot: number; cell: string; individualId: string }) => entry.slot === band && entry.cell === cell && entry.individualId === individualId;
       if (mode === "normal" && store.departed.some(matches)) fail("SPAWN_DEPARTED");
@@ -323,7 +334,7 @@ export function createKingMock(options: {
     }
     p.version++;
     const after = petState(pet); store.changes.push({ kind, before, after });
-    return after;
+    return kind === "buyItem" ? { ...after, wallet: { coins: store.coins, version: store.version } } : after;
   }
   const rpc: KingRpc = async (name, args) => {
     if (name !== "domine_pet_king_v17") return { data: null, error: { code: "PGRST202", message: "Missing function" } };
@@ -332,6 +343,7 @@ export function createKingMock(options: {
     if (!uuidPattern.test(args.p_request_id) || !/^[가-힣a-zA-Z0-9]{1,8}$/.test(nickname) || !/^[a-f0-9]{64}$/.test(args.p_secret))
       return { data: reply("INVALID_INPUT"), error: null };
     if (identities.get(nickname) !== args.p_secret) return { data: reply("AUTH_FAILED"), error: null };
+    if (["state", "spawns", "watching"].includes(args.p_kind)) return { data: clone(reply("OK", dispatch(args.p_kind, {}, nickname))), error: null };
     const key = `${nickname}:${args.p_request_id}`, payload = canonical(args.p_input), prior = operations.get(key);
     if (prior) return { data: clone(prior.kind === args.p_kind && prior.payload === payload ? prior.result : reply("REQUEST_CONFLICT")), error: null };
     expire();
@@ -341,6 +353,6 @@ export function createKingMock(options: {
     operations.set(key, { kind: args.p_kind, payload, result: clone(result) });
     return { data: clone(result), error: null };
   };
-  return { rpc, slot, advance: (ms: number) => { now += ms; }, inspect: () => clone(store),
+  return { rpc, slot, operationCount: () => operations.size, advance: (ms: number) => { now += ms; }, inspect: () => clone(store),
     register: (identity: { nickname: string; secret: string }) => { identities.set(identity.nickname.normalize("NFC"), identity.secret); } };
 }

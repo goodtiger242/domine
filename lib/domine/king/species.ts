@@ -1,4 +1,4 @@
-import { BREEDS as ENGINE_BREEDS } from "../battle/data";
+import { BREEDS as ENGINE_BREEDS, BREED_BY_ID as ENGINE_BY_ID } from "../battle/data";
 import { profileFor } from "../battle/profiles";
 import type { BattleProfile, Species, Breed, Group, Stats } from "../battle/types";
 import type { RivalSpecies } from "../pet-rival-lines";
@@ -23,9 +23,9 @@ export const SPECIES: readonly SpeciesDefinition[] = [
   { id: "sparrow", name: "참새", active: true, art: "/pet/breed/V15.webp", category: "animal" },
   { id: "bulbul", name: "직박구리", active: true, art: "/pet/breed/V17.webp", category: "animal" },
   { id: "duck", name: "오리", active: true, art: "/pet/breed/V19.webp", category: "animal" },
-  { id: "goblin", name: "고블린", active: false, art: null, category: "guest" },
-  { id: "orc", name: "오크", active: false, art: null, category: "guest" },
-  { id: "slime", name: "슬라임", active: false, art: null, category: "guest" },
+  { id: "goblin", name: "고블린", active: true, art: "/pet/breed/G01.webp", category: "guest" },
+  { id: "orc", name: "오크", active: true, art: "/pet/breed/G03.webp", category: "guest" },
+  { id: "slime", name: "슬라임", active: true, art: "/pet/breed/G05.webp", category: "guest" },
  ];
 export const GROUPS: readonly Group[] = ["rush", "trick", "track", "guard", "bond", "endure"];
 export const GROUP_LABEL: Record<Group, string> = { rush: "돌진", trick: "기교", track: "추적", guard: "수호", bond: "교감", endure: "지구" };
@@ -36,6 +36,7 @@ export interface BreedDefinition extends Omit<Breed, "group"> {
   variants: readonly { art: string; look: string }[];
 }
 type BreedRow = [string, string, SpeciesKey, Breed["size"], Breed["temperament"], number[], string, Breed["trait"], Habitat[]];
+const guestHabitats: Habitat[] = ["forest", "river", "shops", "housing", "park", "school", "road", "station", "industry", "church"];
 const rows: BreedRow[] = [
   ["B001", "골든 리트리버", "dog", "large", "kind", [121, 16, 21, 18, 18, 17], "G5", "restDamage", ["housing", "school", "church", "park", "river"]],
   ["B002", "말티즈", "dog", "small", "lively", [140, 19, 24, 23, 20, 19], "G2", "earlySpeed", ["housing", "school", "church", "shops", "station", "road", "industry"]],
@@ -101,8 +102,15 @@ const rows: BreedRow[] = [
   ["V18", "직박구리 밝은 가슴형", "bulbul", "small", "lively", [136, 16, 20, 25, 27, 21], "G5", "longBuff", ["forest", "park"]],
   ["V19", "흰뺨검둥오리 짙은 날개형", "duck", "medium", "steady", [156, 18, 24, 17, 22, 25], "G6", "restDamage", ["river"]],
   ["V20", "흰뺨검둥오리 밝은 옆구리형", "duck", "medium", "careful", [160, 18, 26, 16, 22, 24], "G3", "firstShield", ["river"]],
+  ["G01", "고블린", "goblin", "small", "kind", [148, 20, 19, 24, 20, 30], "G2", "earlySpeed", guestHabitats],
+  ["G03", "오크", "orc", "large", "kind", [168, 16, 20, 13, 17, 22], "G6", "firstShield", guestHabitats],
+  ["G05", "슬라임", "slime", "medium", "kind", [158, 18, 20, 14, 19, 31], "G3", "statusImmune", guestHabitats],
 ];
-const allVariants = [...variants, ...variantsD1, ...variantsD2, ...variantsC];
+const allVariants = [...variants, ...variantsD1, ...variantsD2, ...variantsC,
+  { breed: "G01", file: "G01", look: "갈색 조끼와 작은 주머니" }, { breed: "G01", file: "G02", look: "노란 모자와 청록 목도리" },
+  { breed: "G03", file: "G03", look: "붉은 옷과 나무 방패" }, { breed: "G03", file: "G04", look: "파란 조끼와 둥근 배" },
+  { breed: "G05", file: "G05", look: "민트빛 말랑 몸" }, { breed: "G05", file: "G06", look: "살구빛 말랑 몸" },
+];
 const statKeys = ["hp", "attack", "defense", "speed", "focus", "calm"] as const;
 // Existing twelve breeds stay intact; new rows use their size's mean total budget.
 export const SIZE_BUDGET = Object.fromEntries(["small", "medium", "large"].map(size => {
@@ -110,7 +118,7 @@ export const SIZE_BUDGET = Object.fromEntries(["small", "medium", "large"].map(s
   return [size, Math.round(peers.reduce((sum, b) => sum + Object.values(b.base).reduce((a, v) => a + v, 0), 0) / peers.length)];
 })) as Record<Breed["size"], number>;
 export const BREEDS: readonly BreedDefinition[] = rows.map(([id, name, species, size, temperament, values, growth, trait, habitat]) => {
-  const existing = ENGINE_BREEDS.find(b => b.id === id);
+  const existing = ENGINE_BY_ID[id];
   const total = values.reduce((sum, value) => sum + value, 0);
   const base = existing?.base ?? Object.fromEntries(statKeys.map((key, i) => [key, Math.round(values[i] * SIZE_BUDGET[size] / total)])) as Stats;
   return { id, name, species, size, temperament, base, battleProfile: profileFor(species === "waterdeer" ? "deer" : species as Species,id), growth: existing?.growth ?? growth, trait, habitat,

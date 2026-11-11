@@ -94,6 +94,12 @@ export const CONSUMABLES: readonly Item[] = [
   { id: "P13", name: "장난감 공", slot: "bag", category: "cancel", price: 35 },
   { id: "P14", name: "끈기 리본", slot: "bag", category: "survive", price: 60 },
 ];
-export const BREED_BY_ID: Readonly<Record<string, Breed>> = Object.fromEntries(BREEDS.map(b => [b.id, b]));
+// Keep the original dog roster/order for saved opponents and size budgets.
+export const GUEST_BREEDS: readonly Breed[] = [
+  { id: "G01", name: "고블린", group: "trick", temperament: "kind", size: "small", base: stats(148,20,19,24,20,30), growth: "G2", trait: "earlySpeed", learn: learn(13,43) },
+  { id: "G03", name: "오크", group: "guard", temperament: "kind", size: "large", base: stats(168,16,20,13,17,22), growth: "G6", trait: "firstShield", learn: learn(37,43) },
+  { id: "G05", name: "슬라임", group: "endure", temperament: "kind", size: "medium", base: stats(158,18,20,14,19,31), growth: "G3", trait: "statusImmune", learn: learn(61,43) },
+];
+export const BREED_BY_ID: Readonly<Record<string, Breed>> = Object.fromEntries([...BREEDS, ...GUEST_BREEDS].map(b => [b.id, b]));
 export const MOVE_BY_ID: Readonly<Record<string, Move>> = Object.fromEntries([...MOVES,...FINISHERS].map(m => [m.id, m]));
 export const ITEM_BY_ID: Readonly<Record<string, Item>> = Object.fromEntries([...ITEMS,...CONSUMABLES].map(i => [i.id, i]));

@@ -1,5 +1,6 @@
 import { BREED_BY_ID, ITEM_BY_ID } from "./data";
 import { availableActions, moveFor, previewDamage, recoveryLeft } from "./rules";
+import { supportScale } from "./support";
 import { random } from "./rng";
 import type { Action, AiTier, Actor, BattleState } from "./types";
 
@@ -21,7 +22,13 @@ function expected(action: Action, actor: Actor, target: Actor, round: number): n
 export function chooseAction(state: BattleState, aiTier: AiTier = state.aiTier ?? state.opponent.aiTier ?? (state.difficulty === "hard" ? "veteran" : "normal"), announcedResponse?: Action): { action: Action; rng: number; hint?: BattleState["opponentHint"] } {
   if (!Object.hasOwn(AI_TIERS,aiTier)) throw new Error("AI 등급을 확인해 주세요.");
   const actor = state.opponent, target = state.player, config = AI_TIERS[aiTier];
-  const actions = availableActions(state,"opponent").filter(a => a.kind !== "item" || actor.owned === true);
+  const estimates = new Map<string,number>();
+  const estimate = (action: Action, from: Actor, to: Actor) => {
+    const key = `${from === actor ? "o" : "p"}:${action.kind === "move" ? action.moveId : action.kind}`;
+    if (!estimates.has(key)) estimates.set(key,expected(action,from,to,state.round));
+    return estimates.get(key)!;
+  };
+  const actions = availableActions(state,"opponent").filter(a => a.kind !== "item" || actor.owned === true && (aiTier === "boss" || aiTier === "king"));
   if (!actions.length) return { action: { kind: "rest" }, rng: state.rng };
   if (actor.charging) return { action: actions[0], rng: state.rng };
   const history = target.history ?? (target.lastAction ? [target.lastAction] : []);
@@ -29,21 +36,21 @@ export function chooseAction(state: BattleState, aiTier: AiTier = state.aiTier ?
   const contacts = history.filter(a => moveFor(a)?.contact && moveFor(a)?.kind === "attack").length / Math.max(1,history.length);
   const temperament = BREED_BY_ID[actor.breedId].temperament;
   const targetActions = availableActions(state,"player").filter(a => a.kind !== "quit");
-  const targetBest = config.read >= .7 ? targetActions.filter(a => moveFor(a)?.kind === "attack").sort((a,b) => expected(b,target,actor,state.round)-expected(a,target,actor,state.round))[0] : undefined;
+  const targetBest = config.read >= .7 ? targetActions.filter(a => moveFor(a)?.kind === "attack").sort((a,b) => estimate(b,target,actor)-estimate(a,target,actor))[0] : undefined;
   // Predict from public history/response only, never an unsubmitted action or hidden affinity.
   const lookAhead = config.read >= .7 && random(state.rng ^ 0x9e3779b9).value < (aiTier === "veteran" ? .5 : 1);
   const prediction = lookAhead ? announcedResponse ?? (target.charging ? targetActions[0] : target.energy < 2 ? { kind: "rest" } as Action : guards >= .5 ? target.lastAction : targetBest) : target.lastAction;
   const incoming = prediction && moveFor(prediction);
-  const threat = prediction ? expected(prediction,target,actor,state.round) / actor.stats.hp * 100 : 0;
+  const threat = prediction ? estimate(prediction,target,actor) / actor.stats.hp * 100 : 0;
   const attacks = actions.filter(a => moveFor(a)?.kind === "attack");
-  const bestDamage = Math.max(0,...attacks.map(a => expected(a,actor,target,state.round)));
+  const bestDamage = Math.max(0,...attacks.map(a => estimate(a,actor,target)));
   const urgent = actor.hp / actor.stats.hp < .35;
   const ranked = actions.map(action => {
     const move = moveFor(action), item = action.kind === "item" ? ITEM_BY_ID[action.itemId] : undefined;
     let score = -20;
     if (action.kind === "rest") score = actor.energy <= 2 ? (aiTier === "gentle" ? 6 : 23) : actor.energy <= 4 && threat === 0 ? 17 : -10;
     if (move?.kind === "attack") {
-      const damage = expected(action,actor,target,state.round);
+      const damage = estimate(action,actor,target);
       score = damage / target.stats.hp * 100;
       if (move.mode !== "charge" && damage >= target.hp) score += 70;
       if (move.energy >= 5 && actor.energy - move.energy < 2 && target.hp > damage * 2) score -= temperament === "lively" ? 0 : 4;
@@ -76,6 +83,19 @@ export function chooseAction(state: BattleState, aiTier: AiTier = state.aiTier ?
     if (item?.category === "critical") score = threat === 0 && actor.energy >= 3 ? 16 : -5;
     if (item?.buff) score = state.round <= 4 && !actor.buffs.some(b => b.stat === item.buff) ? 14 : -5;
     if (item?.category === "cancel") score = !target.boss && threat > 20 ? 28 : -5;
+    if (move?.support) {
+      const s = move.support;
+      if (s.restore) score = actor.energy <= 4 ? 24 + s.restore : -15;
+      if (s.role === "buff") score = !actor.buffs.some(b => b.stat === move.buff && (b.rate ?? .15) > 0) && state.round <= 5 && actor.energy >= 5 ? 18 + config.read * 20 : -15;
+      if (s.debuff) score = target.buffs.some(b => (b.rate ?? .15) > 0) && !target.buffs.some(b => (b.rate ?? 0) < 0) ? 24 + config.read * 16 : -5;
+      if (s.cleanse && urgent) score = Math.max(score,26 + config.read * 12);
+      if (s.cleanse && actor.statuses.length + actor.buffs.filter(b => (b.rate ?? 0) < 0).length > 0) score += 18 + config.read * 12;
+      if (s.role === "prepare") score = !actor.prepared && actor.energy >= 6 && state.round < 10 ? 18 + config.read * 20 : -15;
+      if (s.read) score = !actor.prepared && history.length >= 2 && (contacts >= .5 || guards >= .5) ? 8 + config.read * 15 : -15;
+      if (s.momentum) score = (actor.momentum ?? 0) >= 50 && (actor.momentumCharged ?? 0) < 60 && actor.energy >= 6 ? 12 + config.read * 12 : -20;
+      score *= supportScale(actor,move.id);
+      if (actor.supportChain && actor.supportChain.count >= 2) score -= 18;
+    }
     if (bestDamage >= target.hp && move?.kind !== "attack") score -= 50;
     if (aiTier === "king" && actor.hp < actor.stats.hp * .5 && move?.kind === "attack") score += 4;
     const id = action.kind === "move" ? action.moveId : action.kind === "item" ? action.itemId : action.kind;

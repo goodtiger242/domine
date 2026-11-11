@@ -1,15 +1,17 @@
+import { redesignSupport } from "./support";
 import { powerBudget } from "./move-budget";
 import type { Group, JobId, Move, MoveTag, Species } from "./types";
 
 export const ELEMENTS: readonly Group[] = ["rush", "trick", "track", "guard", "bond", "endure"];
 export const MOVE_TAGS: readonly MoveTag[] = ["contact", "sound", "scent", "trick", "multi", "charge", "gaze"];
-export const SPECIES: readonly Species[] = ["dog", "cat", "pigeon", "magpie", "sparrow", "bulbul", "duck", "deer", "boar", "raccoon", "squirrel", "chipmunk"];
+const ANIMAL_SPECIES = ["dog", "cat", "pigeon", "magpie", "sparrow", "bulbul", "duck", "deer", "boar", "raccoon", "squirrel", "chipmunk"] as const;
+export const SPECIES: readonly Species[] = [...ANIMAL_SPECIES, "goblin", "orc", "slime"];
 
 export function describeMove(move: Move): Move {
   const tag: MoveTag = move.contact ? "contact" : move.group === "track" ? "scent" : move.group === "bond" ? "sound" : "trick";
-  return { tags: move.mode === "multi" || move.mode === "charge" ? [tag, move.mode] : [tag],
+  return redesignSupport({ tags: move.mode === "multi" || move.mode === "charge" ? [tag, move.mode] : [tag],
     fx: move.mode === "charge" ? "charge" : move.mode === "multi" ? "flurry" : move.defense ?? tag,
-    source: move.common && move.group === "neutral" ? "common" : "element", learn: { level: 1 }, ...move };
+    source: move.common && move.group === "neutral" ? "common" : "element", learn: { level: 1 }, ...move });
 }
 let nextId = 1;
 function make(name: string, group: Move["group"], energy: number, source: NonNullable<Move["source"]>, level: number, extra: Partial<Move> = {}): Move {
@@ -54,7 +56,7 @@ const elemental = ELEMENTS.flatMap(group => elementNames[group].map((name,i) => 
   return make(name,group,elementCosts[i],"element",elementLevels[i],extra);
 }));
 
-const speciesNames: Record<Species, [string,string,string]> = {
+const speciesNames: Record<typeof ANIMAL_SPECIES[number], [string,string,string]> = {
   dog: ["코로 장난감찾기", "앞발 장난치기", "달려 물고당기기"],
   cat: ["수염 간질이기", "높은곳 점프급습", "꼬리잡기 놀이"],
   pigeon: ["고개 까딱이기", "날아올라 급강하", "날개로 자리내기"],
@@ -68,7 +70,7 @@ const speciesNames: Record<Species, [string,string,string]> = {
   squirrel: ["큰꼬리 시선끌기", "나무타고 돌아오기", "가지넘어 뛰기"],
   chipmunk: ["볼주머니 흔들기", "도토리 숨기기", "바위틈 뛰기"],
 };
-const speciesMoves = SPECIES.flatMap((species, s) => speciesNames[species].map((name,i) => {
+const speciesMoves = ANIMAL_SPECIES.flatMap((species, s) => speciesNames[species].map((name,i) => {
   const bird = ["pigeon","magpie","sparrow","bulbul","duck"].includes(species);
   const group: Group = species === "boar" || species === "dog" ? "rush" : bird ? "bond" : "trick";
   const energy = i === 0 ? 1 : i === 1 ? 3 : s % 2 ? 5 : 4;
@@ -119,4 +121,29 @@ const jobMoves = jobRows.map(([name,group,cost,extra],i) => make(name,group,cost
   learn: { level: [10,15,30,40,60,80][i % 6], job: (["rush","guard","trick","track","bond"] as JobId[])[Math.floor(i / 6)],
     tier: (Math.floor(i % 6 / 2) + 1) as 1 | 2 | 3,
     ...(i % 6 >= 2 ? { prerequisite: `M${String(jobStart + i - 2).padStart(3,"0")}` } : {}) } }));
-export const EXPANDED_MOVES: readonly Move[] = [...common, ...elemental, ...speciesMoves, ...signatures, ...jobMoves];
+const supportNames = ["주머니 숨모으기", "발판 다지기", "딴청 피우기", "털 털고쉬기", "도약 꿈꾸기", "버릇 살피기", "응원 모으기"];
+const supportRoles = ["energy", "buff", "disrupt", "recover", "prepare", "read", "momentum"] as const;
+const supportLevels = [1, 5, 10, 15, 20, 25, 30];
+const supportCosts = [0, 2, 2, 2, 2, 1, 5];
+const supportStats = ["attack", "speed", "focus", "defense", "calm", "attack"] as const;
+const supportMoves = supportRoles.flatMap((role, i) => [
+  make(supportNames[i], "neutral", supportCosts[i], "common", supportLevels[i], { kind: "support", support: { role }, fx: role, tags: [role === "read" ? "gaze" : "trick"] }),
+  ...ELEMENTS.map((group, j) => make(`${["씽씽", "살랑", "킁킁", "단단", "도란", "느긋"][j]}${["숨모으기", "발다지기", "딴청놀이", "털고쉬기", "뜀준비", "눈치놀이", "응원놀이"][i]}`, group, supportCosts[i], "element", supportLevels[i] + 5,
+    { kind: "support", support: { role }, ...(role === "buff" ? { buff: supportStats[j] } : {}), fx: role, tags: [group === "bond" ? "sound" : group === "track" ? "scent" : "trick"] })),
+]);
+const speciesSupport = ANIMAL_SPECIES.map((species, i) => {
+  const role = supportRoles[i % 7];
+  return make(`${["꼬리", "수염", "깃털", "깍깍", "짹짹", "열매", "물결", "쫑긋", "흙발", "능청", "솔방울", "도토리"][i]}${["숨모으기", "발다지기", "딴청놀이", "털고쉬기", "뜀준비", "눈치놀이", "응원놀이"][i % 7]}`, "neutral", supportCosts[i % 7], "species", 10 + i * 3,
+    { kind: "support", support: { role }, learn: { species, level: 10 + i * 3 }, fx: role, tags: ["trick"] });
+});
+// Append only: persisted M001–M263 IDs must never shift when a species joins.
+const guestMoves = ([
+  ["goblin", "trick", ["주머니 뒤지기", "동전 딸랑이기", "주머니 공 던지기"], [1,3,5]],
+  ["orc", "guard", ["방패 두드리기", "어깨로 공 굴리기", "쿠션 크게 밀기"], [2,3,5]],
+  ["slime", "endure", ["몰랑 튕기기", "젤리 통통뛰기", "말랑 파도타기"], [1,3,5]],
+] as const).flatMap(([species, group, names, costs]) => names.map((name, i) => make(name, group, costs[i], "species", [1,10,30][i], {
+  learn: { species, level: [1,10,30][i] }, contact: i === 1,
+  tags: [i === 1 ? "contact" : species === "orc" ? "sound" : "trick"],
+  fx: species === "goblin" ? "feint" : species === "orc" ? "toy-contest" : "pounce",
+})));
+export const EXPANDED_MOVES: readonly Move[] = [...common, ...elemental, ...speciesMoves, ...signatures, ...jobMoves, ...supportMoves, ...speciesSupport, ...guestMoves];

@@ -26,24 +26,30 @@ export function pickSpawns(cellId: string, slot: number, careLevel: number): Spa
   const spawns: Spawn[] = [];
   if (roll("presence") < .3) {
     const countRoll = roll("count"), count = countRoll < .65 ? 1 : countRoll < .9 ? 2 : 3;
-    const used = new Set<string>();
+    const used = new Set<string>(), usedGuests = new Set<string>();
     for (let i = 0; i < count; i++) {
-      const guestPool = guests.filter(g => !used.has(g.id));
-      let candidates = roll(`guest:${i}`) < GUEST_RATE && guestPool.length ? guestPool : pools[habitat].filter(p => !used.has(p.id));
+      const guestPool = guests.filter(g => !usedGuests.has(g.id));
+      let candidates = pools[habitat].filter(p => !used.has(p.id));
       if (!candidates.length) throw new Error(`Empty spawn pool: ${habitat}`);
-      if (candidates !== guestPool) {
+      {
         const species = [...new Set(candidates.map(c => c.species))];
         const total = species.reduce((sum, s) => sum + (HABITAT_WEIGHTS[habitat][s] ?? 0), 0);
         let point = roll(`species:${i}`) * total;
         const selected = species.find(s => (point -= HABITAT_WEIGHTS[habitat][s] ?? 0) < 0) ?? species[species.length - 1];
         candidates = candidates.filter(c => c.species === selected);
       }
-      const individual = candidates[Math.floor(roll(`individual:${i}`) * candidates.length)];
+      let individual = candidates[Math.floor(roll(`individual:${i}`) * candidates.length)];
       used.add(individual.id);
+      // Reserve the original animal even when replaced, so later animal slots keep their seeds.
+      const guest = roll(`guest:${i}`) < GUEST_RATE + (habitat === "forest" ? .01 : 0) && guestPool.length > 0;
+      if (guest) {
+        individual = guestPool[Math.floor(roll(`individual:${i}`) * guestPool.length)];
+        usedGuests.add(individual.id);
+      }
       // Residents scale with our dog: farther regions add +0..+3, each animal −3..+3, never more than 5 above us.
       const tier = Math.floor((levelRange(cellId)[0] - 1) / 18);
       const level = Math.max(1, Math.min(999, playerLevel + 5, playerLevel + tier + individual.levelOffset));
-      spawns.push({ individual: { ...individual, intelligence: intelligenceFor(individual.temperament, level) }, kind: "resident", cellId, slot, level });
+      spawns.push({ individual: { ...individual, intelligence: intelligenceFor(individual.temperament, guest ? Math.min(level, 15) : level) }, kind: "resident", cellId, slot, level });
     }
   }
   // Named encounters are additional fixed residents, outside the 0/1/2/3 random quota.

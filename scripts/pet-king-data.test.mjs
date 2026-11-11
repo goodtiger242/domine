@@ -30,7 +30,7 @@ test("종 성향 점수 0±1·품종 한 가지 ±1점·체급 연결·기운 �
   const score = p => p.critBonus / 2 + (p.critMultiplier - 1.5) / .08 + (p.momentumRate - 1) / .1
     + p.evade / 2 + (p.restEnergy - 5) * 2 + (1 - p.statusTaken) / .15 + (p.statusDealt - 1) / .15
     + Object.values(p.statTilt).reduce((sum,value) => sum + value / .06,0);
-  assert.equal(Object.keys(BATTLE_PROFILES).length,14);
+  assert.equal(Object.keys(BATTLE_PROFILES).length,17);
   for (const [id,p] of Object.entries(BATTLE_PROFILES)) {
     assert.ok(Math.abs(score(p)) <= 1 + 1e-9,`${id}: ${score(p)}`);
     assert.ok(p.critBonus >= -2 && p.critBonus <= 4 && p.critMultiplier >= 1.4 && p.critMultiplier <= 1.65);
@@ -55,15 +55,15 @@ test("종 성향 점수 0±1·품종 한 가지 ±1점·체급 연결·기운 �
   assert.equal(profileFor("cat").statTilt.hp,-.06);
 });
 
-test("12종·64형과 비활성 손님 3종: 기존 품종 보존, 신규 체급 예산, 모든 그림·변형 존재", () => {
-  assert.equal(SPECIES.filter(s => s.active).length, 12);
-  assert.equal(BREEDS.length, 64);
+test("15종·67형과 활성 손님 3종: 기존 품종 보존, 신규 체급 예산, 모든 그림·변형 존재", () => {
+  assert.equal(SPECIES.filter(s => s.active).length, 15);
+  assert.equal(BREEDS.length, 67);
   assert.equal(BREEDS.filter(b => b.species === "dog").length, 32);
   assert.equal(BREEDS.filter(b => b.species === "cat").length, 12);
-  assert.equal(new Set(BREEDS.map(b => b.id)).size, 64);
+  assert.equal(new Set(BREEDS.map(b => b.id)).size, 67);
   for (const guest of SPECIES.filter(s => s.category === "guest")) {
-    assert.equal(guest.active, false); assert.equal(guest.art, null);
-    assert.ok(!INDIVIDUALS.some(i => i.species === guest.id));
+    assert.equal(guest.active, true); assert.ok(guest.art);
+    assert.equal(INDIVIDUALS.filter(i => i.species === guest.id).length, 8);
   }
   assert.equal(SPECIES.filter(s => s.category === "guest").length, 3);
   for (const breed of BREEDS) {
@@ -75,7 +75,7 @@ test("12종·64형과 비활성 손님 3종: 기존 품종 보존, 신규 체급
       assert.ok(existsSync(resolve("public", variant.art.slice(1))), variant.art);
       assert.ok(variant.look.length > 0);
     }
-    assert.equal(breed.variants.length, ["dog", "cat"].includes(breed.species) ? 3 : 0);
+    assert.equal(breed.variants.length, ["dog", "cat"].includes(breed.species) ? 3 : breed.id.startsWith("G") ? 2 : 0);
     const old = engine.BREEDS.find(b => b.id === breed.id);
     if (old) {
       for (const key of ["id", "name", "size", "temperament", "base", "growth", "trait", "learn"]) assert.deepEqual(breed[key], old[key], `${breed.id}:${key}`);
@@ -87,10 +87,10 @@ test("12종·64형과 비활성 손님 3종: 기존 품종 보존, 신규 체급
   }
 });
 
-test("512개 시드·ID·종별 이름 유일, 기운·태그·외형·주인·컨디션 유효", () => {
-  assert.equal(INDIVIDUALS.length, 512);
-  assert.equal(new Set(INDIVIDUALS.map(i => i.id)).size, 512);
-  assert.deepEqual(INDIVIDUALS.map(i => i.seed), Array.from({ length: 512 }, (_, i) => i));
+test("기존 512개 + 손님 24개 시드·ID·종별 이름 유일, 기운·태그·외형·주인·컨디션 유효", () => {
+  assert.equal(INDIVIDUALS.length, 536);
+  assert.equal(new Set(INDIVIDUALS.map(i => i.id)).size, 536);
+  assert.deepEqual(INDIVIDUALS.map(i => i.seed), Array.from({ length: 536 }, (_, i) => i));
   assert.ok(SINGLE_NAMES.length >= 200);
   assert.equal(new Set(Object.values(OWNER_TITLES).flat()).size, 60);
   const names = new Set();
@@ -115,7 +115,7 @@ test("512개 시드·ID·종별 이름 유일, 기운·태그·외형·주인·�
     assert.equal(Object.entries(statShift).reduce((sum, [s, v]) => sum + (s === "hp" ? v / 4 : v), 0), 0);
     for (const value of Object.values(individual.condition)) assert.ok(value >= 0 && value <= 100);
     if (owner) assert.ok(OWNER_TITLES[individual.habitat].includes(owner.title));
-    else assert.equal(individual.ownerLabel, "길에서 지냄");
+    else assert.equal(individual.ownerLabel, breed.id.startsWith("G") ? "길 잃은 이세계 손님" : "길에서 지냄");
     if (!["cat", "dog"].includes(species)) assert.equal(owner, null);
   }
   for (const breed of BREEDS) {
@@ -155,6 +155,7 @@ test("100칸·10구역 누락·중복 0, 설계서 구역 경계·레벨·실제
 
 test("1000구간×98칸 출몰 분포와 입력 재현·서식 가중치·개체 중복·레벨 범위", () => {
   const counts = [0, 0, 0, 0], speciesCounts = {}, habitatTotals = {};
+  let guests = 0, residents = 0;
   for (let slot = 0; slot < 1000; slot++) for (const cell of PET_WORLD) {
     const spawns = pickSpawns(cell.id, slot, 1);
     if (SAFE_CELLS.includes(cell.id)) { assert.deepEqual(spawns, []); continue; }
@@ -171,6 +172,8 @@ test("1000구간×98칸 출몰 분포와 입력 재현·서식 가중치·개체
       assert.equal(spawn.kind, "resident");
       assert.ok(spawn.level >= 1 && spawn.level <= Math.min(6, 1 + tier + 3), "level near ours (Lv.1 here)");
       assert.ok(BREED_BY_ID[spawn.individual.breedId].habitat.includes(habitat));
+      residents++;
+      if (spawn.individual.breedId.startsWith("G")) { guests++; continue; }
       assert.ok(HABITAT_WEIGHTS[habitat][spawn.individual.species] > 0);
       const key = `${habitat}:${spawn.individual.species}`;
       speciesCounts[key] = (speciesCounts[key] ?? 0) + 1;
@@ -184,14 +187,16 @@ test("1000구간×98칸 출몰 분포와 입력 재현·서식 가중치·개체
     for (const [species, weight] of Object.entries(weights)) assert.ok(Math.abs((speciesCounts[`${habitat}:${species}`] ?? 0) / habitatTotals[habitat] - weight / sum) < .06, `${habitat}:${species}`);
   }
   assert.ok(GUEST_RATE >= .05 && GUEST_RATE <= .08);
+  assert.ok(guests / residents >= .05 && guests / residents <= .08);
+  console.log(`손님 출현 ${guests}/${residents} (${(guests / residents * 100).toFixed(3)}%)`);
   console.log("일반 출몰 비율(0/1/2/3):", counts.map(n => (n / total * 100).toFixed(2) + "%").join(" / "));
 });
 
 test("네임드 35마리: 10구역 대장·20칸 대장·4길목·1싸움왕, 고정 출현 조건과 전용 대사", () => {
   assert.equal(NAMED.length, 35);
   assert.deepEqual([...RESERVED_NAMES].sort(), NAMED.map(n => n.name).sort());
-  assert.equal(new Set([...INDIVIDUALS, ...NAMED].map(i => i.id)).size, 547);
-  assert.equal(new Set([...INDIVIDUALS, ...NAMED].map(i => `${i.species}:${i.name}`)).size, 547);
+  assert.equal(new Set([...INDIVIDUALS, ...NAMED].map(i => i.id)).size, 571);
+  assert.equal(new Set([...INDIVIDUALS, ...NAMED].map(i => `${i.species}:${i.name}`)).size, 571);
   for (const [rank, count] of Object.entries({ "region-boss": 10, "cell-chief": 20, gatekeeper: 4, king: 1 })) assert.equal(NAMED.filter(n => n.rank === rank).length, count);
   for (const region of REGIONS) {
     const boss = NAMED.filter(n => n.regionId === region.id && n.rank === "region-boss");
@@ -214,7 +219,7 @@ test("네임드 35마리: 10구역 대장·20칸 대장·4길목·1싸움왕, �
 
 test("잘못된 입력 거부, 비정상 돌봄 레벨 정규화", () => {
   for (const seed of [-1, .1, NaN, Infinity, 2 ** 32]) assert.throws(() => makeIndividual("dog", seed), RangeError);
-  for (const species of ["unknown", "goblin", "orc", "slime"]) assert.throws(() => makeIndividual(species, 0), RangeError);
+  for (const species of ["unknown", "__proto__"]) assert.throws(() => makeIndividual(species, 0), RangeError);
   for (const cell of ["", "A0", "K1", "A11", "__proto__"]) {
     assert.throws(() => regionOf(cell), RangeError); assert.throws(() => habitatOf(cell), RangeError);
     assert.throws(() => pickSpawns(cell, 0, 1), RangeError);

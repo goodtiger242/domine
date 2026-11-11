@@ -11,15 +11,16 @@ const { BATTLE_MOVE_FX, battleMoveFx, battleAssets, moveImage, fxSheets } = load
 const { MOVE_BY_ID } = loadTS("lib/domine/battle/data.ts");
 const { MAX_ROUNDS } = loadTS("lib/domine/battle/rules.ts");
 
-test("모든 기술 ID의 소문자 전용 그림 경로, 기존 26개 그림 유지", () => {
+test("전체 기술은 존재하는 그림만 요청하고 기존 26개 그림을 유지", () => {
   for (let i = 1; i <= 67; i++) {
     const id = `T${String(i).padStart(2, "0")}`;
-    assert.equal(moveImage(id), `/pet/battle/move/${id.toLowerCase()}.webp`);
+    assert.equal(moveImage(id), existsSync(`public/pet/battle/move/${id.toLowerCase()}.webp`) ? `/pet/battle/move/${id.toLowerCase()}.webp` : undefined);
   }
   for (const id of ["push", "rest", ...Object.keys(MOVE_BY_ID)]) {
     assert.equal(BATTLE_MOVE_FX[id].image, moveImage(id));
-    if (id.startsWith("T") || id === "push" || id === "rest") assert.ok(existsSync(`public${moveImage(id)}`));
+    if (moveImage(id)) assert.ok(existsSync(`public${moveImage(id)}`));
   }
+  for (const path of battleAssets(Object.keys(MOVE_BY_ID))) assert.ok(existsSync(`public${path}`), path);
 });
 
 test("장착 기술만 사전 로드, 모든 기술은 1~2개 시트와 자동 연출을 가진다", () => {

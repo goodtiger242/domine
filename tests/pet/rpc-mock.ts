@@ -3,7 +3,7 @@ import type { PetId } from "../../lib/domine/pet-photos";
 import { PetRpcError, supportsExploration } from "../../lib/domine/pet-rpc";
 import type { PetIdentity } from "../../lib/domine/pet-identity";
 import type { PetState } from "../../lib/domine/pet";
-import { ACTION_REWARDS, levelOf, rewardEligible, type Reward } from "../../lib/domine/pet-progress";
+import { type Reward } from "../../lib/domine/pet-progress";
 import { SHOP } from "../../lib/domine/pet-catalog";
 
 export function createPetMock(options: { missing?: boolean; v9?: boolean; busyLock?: boolean; delayMs?: number; error?: "constraint" | "network" } = {}) {
@@ -11,18 +11,18 @@ export function createPetMock(options: { missing?: boolean; v9?: boolean; busyLo
   let owner: PetIdentity | null = null, version = 0, coins = 100, now = Date.parse("2026-11-11T09:00:00Z");
   const owners = new Map<string, PetIdentity>();
   const busy: Partial<Record<PetId, { until: number; nickname: string; action: import("../../lib/domine/pet").PetAction }>> = {};
-  const xp: Record<PetId, number> = { 1: 32, 2: 32 }, inventory: Record<PetId, string[]> = { 1: [], 2: [] };
+  const xp: Record<PetId, number> = { 1: 0, 2: 0 }, inventory: Record<PetId, string[]> = { 1: [], 2: [] };
   const album: string[] = [], badges: string[] = [], history: PetHistoryEntry[] = [];
   const equipment: NonNullable<V6Result["equipment"]> = [], calls: string[] = [];
   const operations = new Map<string, { input: string; result: V6Result }>();
-  let last: number | null = null, daily=0, exploreStarts=0, exploreFinishes=0, lastStart: number | null = null;
+  let daily=0, exploreStarts=0, exploreFinishes=0, lastStart: number | null = null;
   let ticket: V6Result["ticket"] = null;
   let walk: { id: string; last: number; expires: number; closed: boolean } | null = null, walkClaims = 0;
   const log = (pet: PetId, kind: PetHistoryEntry["kind"], detail: string | null) => {
     history.push({ nickname: owner!.nickname, pet, kind, detail, at: new Date(now).toISOString() });
     while (history.length > 100 || (history.length && Date.parse(history[0].at) < now - 14 * 86400000)) history.shift();
   };
-  const snapshot = (pet: PetId = 1): V6Result => ({ ok:true,code:"OK",serverNow:new Date(now).toISOString(),version,pet,coins,levels:{1:levelOf(xp[1]),2:levelOf(xp[2])},player:{xp:xp[pet],level:levelOf(xp[pet]),coins},inventory:[...inventory[pet]],album:[...new Set([...album,...inventory[1],...inventory[2]])],badges:[...badges],equipment:equipment.map(e=>({...e})),daily:{reward_actions:daily,explore_finishes:exploreFinishes,walk_claims:walkClaims},ticket,season:"ordinary",shared:{applied:false,reason:"공동 수치는 충분해요",pet:{...shared}}, ...(options.busyLock ? { busy: busy[pet] && busy[pet]!.until > now ? { nickname: busy[pet]!.nickname, action: busy[pet]!.action, remainingMs: busy[pet]!.until - now } : null } : {}) });
+  const snapshot = (pet: PetId = 1): V6Result => ({ ok:true,code:"OK",serverNow:new Date(now).toISOString(),version,pet,coins,levels:{1:1,2:1},player:{xp:xp[pet],level:1,coins},inventory:[...inventory[pet]],album:[...new Set([...album,...inventory[1],...inventory[2]])],badges:[...badges],equipment:equipment.map(e=>({...e})),daily:{reward_actions:daily,explore_finishes:exploreFinishes,walk_claims:walkClaims},ticket,season:"ordinary",shared:{applied:false,reason:"공동 수치는 충분해요",pet:{...shared}}, ...(options.busyLock ? { busy: busy[pet] && busy[pet]!.until > now ? { nickname: busy[pet]!.nickname, action: busy[pet]!.action, remainingMs: busy[pet]!.until - now } : null } : {}) });
   const failure = (code: string): V6Result => ["AUTH_FAILED", "NICKNAME_TAKEN"].includes(code)
     ? {ok:false,code,serverNow:new Date(now).toISOString()} : {...snapshot(),ok:false,code};
   const authorized = (i: PetIdentity) => owners.get(i.nickname.toLowerCase())?.secret === i.secret;
@@ -57,11 +57,10 @@ export function createPetMock(options: { missing?: boolean; v9?: boolean; busyLo
         if (command.durationMs !== undefined && !Number.isInteger(command.durationMs)) return failure("INVALID_INPUT");
         busy[pet] = { until: now + Math.max(500, Math.min(20000, command.durationMs ?? 6000)), nickname: i.nickname, action: command.action };
       }
-      let code="OK", gain=0, money=0, levelCoins=0; const entries:string[]=[],freshBadges:string[]=[];
+      let code="OK"; const gain=0, money=0, levelCoins=0; const entries:string[]=[],freshBadges:string[]=[];
       let skipped: Reward["skipped"];
-      if(command.kind==="action" && !rewardEligible(now,last,daily)) skipped=daily>=120?"DAILY_CAP":"TOO_FAST";
-      if(command.kind==="action" && !skipped) {
-        [gain,money]=ACTION_REWARDS[command.action]; last=now;daily++;
+      if(command.kind==="action") {
+        daily++;
         if(!badges.includes("A01")){badges.push("A01");freshBadges.push("A01");}
       } else if(command.kind==="purchase") {
         const item=SHOP.find(item=>item.id===command.item);
@@ -82,7 +81,7 @@ export function createPetMock(options: { missing?: boolean; v9?: boolean; busyLo
         if(!ticket || ticket.id!==command.ticket || Date.parse(ticket.expires_at)<=now) code="EXPIRED";
         else if(now<Date.parse(ticket.eligible_at)) code="TOO_EARLY";
         else if(exploreFinishes>=30) { skipped="DAILY_CAP";ticket=null; }
-        else { exploreFinishes++;gain=4;money=2;const entry={church:"001",field:"013",street:"025",park:"037",home:"049",playground:"014",stream:"018",churchback:"001",alley:"025",market:"025",station:"027",mountain:"016",lake:"018",school:"027",foodstreet:"026",cafestreet:"026",bakery:"026",apartment:"052",bikepath:"018",overlook:"041",garden:"013",bridge:"018",pilgrimpath:"016",farm:"013"}[ticket.map_id]; if(album.includes(entry))money++;else{album.push(entry);entries.push(entry);}ticket=null; }
+        else { exploreFinishes++;const entry={church:"001",field:"013",street:"025",park:"037",home:"049",playground:"014",stream:"018",churchback:"001",alley:"025",market:"025",station:"027",mountain:"016",lake:"018",school:"027",foodstreet:"026",cafestreet:"026",bakery:"026",apartment:"052",bikepath:"018",overlook:"041",garden:"013",bridge:"018",pilgrimpath:"016",farm:"013"}[ticket.map_id]; if(!album.includes(entry)){album.push(entry);entries.push(entry);}ticket=null; }
       } else if(command.kind==="walk_begin") {
         walk={id:command.requestId,last:now,expires:now+1800000,closed:false};
       } else if(command.kind==="walk_claim" || command.kind==="walk_end") {
@@ -91,15 +90,12 @@ export function createPetMock(options: { missing?: boolean; v9?: boolean; busyLo
         else if(walk.closed || now>=walk.expires) code="EXPIRED";
         else if(now-walk.last<150000) code="TOO_EARLY";
         else if(walkClaims>=4) code="RATE_LIMITED";
-        else {gain=8;money=4;walk.last=now;walkClaims++;}
+        else {walk.last=now;walkClaims++;}
       }
       if(command.kind==="action") log(pet,"action",command.action);
-      const previous=levelOf(xp[pet]); gain=Math.min(9280-xp[pet],gain);xp[pet]+=gain;
-      for(let level=previous+1;level<=levelOf(xp[pet]);level++)levelCoins+=10+level*2;
-      if(levelOf(xp[pet])>previous) log(pet,"levelup",String(levelOf(xp[pet])));
       for(const entry of entries) log(pet,"discover",entry);
       coins+=money+levelCoins;version++;
-      const result={...snapshot(pet),ok:code==="OK",code,requestId:command.requestId,reward:{xp:gain,coins:money,levelCoins,newEntries:entries,newBadges:freshBadges,...(skipped?{skipped}:{}),...(skipped==="TOO_FAST"?{retryAfterSeconds:Math.ceil((last!+3000-now)/1000)}:{})}};
+      const result={...snapshot(pet),ok:code==="OK",code,requestId:command.requestId,reward:{xp:gain,coins:money,levelCoins,newEntries:entries,newBadges:freshBadges,...(skipped?{skipped}:{})}};
       operations.set(operationKey,{input:serialized,result});
       // Commit first, then delay delivery to exercise response-loss recovery.
       if(options.delayMs) await new Promise(r=>setTimeout(r,options.delayMs));

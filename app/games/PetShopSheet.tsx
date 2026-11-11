@@ -1,14 +1,19 @@
 ﻿"use client";
 import { useRef, useState } from "react";
+import { CONSUMABLES } from "@/lib/domine/battle/data";
+import { itemEffect, purchaseReason } from "@/lib/domine/pet-king-items";
+import type { KingState } from "@/lib/domine/pet-king-rpc";
 import { SHOP, type CatalogEntry } from "@/lib/domine/pet-catalog";
 import type { PetCommand, V6Result } from "@/lib/domine/pet-rpc";
 import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import PetSheet from "./PetSheet";
 import PetItemIcon from "./PetItemIcon";
 import { usePetProgressNumbers } from "./PetProgress";
-export default function PetShopSheet({ state, petId, disabled, notice, execute, onClose, bag = false, onSelectPet, onShop, multiPet = true }: {
+export default function PetShopSheet({ state, petId, disabled, notice, execute, onClose, bag = false, onSelectPet, onFindOpponent, multiPet = true, kingState = null, buyItem, pendingPurchase }: {
+  pendingPurchase?: { pet: PetId; item: string } | null;
+  kingState?: KingState | null; buyItem?: (pet: PetId, id: string) => Promise<string>;
   bag?: boolean; state: V6Result | null; petId: PetId; disabled: boolean; notice: string; execute: (c: PetCommand) => Promise<void>; onClose: () => void;
-  onSelectPet?: (id: PetId) => void; onShop?: () => void; multiPet?: boolean;
+  onSelectPet?: (id: PetId) => void; onShop?: () => void; onFindOpponent?: () => void; multiPet?: boolean;
 }) {
   const [selected, setSelected] = useState<CatalogEntry | null>(null);
   const [done, setDone] = useState("");
@@ -16,10 +21,19 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
   const [category, setCategory] = useState("전체"), [confirm, setConfirm] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const busy = useRef(false);
-  const dog = PETS[petId].name, coins = state?.coins ?? state?.player?.coins ?? 0;
+  const dog = PETS[petId].name, coins = kingState?.coins ?? state?.coins ?? state?.player?.coins ?? 0;
   const display = usePetProgressNumbers(0, coins);
   const owned = (item: CatalogEntry) => state?.inventory?.includes(item.id);
   const equipped = (item: CatalogEntry) => state?.equipment?.some((e) => e.pet_id === petId && e.item_id === item.id);
+  const inventory = kingState?.pets.find(p => p.pet === petId)?.inventory ?? {};
+  const hasBattleItems = CONSUMABLES.some(i => inventory[i.id] > 0);
+  const retrying = (id: string) => pendingPurchase?.pet === petId && pendingPurchase.item === id;
+  async function buy(id: string) {
+    if (!buyItem || busy.current || disabled || !retrying(id) && purchaseReason(kingState,petId,id)) return;
+    busy.current = true; setPending(id); setDone("");
+    try { setDone(await buyItem(petId,id)); } catch { setDone("구매 결과를 확인하지 못했어요"); }
+    finally { busy.current = false; setPending(null); }
+  }
   const blocked = disabled || pending !== null;
   function back() { if (confirm) { setConfirm(false); return true; } if (!selected) return false; setSelected(null); return true; }
   async function act(item: CatalogEntry, purchase = false) {
@@ -45,9 +59,9 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
   const feedback = <>{notice && <p className="pet-sheet-note" role="status">{notice}</p>}{status && <p className="pet-purchase-check" role={done || (applied && !!equipped(applied) !== asked.on) ? "alert" : "status"}>{status}</p>}</>;
   return <PetSheet title={bag ? `${dog}의 가방` : "상점"} onClose={onClose} onBack={back}
     toolbar={<>
-      {bag && onSelectPet && <div className="pet-chips" role="group" aria-label="가방 강아지 선택">{([1, 2] as const).filter(id => multiPet || id === 1).map(id => <button type="button" key={id} aria-pressed={petId === id} disabled={blocked} onClick={() => { if (id === petId) return; setAsked(null); setDone(""); onSelectPet(id); }}>{PETS[id].name}</button>)}</div>}
+      {onSelectPet && <div className="pet-chips" role="group" aria-label="가방 강아지 선택">{([1, 2] as const).filter(id => multiPet || id === 1).map(id => <button type="button" key={id} aria-pressed={petId === id} disabled={blocked} onClick={() => { if (id === petId) return; setAsked(null); setDone(""); onSelectPet(id); }}>{PETS[id].name}</button>)}</div>}
       <p className="pet-shop-coins" aria-label={`우리 코인(공용) ${coins}`}>🪙 {display.coins}</p>
-      {!bag && <div className="pet-chips" role="group" aria-label="상품 분류">{["전체", "옷", "장난감"].map(value => <button type="button" key={value} aria-pressed={category === value} onClick={() => setCategory(value)}>{value}</button>)}</div>}
+      {!bag && <div className="pet-chips" role="group" aria-label="상품 분류">{["전체", "옷", "장난감", "전투 물품"].map(value => <button type="button" key={value} aria-pressed={category === value} onClick={() => { setCategory(value); setSelected(null); setConfirm(false); setDone(""); }}>{value}</button>)}</div>}
     </>}
     panel={!bag && selected && <div className="pet-product-detail">
       <button type="button" onClick={() => { setSelected(null); setConfirm(false); }}>‹ 목록으로</button>
@@ -58,14 +72,24 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
     footer={!bag && selected ? <>
       <div className="pet-footer-actions">
         {confirm && !owned(selected) && <button type="button" disabled={blocked} onClick={() => setConfirm(false)}>취소</button>}
-        <button type="button" className="pet-primary" disabled={blocked} onClick={() => void act(selected, !owned(selected))}>
+        <button type="button" className="pet-primary" aria-busy={pending === selected.id} disabled={blocked || !owned(selected) && coins < (selected.price ?? 0)} onClick={() => void act(selected, !owned(selected))}>
           {pending === selected.id ? "처리 중…" : owned(selected) ? equipped(selected) ? "착용 해제" : "착용하기" : `${confirm ? "구매 확인" : "구매"} ${selected.price}`}
         </button>
       </div>
-    </> : bag && state?.inventory?.length === 0 && onShop ? <button type="button" className="pet-primary" onClick={onShop}>상점 가기</button> : undefined}>
+      {!owned(selected) && coins < (selected.price ?? 0) && <small className="pet-price-short">{(selected.price ?? 0) - coins}코인 부족해요</small>}
+    </> : bag && state?.inventory?.length === 0 && !hasBattleItems && onFindOpponent ? <button type="button" className="pet-primary" onClick={onFindOpponent}>상대 찾기</button> : undefined}>
     {(bag || !selected) && feedback}
     {bag && !state?.inventory && <p className="pet-sheet-note" role="status">{disabled ? "가방을 불러오는 중…" : "기록 메뉴에서 이름을 선택해 주세요."}</p>}
-    {bag && state?.inventory?.length === 0 && <p className="pet-sheet-note">가방이 비었어요.</p>}
+    {bag && state?.inventory?.length === 0 && !hasBattleItems && <p className="pet-sheet-note">승리하면 코인을 얻어요</p>}
+    {(bag ? hasBattleItems : category === "전투 물품") && <section className="pet-combat-shop" aria-label="전투 물품">
+      <h3>전투 물품 <small>· {dog}</small></h3>
+      <div className="pet-combat-grid">{CONSUMABLES.filter(item => !bag || inventory[item.id] > 0).map(item => {
+        const reason = retrying(item.id) ? "" : pendingPurchase ? "이전 구매 결과를 확인해 주세요" : purchaseReason(kingState,petId,item.id), effect = itemEffect(item);
+        return <article key={item.id} className="pet-combat-product"><strong>{item.name} <small>x{inventory[item.id] ?? 0}</small></strong><p>{effect}</p>
+          {!bag && <><button type="button" aria-busy={pending === item.id} disabled={blocked || !buyItem || !!reason} onClick={() => void buy(item.id)} aria-label={`${item.name} 구매`}>{pending === item.id ? "처리 중…" : retrying(item.id) ? "구매 결과 확인" : `🪙 ${kingState?.prices[item.id] ?? item.price} · 구매`}</button>{reason && <small>{reason}</small>}</>}
+        </article>;
+      })}</div>
+    </section>}
     <div className="pet-catalog-grid pet-shop-grid">{SHOP.filter(item => bag ? owned(item) : category === "전체" || item.category === category).map(item => <button type="button" key={item.id} className="pet-catalog-card" data-equipped={!!equipped(item)} aria-pressed={bag ? !!equipped(item) : undefined} disabled={bag && blocked} onClick={() => { if (bag) { void act(item); return; } setSelected(item); setDone(""); setAsked(null); setConfirm(false); }}>
       <PetItemIcon item={item} /><strong>{item.name}</strong><span className={!owned(item) && coins < (item.price ?? 0) ? "pet-price-short" : undefined}>{equipped(item) ? bag ? "착용 해제" : "착용 중" : owned(item) ? bag ? "착용하기" : "보유" : `🪙 ${item.price}`}</span>
       {pending === item.id && <small role="status">적용 중…</small>}

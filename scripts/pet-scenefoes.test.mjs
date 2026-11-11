@@ -62,7 +62,7 @@ test("장면: 현재 칸 그림·개체 이름표·선택 고리·잠금·실패
   assert.match(html, /겨루기, 3마리/);
 });
 
-test("중앙 결과는 큐당 1.2초, 기술명은 해당 동물, 하단 중복 없음", () => {
+test("중앙 타격 결과는 합쳐서 표시하고 기술명은 0.3초, 하단 중복 없음", () => {
   const events = [
     { type: "action", side: "player", action: { kind: "push" }, round: 1 },
     { type: "effectiveness", side: "player", target: "opponent", hint: "good", multiplier: 1.3, round: 1 },
@@ -73,12 +73,12 @@ test("중앙 결과는 큐당 1.2초, 기술명은 해당 동물, 하단 중복 
     { type: "energy", side: "player", amount: 1, energy: 5, reason: "trait", round: 1 },
   ];
   const cues = view.battleCues(events, { player: "도미", opponent: "진돗개 철수" });
-  assert.equal(cues[0].moveName, "가볍게 밀기"); assert.equal(cues[0].side, "player"); assert.equal(cues[0].duration, 1200);
+  assert.equal(cues[0].moveName, "가볍게 밀기"); assert.equal(cues[0].side, "player"); assert.equal(cues[0].duration, 300);
   const results = cues.filter(c => c.result);
-  assert.deepEqual(results.slice(0, 4).map(c => c.result), ["크리티컬!", "효과가 컸다!", "유독 잘 통했다!", "빗나갔다!"]);
-  assert.equal(results.length, 5, "방어와 무관한 특성 기력은 막기 성공으로 표시하지 않는다");
-  assert.ok(view.DEFENSE_RESULTS.counter.success.includes(results[4].result));
-  assert.ok(results.every(c => c.duration >= 1000 && c.duration <= 1400 && !c.text));
+  assert.deepEqual(results.slice(0, 3).map(c => c.result), ["크리티컬! · 효과가 컸다!", "유독 잘 통했다!", "빗나갔다!"]);
+  assert.equal(results.length, 4, "방어와 무관한 특성 기력은 막기 성공으로 표시하지 않는다");
+  assert.ok(view.DEFENSE_RESULTS.counter.success.includes(results[3].result));
+  assert.ok(results.every(c => c.duration >= 450 && c.duration <= 1200 && !c.text));
 });
 
 test("기세 표시·결정기 비용·상대 대사 최대 1번·없는 상황은 생략", () => {
@@ -90,7 +90,7 @@ test("기세 표시·결정기 비용·상대 대사 최대 1번·없는 상황�
   for (let round = 1; round < 100; round++) {
     const spoken = view.rivalCues(candidates, foe, { ...state, round }, "");
     const lines = spoken.cues.filter(c => c.rivalText);
-    assert.ok(lines.length <= 1); assert.ok(lines.every(c => c.duration === 1600));
+    assert.ok(lines.length <= 1); assert.ok(lines.every(c => c.duration === 850));
   }
   assert.equal(view.encounterLine(foe, "does-not-exist", 1), "");
   assert.ok(view.encounterLine(foe, "flee", 1));

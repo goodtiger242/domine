@@ -1,6 +1,6 @@
 export type Group = "rush" | "trick" | "track" | "guard" | "bond" | "endure";
 export type MoveTag = "contact" | "sound" | "scent" | "trick" | "multi" | "charge" | "gaze";
-export type Species = "dog" | "cat" | "pigeon" | "magpie" | "sparrow" | "bulbul" | "duck" | "deer" | "boar" | "raccoon" | "squirrel" | "chipmunk";
+export type Species = "dog" | "cat" | "pigeon" | "magpie" | "sparrow" | "bulbul" | "duck" | "deer" | "boar" | "raccoon" | "squirrel" | "chipmunk" | "goblin" | "orc" | "slime";
 export type JobId = "rush" | "guard" | "trick" | "track" | "bond";
 export type Job = { id: JobId; tier: 1 | 2 | 3; nodes?: Readonly<Record<string, 1 | 2>> };
 export type AiTier = "gentle" | "normal" | "veteran" | "boss" | "king";
@@ -33,6 +33,8 @@ export interface Breed {
   base: Stats; growth: string; trait: Trait; learn: readonly { level: number; move: string }[];
 }
 export interface Move {
+  support?: SupportEffect;
+  description?: string;
   tags?: readonly MoveTag[]; fx?: string;
   source?: "common" | "element" | "species" | "breed" | "job";
   learn?: { level: number; species?: Species; breedId?: string; job?: JobId; tier?: 1 | 2 | 3; prerequisite?: string };
@@ -44,6 +46,12 @@ export interface Move {
   common?: boolean;
   defense?: "guard" | "counter" | "evade" | "stance";
   contact?: boolean; breaksDefense?: boolean; finisher?: boolean;
+}
+export type SupportRole = "energy" | "buff" | "disrupt" | "recover" | "prepare" | "read" | "momentum";
+export interface SupportEffect {
+  role: SupportRole; rounds?: number; restore?: number; discount?: number; rate?: number;
+  debuff?: Exclude<Stat, "hp">; cleanse?: boolean; lowHeal?: number;
+  nextPower?: number; nextCritical?: number; nextGuard?: number; read?: number; momentum?: number;
 }
 export interface Item {
   id: string; name: string; slot: "collar" | "harness" | "charm" | "bag";
@@ -58,6 +66,11 @@ export interface Fighter extends FighterOptions {
   equipment: readonly string[]; consumable?: string;
 }
 export interface Actor extends Fighter {
+  supportChain?: { id: string; count: number };
+  discount?: number;
+  prepared?: { power: number; critical: number; guard: number; read: number; expires: number };
+  immunityUntil?: number;
+  momentumCharged?: number;
   history?: Action[];
   hp: number; energy: number; healed: number; itemUsed: boolean;
   statuses: { id: Status; applied: number; expires: number }[];
@@ -66,7 +79,7 @@ export interface Actor extends Fighter {
   lastAction?: Action; lastDefense: number; traitUsed: boolean; rested: boolean;
   charging?: string;
   momentum?: number; usedItems?: string[]; guaranteedCritical?: boolean; survival?: boolean; survivalUsed?: boolean;
-  defense?: { kind: NonNullable<Move["defense"]>; expires: number; strength: number; triggered?: boolean };
+  defense?: { kind: NonNullable<Move["defense"]>; expires: number; strength: number; read?: boolean; triggered?: boolean };
   exposedUntil?: number;
   recoil?: { energy?: number; stat?: Exclude<Stat, "hp">; rate?: number; expires: number };
 }

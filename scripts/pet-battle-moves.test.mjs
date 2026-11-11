@@ -79,12 +79,12 @@ test("성향 전투 선공 재현·우선도·미리보기 일치와 최종 피�
   }
 });
 
-test("기술 235개: 분류·태그·연출·비용·예산·학습 범위",()=>{
-  assert.equal(MOVES.length,235);
-  assert.equal(new Set([...MOVES,...FINISHERS,PUSH].map(m=>m.id)).size,242);
+test("기술 305개: 분류·태그·연출·비용·예산·학습 범위",()=>{
+  assert.equal(MOVES.length,305);
+  assert.equal(new Set([...MOVES,...FINISHERS,PUSH].map(m=>m.id)).size,312);
   const expanded=MOVES.filter(m=>m.id.startsWith("M"));
   const counts=Object.fromEntries(["common","element","species","breed","job"].map(s=>[s,expanded.filter(m=>m.source===s).length]));
-  assert.deepEqual(counts,{common:20,element:72,species:36,breed:44,job:30});
+  assert.deepEqual(counts,{common:27,element:114,species:57,breed:44,job:30});
   for(const [index,m] of expanded.entries()) {
     assert.equal(m.id,`M${String(index+1).padStart(3,"0")}`);
     assert.match(m.name,/[가-힣]/); assert.ok(m.name.length<=12);
@@ -95,11 +95,11 @@ test("기술 235개: 분류·태그·연출·비용·예산·학습 범위",()=>
     assert.equal(m.kind==="attack" ? m.power : 0,m.kind==="attack" ? powerBudget(m.energy,m) : 0);
     if(m.source==="common") assert.equal(m.group,"neutral");
   }
-  const proportions=[m=>m.energy<=1,m=>m.energy>=2&&m.energy<=4,m=>m.energy>=5].map(f=>expanded.filter(f).length/expanded.length);
+  const proportions=[m=>m.energy<=1,m=>m.energy>=2&&m.energy<=4,m=>m.energy>=5].map(f=>expanded.filter(m=>Number(m.id.slice(1))<=202).filter(f).length/202);
   for(let i=0;i<3;i++) assert.ok(Math.abs(proportions[i]-[.20,.55,.25][i])<=.05,`${i}: ${proportions[i]}`);
   for(const element of ELEMENTS) {
     const pool=expanded.filter(m=>m.source==="element"&&m.group===element);
-    assert.equal(pool.length,12);
+    assert.equal(pool.length,19);
     for(const mode of ["charge","multi","recoil"]) assert.ok(pool.some(m=>m.mode===mode));
     for(const kind of ["attack","defense","support"]) assert.ok(pool.some(m=>m.kind===kind));
     assert.ok(pool.some(m=>m.breaksDefense));
@@ -161,7 +161,7 @@ test("신규 202개를 습득 조건대로 장착하고 각각 실행",()=>{
     state.player.hp=Math.floor(state.player.stats.hp*.6);
     const result=stepRound(state,move(m.id));
     assert.ok(result.events.some(e=>e.type==="action"&&e.side==="player"&&e.action.moveId===m.id),m.id);
-    assert.equal(result.state.player.energy,Math.max(0,10-m.energy-(m.recoil?.energy??0)),m.id);
+    assert.equal(result.state.player.energy,Math.min(10,Math.max(0,10-m.energy-(m.recoil?.energy??0))+(m.support?.restore??0)),m.id);
     if(m.mode==="charge") {
       assert.equal(result.state.player.charging,m.id);
       state=result.state;state.opponentAction=rest;

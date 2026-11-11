@@ -26,3 +26,20 @@
 | Game-icons.net (source note only, nothing downloaded) | Lorc, Delapouite & contributors | CC BY 3.0 | https://game-icons.net/ | 아직 |
 
 지도: © OpenStreetMap contributors (ODbL). 칸 그림: 카카오맵 로드뷰를 참고해 새로 그림.
+
+## 수상한 손님 (2026-11-12)
+
+고블린·오크·슬라임은 OpenAI 내장 이미지 생성 도구로 이 프로젝트용으로 새로 만들었다. 외부 자산을 가져온 것이 아니며, CC0로 표시하지 않는다. 공통 생성 지시: 따뜻한 수채 일러스트, 두꺼운 윤곽선 없음, 귀엽고 코믹한 전신 옆모습, 오른쪽 시선, 투명 배경, 발밑의 옅은 회색 그림자. 오크 파란 조끼형은 머리 위 여백을 추가로 수정했다.
+
+| 파일 | 변형 | 용량(bytes) | 출처·라이선스 구분 |
+|---|---|---:|---|
+| G01.webp | 고블린 갈색 조끼·주머니 | 26,492 | 프로젝트용 AI 생성물, CC0 아님 |
+| G02.webp | 고블린 노란 모자·청록 목도리 | 22,394 | 프로젝트용 AI 생성물, CC0 아님 |
+| G03.webp | 오크 붉은 옷·나무 방패 | 22,052 | 프로젝트용 AI 생성물, CC0 아님 |
+| G04.webp | 오크 파란 조끼 | 17,004 | 프로젝트용 AI 생성물, CC0 아님 |
+| G05.webp | 슬라임 민트형 | 16,428 | 프로젝트용 AI 생성물, CC0 아님 |
+| G06.webp | 슬라임 살구형 | 23,964 | 프로젝트용 AI 생성물, CC0 아님 |
+
+6장, 합계 **128,334bytes(128.3KB)**. 모두 `public/pet/breed/`에 있으며 480×480 WebP·알파 투명 배경이다. 원본은 `public/` 밖에 보관했다. `scripts/optimize_images.py --kind character --width 480 --quality 35`로 변환했다. 640px 결과는 합계 150KB를 넘어서 480px로 조정했다.
+
+먼저 확인한 CC0 후보는 [8x8 Critter Pack](https://opengameart.org/content/8x8-critter-pack)과 [Slimes](https://opengameart.org/content/slimes-0)다. 두 페이지 모두 CC0를 명시하지만, 각각 8×8·48×64 픽셀 스타일이라 기존 동물의 크기·질감과 맞지 않아 사용하지 않았다. 해당 후보의 [CC0 1.0 라이선스](https://creativecommons.org/publicdomain/zero/1.0/)는 이번 생성 그림에 적용하지 않는다.

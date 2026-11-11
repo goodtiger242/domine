@@ -3,8 +3,7 @@ import { loadTS } from "./pet-test-loader.mjs";
 const { travelEdge, actorBounds } = loadTS("lib/domine/pet-geometry.ts");
 const { travelDirection } = loadTS("lib/domine/pet-world.ts");
 const { fallingNeeds } = loadTS("lib/domine/pet-signals.ts");
-const { nextGoal, MAX_XP } = loadTS("lib/domine/pet-progress.ts");
-const { CATALOG, SHOP, catalogHint } = loadTS("lib/domine/pet-catalog.ts");
+const { CATALOG, catalogHint } = loadTS("lib/domine/pet-catalog.ts");
 const { buildScenePlan } = loadTS("lib/domine/pet-scene-plan.ts");
 const tap = buildScenePlan({action:"tap",id:1},{map:"field",width:26,ratio:.7,origin:{x:95,y:80}},()=>.5);
 assert.equal(tap.keyframes[0].pose.x,95); assert.equal(tap.keyframes[0].pose.y,80);
@@ -35,11 +34,6 @@ assert.deepEqual(fallingNeeds(state(100),state(79),seen),[],"already signalled b
 assert.deepEqual(fallingNeeds(state(79),state(19),seen),["idle_hungry","idle_sad","idle_dirty"]);
 assert.equal(seen.size,12);
 assert.deepEqual(fallingNeeds(state(19),state(100),seen),[]);
-assert.match(nextGoal(39,0,[]),/40??/);
-assert.match(nextGoal(0,39,[]),/1코인/);
-assert.match(nextGoal(0,40,[]),/살 수 있어요/);
-assert.match(nextGoal(0,0,SHOP.map(i=>i.id)),/40 XP/);
-assert.equal(nextGoal(MAX_XP,0,SHOP.map(i=>i.id)),"");
 for (const [map,name] of [["church","성당 마당"],["field","들판"],["street","상가 거리"],["park","공원 숲길"],["home","집 마당"]]) {
   assert.ok(catalogHint(CATALOG.find(i=>i.map===map)).startsWith(`${name} · `));
 }

@@ -17,9 +17,10 @@ import { GROUP_LABEL, type Encounter } from "@/lib/domine/pet-battle-view";
 
 import { buildIdlePlan, buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
 import { chooseIdleAction, chooseNeedGoal, type IdleGoal } from "@/lib/domine/pet-idle";
-import { itemAsset } from "@/lib/domine/pet-assets";
+import { itemAsset, prepareImage } from "@/lib/domine/pet-assets";
 import { chooseTap, tapCount, type TapNeeds, type TapPoint, type TapReaction } from "@/lib/domine/pet-tap";
 const depth = (y: number) => 0.84 + ((y - 76) / 13) * 0.2;
+const preloadBattle = () => { void import("./PetBattleSheet").catch(() => { /* Opening the sheet can retry. */ }); };
 
 /** 소품: 사진이 있으면 사진(가운데 기준), 없으면 이모지 */
 function Prop({ e, size, className }: { e: string; size: number; className?: string }) {
@@ -119,8 +120,22 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
 export const PetScene = memo(function PetScene({ busyText, watchingText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, encounters = [], selectedEncounter, onEncounter, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
   const cell = worldCell(cellId);
   const [moving, setMoving] = useState(false);
+  const lastTravel = useRef<MapTravel | null>(null);
+  const [failedTravel, setFailedTravel] = useState<MapTravel | null>(null);
+  useEffect(() => {
+    if (travel) setFailedTravel(null);
+    else if (lastTravel.current?.phase === "exit" && lastTravel.current.from === cell.id) setFailedTravel(lastTravel.current);
+    lastTravel.current = travel ?? null;
+  }, [travel, cell.id]);
   const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
   const ask = asking?.from === cell.id ? neighborCell(cell.id, asking.direction) : null;
+  const confirmation = useRef<HTMLDivElement>(null);
+  const moveToggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!ask) return;
+    confirmation.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => moveToggle.current?.focus({ preventScroll: true });
+  }, [ask]);
   const map = cell.theme;
   const occupied = encounters.length > 0;
   const sceneScale = SCENE_SCALE * (occupied ? .5 : 1) * (map === "church" ? .85 : 1) * (petId === 2 ? .8 / PETS[2].scale : 1);
@@ -207,19 +222,23 @@ export const PetScene = memo(function PetScene({ busyText, watchingText, travel,
   const background = cellBackground(cell.id, hour);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
+  const [shownBackground, setShownBackground] = useState(background);
+  const [imageAttempt, setImageAttempt] = useState(0);
+  const config = PETS[petId];
+  const photoPose = s.motion === "pet-sleep" || (!s.motion && face === "sleepy") ? "sleep" : s.motion === "pet-sit" || reacting?.kind === "yawn" ? "sit" : s.motion === "pet-lie" ? "lie" : null;
+  const posePhoto = photoPose ? config.poses[photoPose].src : null;
+  const imageFailed = failed[background] || failed[config.standing[stage]] || !!posePhoto && failed[posePhoto];
   useEffect(() => {
-    let cancelled = false;
-    const config = PETS[petId];
-    const pose = s.motion === "pet-sleep" || (!s.motion && face === "sleepy") ? "sleep" : s.motion === "pet-sit" || reacting?.kind === "yawn" ? "sit" : s.motion === "pet-lie" ? "lie" : null;
-    const urls = [config.standing[stage], ...(pose ? [config.poses[pose].src] : []), ...(map === "home" ? [DOGHOUSE] : [])];
-    const images = urls.map((src) => {
-      const img = new Image();
-      img.onload = () => { if (!cancelled) setPhotos((prev) => ({ ...prev, [src]: true })); };
-      img.src = src;
-      return img;
+    const controller = new AbortController();
+    const urls = [background, config.standing[stage], ...(posePhoto ? [posePhoto] : []), ...(map === "home" ? [DOGHOUSE] : [])];
+    for (const src of urls) void prepareImage(src, controller.signal).then(ready => {
+      if (controller.signal.aborted) return;
+      setPhotos(previous => ({ ...previous, [src]: ready }));
+      setFailed(previous => ({ ...previous, [src]: !ready }));
+      if (ready && src === background) setShownBackground(src);
     });
-    return () => { cancelled = true; images.forEach((img) => { img.onload = null; img.onerror = null; }); };
-  }, [petId, stage, map, s.motion, face, reacting?.kind]);
+    return () => controller.abort();
+  }, [background, config, stage, map, posePhoto, imageAttempt]);
 
   useEffect(() => {
     if (!cue || paused || cue.action === "map") return;
@@ -316,8 +335,8 @@ export const PetScene = memo(function PetScene({ busyText, watchingText, travel,
       <rect y="66" width="160" height="30" fill={c.ground} />
 
       <g pointerEvents="none" className={s.scroll ? "pet-photo-pan" : undefined}>
-        {!failed[background] && <image href={background} x="0" y="6" width="160" height="90"
-          preserveAspectRatio="none" onError={() => setFailed((prev) => ({ ...prev, [background]: true }))} />}
+        {!failed[shownBackground] && <image href={shownBackground} x="0" y="6" width="160" height="90"
+          preserveAspectRatio="none" onError={() => setFailed((prev) => ({ ...prev, [shownBackground]: true }))} />}
       </g>
 
       {map !== "field" && !church && <rect pointerEvents="none" y="6" width="160" height="90"
@@ -475,16 +494,17 @@ export const PetScene = memo(function PetScene({ busyText, watchingText, travel,
     <div className="pet-scene-picture pet-scene-ui">
       {!travel && encounters.map((foe, index) => <button type="button" key={foe.id} className="pet-scene-foe" data-selected={foe.id === selectedEncounter}
         style={{ left: `${[58, 74, 88][index]}%`, width: `${Math.min(13.4, w / 160 * 100 * [.8, .83, .86][index])}%`, "--foe-delay": `${index * -2.3}s` } as React.CSSProperties}
-        disabled={locked || battleDisabled || paused || moving || !!ask} aria-label={`${foe.name} Lv.${foe.level}, ${GROUP_LABEL[foe.individual.group]}, 확인하기`} onClick={() => onEncounter?.(foe)}>
+        disabled={locked || battleDisabled || paused || moving || !!ask} onPointerEnter={preloadBattle} onFocus={preloadBattle} onPointerDown={preloadBattle}
+        aria-label={`${foe.name} Lv.${foe.level}, ${GROUP_LABEL[foe.individual.group]}, 확인하기`} onClick={() => onEncounter?.(foe)}>
         <span className="pet-scene-foe-art">{failed[foe.art] ? <span role="img" aria-label={foe.name}>🐾</span> : <NextImage src={foe.art} alt="" width={160} height={160} sizes="16vw" unoptimized onError={() => setFailed(previous => ({ ...previous, [foe.art]: true }))} />}</span>
         <span className="pet-scene-foe-label"><strong title={foe.name}>{foe.given}</strong><small data-danger={foe.levelDifference >= 5}><i data-group={foe.individual.group} aria-label={GROUP_LABEL[foe.individual.group]} />Lv.{foe.level}</small></span>
       </button>)}
       {watchingText && !travel && <div className="pet-watching" role="status" title={watchingText}>{watchingText}</div>}
       {busyText && !watchingText && <div className="pet-busy" role="status">{busyText}</div>}
       <div key={arrivalId ?? 0} className={`pet-location${arrivalId && !travel ? " pet-location-arrived" : ""}`} aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
-      <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기"><span aria-hidden="true">🗺️</span></button>
-      {onBattle && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled || moving || !!ask} onClick={onBattle} aria-label={`겨루기, ${encounters.length}마리`}><span aria-hidden="true">⚔️</span></button>}
-      <button type="button" className="pet-move-toggle" aria-pressed={moving} disabled={locked} onClick={() => { setMoving(!moving); setAsking(null); }} aria-label={moving ? "이동 닫기" : "이동"}><span aria-hidden="true">{moving ? "✕" : "🧭"}</span></button>
+      <button type="button" className="pet-map-button" disabled={locked || !!ask} onClick={onMap} aria-label="동네 지도 열기"><span aria-hidden="true">🗺️</span></button>
+      {onBattle && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled || moving || !!ask} onPointerEnter={preloadBattle} onFocus={preloadBattle} onPointerDown={preloadBattle} onClick={onBattle} aria-label={`겨루기, ${encounters.length}마리`}><span aria-hidden="true">⚔️</span></button>}
+      <button ref={moveToggle} type="button" className="pet-move-toggle" aria-pressed={moving} disabled={locked || !!ask} onClick={() => { setMoving(!moving); setAsking(null); }} aria-label={moving ? "이동 닫기" : "이동"}><span aria-hidden="true">{moving ? "✕" : "🧭"}</span></button>
       {moving && DIRECTIONS.map((direction) => {
         const destination = neighborCell(cell.id, direction);
         return destination && <button key={direction} type="button" className={`pet-direction pet-direction-${direction}`}
@@ -493,10 +513,22 @@ export const PetScene = memo(function PetScene({ busyText, watchingText, travel,
           <span aria-hidden="true">{{ n: "↑", s: "↓", e: "→", w: "←" }[direction]}</span>
         </button>;
       })}
-      {ask && asking && !locked && <div className="pet-move-confirm" role="alertdialog" aria-label={`${ask.name}(으)로 이동할까요?`}>
+      {ask && asking && !locked && <div ref={confirmation} className="pet-move-confirm" role="alertdialog" aria-label={`${ask.name}(으)로 이동할까요?`}
+        onKeyDown={event => {
+          if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setAsking(null); }
+          if (event.key === "Tab") {
+            const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>("button");
+            event.preventDefault();
+            buttons[document.activeElement === buttons[0] ? 1 : 0]?.focus();
+          }
+        }}>
         <p><strong>{ask.name}</strong>(으)로 갈까요?</p>
         <div><button type="button" data-primary onClick={() => { const direction = asking.direction; setAsking(null); onLocal?.({ action: "map", direction, id: Date.now() }); }}>이동</button>
           <button type="button" onClick={() => setAsking(null)}>취소</button></div>
+      </div>}
+      {!ask && !moving && !busyText && !watchingText && (failedTravel || travel?.phase === "exit" || imageFailed || !photos[background]) && <div className="pet-image-status" role="status" aria-busy={!imageFailed && !failedTravel}>
+        {failedTravel ? <button type="button" disabled={locked} onClick={() => { setFailedTravel(null); onMap?.(); }}>이동 실패 · 지도 열기</button>
+          : imageFailed ? <button type="button" disabled={locked} onClick={() => { setFailed({}); setImageAttempt(attempt => attempt + 1); }}>그림 다시 불러오기</button> : "그림 준비 중…"}
       </div>}
     </div>
     </div>

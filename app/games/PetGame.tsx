@@ -13,23 +13,27 @@ import { PETS, petText } from "@/lib/domine/pet-photos";
 import { encounterChoice, spawnsFor, encounterSlot, ENCOUNTER_STORAGE, readEncounterWins, type Encounter } from "@/lib/domine/pet-battle-view";
 import { PET_LEGAL_NAMES } from "@/lib/domine/pet-identity";
 import type { PetApi } from "@/lib/domine/pet-rpc";
+import type { KingSettlement } from "@/lib/domine/pet-king-rpc";
 import { visualLocked } from "@/lib/domine/pet-machine";
 import { PetScene } from "./PetScene";
 import PetProgress from "./PetProgress";
 import PetFeedback, { PetNotice, PetPickupFeedback } from "./PetFeedback";
 import { usePetController } from "./usePetController";
 import { usePetKing } from "./usePetKing";
+import { selectedItems } from "@/lib/domine/pet-king-items";
 import { departedWins, type KingApi } from "@/lib/domine/pet-king-client";
 import "./pet-game.css";
-const PetShopSheet = dynamic(() => import("./PetShopSheet"));
-const PetAlbumSheet = dynamic(() => import("./PetAlbumSheet"));
-const PetHistorySheet = dynamic(() => import("./PetHistorySheet"));
-const PetAchievementSheet = dynamic(() => import("./PetAchievementSheet"));
-const PetWorldSheet = dynamic(() => import("./PetWorldSheet"));
-const PetSheet = dynamic(() => import("./PetSheet"));
-const PetBattleSheet = dynamic(() => import("./PetBattleSheet"), { ssr: false });
-const PetEncounterSheet = dynamic(() => import("./PetEncounterSheet"));
-type Sheet = "map" | "shop" | "bag" | "album" | "achievements" | "history" | "record" | "notice" | "encounter" | "battle" | null;
+const loading = () => <div className="pet-sheet-loading" role="status" aria-busy="true">불러오는 중…</div>;
+const PetShopSheet = dynamic(() => import("./PetShopSheet"), { loading });
+const PetAlbumSheet = dynamic(() => import("./PetAlbumSheet"), { loading });
+const PetHistorySheet = dynamic(() => import("./PetHistorySheet"), { loading });
+const PetAchievementSheet = dynamic(() => import("./PetAchievementSheet"), { loading });
+const PetWorldSheet = dynamic(() => import("./PetWorldSheet"), { loading });
+const PetStatusSheet = dynamic(() => import("./PetStatusSheet"), { loading });
+const PetSheet = dynamic(() => import("./PetSheet"), { loading });
+const PetBattleSheet = dynamic(() => import("./PetBattleSheet"), { ssr: false, loading });
+const PetEncounterSheet = dynamic(() => import("./PetEncounterSheet"), { loading });
+type Sheet = "status" | "map" | "shop" | "bag" | "album" | "achievements" | "history" | "record" | "notice" | "encounter" | "battle" | null;
 const BUSY_ACTION: Record<string, string> = { feed: "밥 주는", treat: "간식 주는", pet: "쓰다듬는", play: "공놀이하는", walk: "산책하는", brush: "빗질하는", bath: "목욕시키는", train: "훈련하는" };
 
 
@@ -47,6 +51,8 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
   const [nameSearch, setNameSearch] = useState(""), [connecting, setConnecting] = useState(false);
   const query = nameSearch.normalize("NFC").trim();
   const [invalidName, setInvalidName] = useState(false);
+  const [connectionFailed, setConnectionFailed] = useState(false);
+  const [settlement, setSettlement] = useState<{ pet: number; result: KingSettlement; hasWon: boolean } | null>(null);
   const [speeches, setSpeeches] = useState<Speech[]>([]);
   const speech = speeches[0];
   const [hour, setHour] = useState(12);
@@ -62,9 +68,41 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
   const busyText = game.busy ? `${game.busy.nickname}님이 ${PETS[game.petId].name}에게 ${BUSY_ACTION[game.busy.action]} 중이에요` : "";
   const status = storageError || game.message || (game.canRetry ? "응답을 확인하지 못했어요." : "") || notice;
   const king = usePetKing(game.kingApi, game.registered ? game.identity : null, cell.id, game.arrival?.id,
-    game.worldReady && !game.travel && machine.visual === "idle" && !sheet, game.refresh);
-  const growth = king.state?.pets.find(p => p.pet === game.petId);
+    game.worldReady && !game.travel && machine.visual === "idle" && !sheet, game.refresh, game.active && sheet !== "battle");
+  useEffect(() => { setSettlement(null); }, [game.identity]);
+  const rewardEpoch = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (rewardEpoch.current && king.state?.resetEpoch && rewardEpoch.current !== king.state.resetEpoch) setSettlement(null);
+    rewardEpoch.current = king.state?.resetEpoch;
+  }, [king.state?.resetEpoch]);
+  useEffect(() => {
+    const epoch = king.state?.resetEpoch;
+    if (!epoch) return;
+    try {
+      if (localStorage.getItem("domine-pet-encounter-epoch") === epoch) return;
+      localStorage.removeItem(ENCOUNTER_STORAGE); localStorage.setItem("domine-pet-encounter-epoch", epoch);
+    } catch { /* Reset session wins even when storage is unavailable. */ }
+    setWins([]);
+  }, [king.state?.resetEpoch]);
+  const reward = settlement?.pet === game.petId ? settlement.result : undefined;
+  const savedGrowth = king.state?.pets.find(p => p.pet === game.petId);
+  const growth = reward?.progress && (!savedGrowth || reward.progress.version >= savedGrowth.version) ? reward.progress : savedGrowth;
   const playerLevel = growth?.level ?? 1;
+  const wallet = king.state && king.state.version >= (personal?.version ?? -1) ? king.state : personal;
+  const confirmedWallet = settlement?.result.wallet;
+  const coins = confirmedWallet && confirmedWallet.version >= (wallet?.version ?? -1) ? confirmedWallet.coins : wallet?.coins ?? personal?.player?.coins ?? 0;
+  const firstOpponent = game.registered && !king.state?.encyclopedia.some(e => e.wins > 0) && !settlement?.hasWon;
+  const nameError = invalidName || game.message === "이름을 다시 입력해 주세요" || game.message === "도미네 청년회 이름을 정자로 사용해주세요";
+  const connectionError = connectionFailed || game.capability === "error" || !!game.message && !["이름을 다시 입력해 주세요", "도미네 청년회 이름을 정자로 사용해주세요", "내 이름을 입력하면 함께 키울 수 있어요"].includes(game.message);
+  const [supportMove, setSupportMove] = useState("");
+  const [carried, setCarried] = useState<string[]>([]);
+  const carryKey = `domine-pet-items:${game.petId}`;
+  useEffect(() => {
+    try { const saved = JSON.parse(window.localStorage.getItem(carryKey) ?? "[]"); setCarried(selectedItems(saved,Object.fromEntries((Array.isArray(saved) ? saved : []).map(id => [id,1])))); }
+    catch { setCarried([]); }
+  }, [carryKey]);
+  const items = selectedItems(carried,growth?.inventory ?? {});
+  const rememberItems = (next: string[]) => { setCarried(next); try { window.localStorage.setItem(carryKey,JSON.stringify(next)); } catch { /* Session memory remains available. */ } };
   const sharedWins = departedWins(wins, king.departed, slot);
   const currentEncounters = spawnsFor(cell.id, playerLevel, slot, sharedWins);
   const careLocked = locked || !!game.busy || (!!game.features?.busyLock && machine.command !== "idle");
@@ -123,7 +161,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     const timer = setInterval(() => { setHour(new Date().getHours()); }, 9000);
     return () => clearInterval(timer);
   }, [game.active, sheet]);
-  function open(next: Sheet) { setNoOpponent(false); game.pause(next === "battle"); setSheet(next); }
+  function open(next: Sheet) { if (next === "record") { setNameSearch(""); setInvalidName(false); } setNoOpponent(false); game.pause(next === "battle"); setSheet(next); }
   function openMap(animals = false) { if (animals) rememberAnimals(true); open("map"); }
   function startBattle(selected?: Encounter) {
     if (sheet || locked) return;
@@ -164,8 +202,19 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     const name = value.normalize("NFC").trim();
     if (!PET_LEGAL_NAMES.includes(name)) { setInvalidName(true); return; }
     if (connecting) return;
-    setConnecting(true);
-    try { await game.connect(name); close(); } finally { setConnecting(false); }
+    setConnecting(true); setConnectionFailed(false); setInvalidName(false);
+    try { await game.connect(name); setSheet(null); game.resume(); }
+    catch { setConnectionFailed(true); }
+    finally { setConnecting(false); }
+  }
+  async function retryConnection() {
+    if (connecting) return;
+    setConnecting(true); setConnectionFailed(false); game.setMessage("");
+    try {
+      if (game.capability !== "ready") await game.checkCapabilities();
+      if (PET_LEGAL_NAMES.includes(query)) await game.connect(query);
+    } catch { setConnectionFailed(true); }
+    finally { setConnecting(false); }
   }
   return <div ref={game.host} className="pet-game">
     <div className="pet-title-row">
@@ -173,19 +222,22 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
       <div role="group" aria-label="강아지 선택">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeeches([]); }}>{PETS[id].name}</button>)}</div>
       <button type="button" className="pet-record-button" onClick={() => open("record")}>{game.registered && game.nickname || "내 이름"}</button>
     </div>
-    {!game.registered && (game.capability === "ready" || game.capability === "missing") && <form className="pet-name-gate" onSubmit={(event) => { event.preventDefault(); void connect(query); }}>
+    {!game.registered && <form className="pet-name-gate" onSubmit={(event) => { event.preventDefault(); void connect(query); }}>
       <strong>이름을 입력해 주세요</strong>
       <p>청년회 이름을 입력하면 도미·미네와 함께 시작해요.</p>
       <div>
         <input aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder="이름" enterKeyHint="go" />
-        <button type="submit" disabled={connecting || !query}>시작</button>
+        <button type="submit" aria-busy={connecting} disabled={connecting || !query || game.capability === "loading"}>{connecting ? "확인 중…" : "시작"}</button>
       </div>
-      {(invalidName || game.message === "이름을 다시 입력해 주세요") && <p role="status" className="pet-name-gate-error">도미네 청년회 이름을 정자로 사용해주세요</p>}
+      {nameError && <p role="status" className="pet-name-gate-error">도미네 청년회 이름을 정자로 사용해주세요</p>}
+      {connectionError && <p role="status" className="pet-name-gate-error">연결을 확인하지 못했어요 · <button type="button" disabled={connecting} aria-busy={connecting} onClick={() => void retryConnection()}>{connecting ? "확인 중…" : "다시 시도"}</button></p>}
+      {game.capability === "loading" && <p role="status">연결 확인 중…</p>}
     </form>}
-    {game.registered && <div className="pet-progress-row">{personal && !personal.player ? <span role="status">불러오는 중… · <span aria-label={`우리 코인(공용) ${personal.coins ?? 0}`}>🪙 {personal.coins ?? 0}</span></span> : <PetProgress key={game.petId} needs={pet ? { fullness: pet.fullness, mood: pet.mood, clean: pet.clean ?? 80 } : undefined} name={PETS[game.petId].name} level={playerLevel} xp={growth?.xp ?? 0} coins={personal?.coins ?? personal?.player?.coins ?? 0} />}
+    {game.registered && <div className="pet-progress-row">{personal && !personal.player ? <span role="status">불러오는 중… · <span aria-label={`우리 코인(공용) ${personal.coins ?? 0}`}>🪙 {personal.coins ?? 0}</span></span> : <PetProgress key={game.petId} onInfo={() => open("status")} needs={pet ? { fullness: pet.fullness, mood: pet.mood, clean: pet.clean ?? 80 } : undefined} name={PETS[game.petId].name} level={playerLevel} xp={growth?.xp ?? 0} coins={coins} reward={reward} />}
       {game.canRetry && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>}
     {status && game.registered && <PetNotice key={`${game.petId}-${status}`} parts={[status]} onOpen={() => open(game.registered ? "notice" : "record")} />}
+    {firstOpponent && !sheet && <button type="button" className="pet-first-opponent" disabled={locked} onClick={() => openMap(true)}>지도에서 첫 상대 찾기</button>}
     <div onPointerDownCapture={() => setNoOpponent(false)} className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
       {game.worldReady ? <PetScene key={game.petId} busyText={busyText} watchingText={sheet === "battle" ? "" : king.watching} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => openMap()} onLocal={game.localScene} locked={locked}
         onBattle={() => startBattle()} encounters={currentEncounters} selectedEncounter={sheet === "encounter" ? encounter?.id : undefined} onEncounter={startBattle} battleDisabled={locked}
@@ -196,7 +248,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
         cue={game.cue} onSay={say} onDone={game.done} speaker={speech?.speaker} needs={pet ?? undefined}
         bubble={speech?.arrival ? speech.text : petText(speech?.text || "반가워요!", game.petId)} wearable={equipment("wearable")} toy={equipment("toy")} />
         : <p className="p-8 text-center text-sm" role="status">동네를 불러오고 있어요…</p>}
-      {noOpponent && <div className="pet-encounter-notice" role="status"><button type="button" onClick={() => setNoOpponent(false)}>여긴 겨룰 상대가 없어요 · 지도에서 🐾를 찾아보세요</button></div>}
+      {noOpponent && <div className="pet-encounter-notice" role="status"><button type="button" onClick={() => openMap(true)}>상대가 없어요 · 지도에서 찾기</button></div>}
       {game.feedback && <PetFeedback key={game.feedback.id} result={game.feedback.result} previousLevel={game.feedback.previousLevel} />}
       {king.pickup && !game.travel && !sheet && <PetPickupFeedback key={king.pickup.id} coins={king.pickup.coins} pouch={king.pickup.pouch} />}
     </div>
@@ -214,12 +266,13 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
       </button>)}
     </div>)}
     <nav className="pet-menu" aria-label="진행과 기록"><button type="button" onClick={() => open("shop")}><span aria-hidden="true">🛍️</span>상점</button><button type="button" onClick={() => open("bag")}><span aria-hidden="true">🎒</span>가방</button><button type="button" onClick={() => open("album")}><span aria-hidden="true">📖</span>도감</button><button type="button" onClick={() => open("achievements")}><span aria-hidden="true">🏅</span>업적</button><button type="button" onClick={() => open("history")}><span aria-hidden="true">🕘</span>이력</button></nav>
-    {sheet === "encounter" && <PetEncounterSheet encounters={currentEncounters} selected={encounter} petId={game.petId} onSelect={setEncounter} onStart={confirmBattle} onClose={close} />}
+    {sheet === "encounter" && <PetEncounterSheet encounters={currentEncounters} selected={encounter} petId={game.petId} supportMove={supportMove} onSupportMove={setSupportMove} inventory={growth?.inventory} items={items} onItems={rememberItems} onSelect={setEncounter} onStart={confirmBattle} onClose={close} />}
     {sheet === "battle" && encounter && <PetBattleSheet key={`${encounter.id}:${game.petId}`} encounter={encounter} petId={game.petId} condition={pet ?? undefined} stage={stage} hour={hour} onClose={close} onWin={winBattle}
-      kingApi={game.kingApi} identity={game.identity} firstWin={!!king.state && !king.state.encyclopedia.some(e => e.individualId === encounter.individual.id && e.wins > 0)} onSettled={king.settled} />}
+      kingApi={game.kingApi} identity={game.identity} growth={growth} supportMove={supportMove} items={items} onInventoryRefresh={king.refresh} firstWin={!!king.state && !king.state.encyclopedia.some(e => e.individualId === encounter.individual.id && e.wins > 0)} onSettled={result => { king.settled(result); setSettlement(previous => ({ pet: game.petId, result, hasWon: !!previous?.hasWon || result.outcome === "win" })); }} />}
+    {sheet === "status" && <PetStatusSheet petId={game.petId} growth={growth} condition={pet ?? undefined} supportMove={supportMove} stage={stage} onClose={close} />}
     {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={sharedWins} careLevel={playerLevel} showAnimals={animalMap} onAnimals={rememberAnimals}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
-    {(sheet === "shop" || sheet === "bag") && <PetShopSheet bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={game.execute} onClose={close} onSelectPet={game.selectPet} multiPet={game.multiPet} onShop={() => setSheet("shop")} />}
+    {(sheet === "shop" || sheet === "bag") && <PetShopSheet pendingPurchase={king.pendingPurchase} kingState={king.state} buyItem={king.buyItem} bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={async (...args) => { await game.execute(...args); await king.refresh(); }} onClose={close} onSelectPet={game.selectPet} multiPet={game.multiPet} onFindOpponent={() => openMap(true)} />}
     {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}
     {sheet === "history" && <PetHistorySheet history={game.api.history} onClose={close} />}
     {sheet === "achievements" && <PetAchievementSheet badges={personal?.badges ?? []} notice={notice} onClose={close} />}

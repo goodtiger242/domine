@@ -12,6 +12,7 @@ const notoSansKr = Noto_Sans_KR({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL

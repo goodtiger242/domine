@@ -120,7 +120,7 @@ const sheetSource = ts.transpileModule(readFileSync("app/games/PetWorldSheet.tsx
 new Function("require", "exports", sheetSource)((name) => {
   if (name === "./PetSheet") return { default: ({ children, footer }) => createElement("div", null, children, footer) };
   if (name.startsWith("@/")) return loadTS(`${name.slice(2)}.ts`);
-  if (name === "react") return { useState: () => [selectedCell, (id) => { selectedCell = id; }] };
+  if (name === "react") return { useState: initial => typeof initial === "boolean" ? [initial, () => {}] : [selectedCell, (id) => { selectedCell = id; }] };
   if (name === "react/jsx-runtime") {
     const runtime = require(name);
     const wrap = (fn) => (type, props, key) => {
@@ -191,7 +191,7 @@ try {
     const cellImage = CELL_IMAGES[cell.id] ? `/pet/cell/${cell.id}.webp` : null;
     const expected = cellImage ?? map.background ?? (map.id === "church" ? CHURCH_BACKGROUNDS : BACKGROUNDS)[backgroundAt(hour)];
     assert.ok(rendered.includes(`href="${expected}"`), "Only committed background renders");
-    assert.deepEqual(requested.filter((src) => src.startsWith("/pet/bg/")), [], "No background preloading outside map preparation");
+    assert.deepEqual(requested.filter((src) => src.startsWith("/pet/bg/")), expected.startsWith("/pet/bg/") ? [expected] : [], "Only the current background is prepared");
     assert.ok(!requested.some((src) => src.includes("/mine/")), "Other dog's photos are not preloaded");
     cleanups.forEach((cleanup) => cleanup?.());
   }

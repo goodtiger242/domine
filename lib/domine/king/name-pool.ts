@@ -6,6 +6,12 @@ function entries(names: string, tone: NameTone, species: NameEntry["for"] = "any
   return names.trim().split(/\s+/).map((name) => ({ name, tone, for: species }));
 }
 
+export const GUEST_NAMES = {
+  goblin: entries("쪼꼬 딸랑 주섬 꼬깃 잔돈 빈주머니 삐죽 콩주먹", "funny"),
+  orc: entries("우르 우동 두둥 둥치 밥통 쿵짝 방패콩 우걱", "funny"),
+  slime: entries("말랑 몰랑 출렁 푸룽 젤콩 물컹 탱글 찰방", "funny"),
+} as const;
+
 export const NAME_POOL: readonly NameEntry[] = [
   ...entries(`
     뽀삐 몽실 복실 뭉치 해피 똘이 누렁 바둑 백구 황구

@@ -1,14 +1,35 @@
-import { buildFighter } from "./battle/engine";
+import { itemEffect } from "./pet-king-items";
+import { availableActions, buildFighter, learnset } from "./battle/engine";
 import { BREED_BY_ID as ENGINE_BREEDS, ITEM_BY_ID, MOVE_BY_ID } from "./battle/data";
 import { random, seedFor } from "./battle/rng";
 import { LINES } from "./pet-lines";
-import { previewDamage, moveFor, REST_ENERGY, matchup } from "./battle/rules";
+import { previewDamage, moveFor, REST_ENERGY, matchup, moveEnergy, sameAction } from "./battle/rules";
+import { moveSlots } from "./battle/learnset";
+import type { KingProgress } from "./pet-king-rpc";
 import { pickSpawns } from "./king/spawn";
 import { shortBreedName } from "./breed-short";
 import { BREED_BY_ID } from "./king/species";
 import { RIVAL_LINES, rivalLine, shouldSpeak, type RivalMoment, type RivalSpecies } from "./pet-rival-lines";
 import { BATTLE_MOVE_FX, battleFxId } from "./pet-battle-fx";
-import type { Action, AiTier, BattleEvent, BattleState, Move, Outcome, Side, Species, Status } from "./battle/types";
+import type { Action, AiTier, BattleEvent, BattleState, Condition, Job, Move, Outcome, Side, Species, Status } from "./battle/types";
+
+export function battlePlayer(petId: number, level: number, condition?: Condition, items: readonly string[] = [], supportMove?: string, growth?: KingProgress) {
+  const breed = petId === 1 ? "B001" : "B002", element = petId === 1 ? "bond" : "trick";
+  const ids = { striker: "rush", defender: "guard", trickster: "trick", tracker: "track", empath: "bond" } as const;
+  const tier = growth?.jobTier;
+  const job: Job | undefined = growth?.job && ids[growth.job] && (tier === 1 || tier === 2 || tier === 3) && level >= [10, 30, 60][tier - 1] ? { id: ids[growth.job], tier } : undefined;
+  const allocation = growth?.allocationMode === "manual" ? growth.allocation : undefined;
+  let base;
+  try { base = buildFighter(breed, level, [], { condition, items, job, allocation }); }
+  catch { base = buildFighter(breed, level, [], { condition, items, job }); }
+  const learned = learnset("dog", breed, element, level, job);
+  const equipped = [...new Set(growth?.moves ?? [])].filter(id => learned.includes(id)).slice(0, moveSlots(level));
+  const supports = learned.filter(id => MOVE_BY_ID[id].kind === "support").sort((a, b) => (MOVE_BY_ID[a].learn?.level ?? 1) - (MOVE_BY_ID[b].learn?.level ?? 1));
+  const support = supports.includes(supportMove ?? "") ? supportMove : supports.at(-1);
+  // shortcut: server mastery is usage counts, enable rank bonuses when the server defines the conversion.
+  const moves = equipped.length ? equipped : [...new Set([...base.moves.slice(0, 3), ...(support ? [support] : [])])];
+  return buildFighter(breed, level, [], { condition, items, job, allocation: base.allocation, moves });
+}
 
 export const encounterSlot = () => Math.floor(Date.now() / 1800000);
 export const ENCOUNTER_STORAGE = "domine-pet-encounter-wins";
@@ -34,8 +55,12 @@ export function spawnsFor(cellId: string, careLevel: number, slot = encounterSlo
       const fighter = buildFighter(breedId, spawn.level, [], {
         species: species as Species, signatureBreedId: breed.id, element: individual.group,
         weakTag: individual.weakness, resistTag: individual.resistance, aiTier,
+        items: individual.owner && (aiTier === "boss" || aiTier === "king") ? ["P02", "P05"] : [],
         condition: individual.condition, owned: !!individual.owner, boss: spawn.kind === "named",
       });
+      const support = learnset(species as Species,breed.id,individual.group,spawn.level)
+        .map(id => MOVE_BY_ID[id]).filter(move => move.kind === "support");
+      if (support.length) fighter.moves = [...new Set([...fighter.moves.slice(0,-1),support[individual.seed % support.length].id])];
       return { ...spawn, id: `${slot}:${cellId}:${individual.id}`, name: `${shortBreedName(breed.id, breed.name)} ${individual.name}`, given: individual.name, art,
         fighter, npc: individual.owner, difficulty: "normal" as const, levelDifference: spawn.level - playerLevel,
         playerLevel, daySeed: seedFor(String(slot), 0) };
@@ -82,6 +107,7 @@ export function moveEffect(move: Move, state: BattleState) {
     return `상대에게 피해 약 ${damage.min}~${damage.max}${extra}`;
   }
   if (move.kind === "defense") return { guard: "받는 피해 −60% · 기력 +1", counter: "몸싸움 공격이면 피해 0 + 되받아치기", evade: "큰 기술(충전·결정기) 완전 회피 · 상대 기력 −2", stance: "2라운드 피해 −30% · 상태이상 막음" }[move.defense ?? "guard"];
+  if (move.description) return move.description;
   return move.heal ? `체력 ${Math.round(move.heal * 100)}% 회복` : `${move.buff ? STAT_LABEL[move.buff] : "집중"}이 올라가요`;
 }
 export function hpColor(hp: number, max: number) {
@@ -89,21 +115,35 @@ export function hpColor(hp: number, max: number) {
   return ratio <= .2 ? "red" : ratio <= .5 ? "yellow" : "green";
 }
 export const STATUS_LABEL: Record<Status, string> = {
-  stagger: "💫 비틀거림", blur: "🌫️ 시야 흐림", slow: "🐢 느려짐",
+  stagger: "💫 비틀거림", blur: "🌫️ 혼란", slow: "🐢 느려짐",
   tense: "😬 긴장", winded: "💨 숨참", open: "🫧 빈틈",
 };
 export const STAT_LABEL = { hp: "체력", attack: "공격력", defense: "방어력", speed: "민첩", focus: "집중", calm: "침착" };
 export const MOVE_PAGE_SIZE = 6;
 export type MoveFilter = "all" | Move["kind"];
 export const costBadge = (cost: number) => `⚡${cost}`;
-export const actionCost = (action: Action, state: BattleState) => moveFor(action)?.finisher || action.kind === "move" && state.player.charging === action.moveId ? 0 : moveFor(action)?.energy ?? 0;
-export function movePages(actions: readonly Action[], filter: MoveFilter) {
-  const filtered = actions.filter(action => filter === "all" || (action.kind === "rest" ? "support" : moveFor(action)?.kind) === filter);
+export const actionCost = (action: Action, state: BattleState) => moveFor(action)?.finisher || action.kind === "move" && state.player.charging === action.moveId ? 0 : moveFor(action) ? moveEnergy(moveFor(action)!,state.player) : 0;
+export function movePages(actions: readonly Action[], filter: MoveFilter, state?: BattleState) {
+  const filtered = actions.filter(action => filter === "all" || (moveFor(action)?.kind ?? "support") === filter);
+  if (state) {
+    const allowed = availableActions(state, "player");
+    const ranked = new Map(filtered.map(action => {
+      const move = moveFor(action), damage = move?.kind === "attack" ? moveDamage(move, state) : null;
+      return [action, { usable: allowed.some(a => sameAction(a, action)), kind: MOVE_KIND[move?.kind ?? "support"].order,
+        finisher: !!move?.finisher, damage: damage ? damage.base + damage.delta : 0, cost: actionCost(action, state) }];
+    }));
+    filtered.sort((a, b) => {
+      const x = ranked.get(a)!, y = ranked.get(b)!;
+      return Number(y.usable) - Number(x.usable) || (x.usable ? Number(y.finisher) - Number(x.finisher) : 0)
+        || x.kind - y.kind || (x.kind === 0 || !x.usable ? y.damage - x.damage : 0) || x.cost - y.cost;
+    });
+  }
   return Array.from({ length: Math.max(1, Math.ceil(filtered.length / MOVE_PAGE_SIZE)) }, (_, i) => filtered.slice(i * MOVE_PAGE_SIZE, (i + 1) * MOVE_PAGE_SIZE));
 }
 export function compactEffect(move: Move, state: BattleState) {
   if (move.kind === "attack") { const d = moveDamage(move, state); return `피해 ${d.base}${d.delta ? ` ${d.delta > 0 ? "↑+" : "↓−"}${Math.abs(d.delta)}` : ""}`; }
   if (move.kind === "defense") return { guard: "피해 −60% · 기력 +1", counter: "접촉 피해 0 · 되받아치기", evade: "큰 기술 회피 · 상대 기력 −2", stance: "2턴 피해 −30% · 상태이상 막음" }[move.defense ?? "guard"];
+  if (move.description) return move.description;
   return move.heal ? `회복 ${Math.round(move.heal * 100)}%` : `${move.buff ? STAT_LABEL[move.buff] : "집중"}↑`;
 }
 export function moveDamage(move: Move, state: BattleState) {
@@ -118,6 +158,7 @@ export function moveDamage(move: Move, state: BattleState) {
 }
 export function moveDetail(action: Action, state: BattleState) {
   if (action.kind === "rest") return `숨 고르기 · 기력 +${REST_ENERGY}`;
+  if (action.kind === "item") return `${ITEM_BY_ID[action.itemId].name} · ${itemEffect(ITEM_BY_ID[action.itemId])} · 사용하면 한 라운드 행동` ;
   const move = moveFor(action)!;
   const d = previewDamage(move, state.player, state.opponent, state.round);
   return [move.name, `${GROUP_LABEL[move.group]} · ${MOVE_KIND[move.kind].label} · 기력 ${actionCost(action, state)}`, moveEffect(move, state),
@@ -150,8 +191,9 @@ export function showBattleEvent(state: BattleState, event: BattleEvent, resolved
     if (event.change === "applied") actor.statuses.push({ id: event.status, applied: event.round, expires: event.round + 1 });
   }
   if (event.type === "buff") {
+    actor.prepared = resolved?.[event.side].prepared;
     actor.buffs = actor.buffs.filter(b => b.stat !== event.stat);
-    if (event.change === "applied") actor.buffs.push({ ...(resolved?.[event.side].buffs.find(b => b.stat === event.stat) ?? { stat: event.stat, expires: event.round + 1 }) });
+    if (event.change === "applied") actor.buffs.push(...(resolved ? resolved[event.side].buffs.filter(b => b.stat === event.stat).map(b => ({...b})) : [{ stat: event.stat, expires: event.round + 1 }]));
   }
   if (event.type === "shield") actor.shield = event.change === "applied" ? { multiplier: event.multiplier, expires: event.round + 1 } : undefined;
   return { ...state, [event.side]: actor };
@@ -163,11 +205,23 @@ export type BattleCue = {
   motion?: "intro" | "skill" | "hit" | "weak-hit" | "heal" | "effective" | "finish";
   moveFx?: string; target?: Side; missed?: boolean;
   seenMove?: string; critical?: boolean;
-  fx?: "hit" | "hit-good" | "heal" | "buff" | "debuff" | "dizzy" | "sleepy" | "shield";
+  fx?: "energy" | "cleanse" | "hit" | "hit-good" | "heal" | "buff" | "debuff" | "dizzy" | "sleepy" | "shield";
   side?: Side; amount?: number; outcome?: Outcome;
   playerText?: string; playerMoment?: "start" | "success" | "failure" | "broken";
   defenseResult?: boolean;
+  impactSide?: Side;
+  finisher?: "cutin" | "charge" | "impact" | "afterglow";
+  finisherId?: string;
+  blocked?: boolean;
+  guarded?: boolean;
 };
+
+export const FINISHER_MS = { cutin: 500, charge: 400, impact: 800, afterglow: 400 } as const;
+export function finisherDuration(phase: NonNullable<BattleCue["finisher"]>, speed: 0 | 1 | 2, reduced: boolean) {
+  if (reduced) return ({ cutin: 200, charge: 0, impact: 100, afterglow: 100 })[phase];
+  const factor = [1, 3, 5.25][speed];
+  return phase === "afterglow" ? Math.round(2100 / factor) - [500, 400, 800].reduce((sum, ms) => sum + Math.round(ms / factor), 0) : Math.round(FINISHER_MS[phase] / factor);
+}
 
 export const DEFENSE_RESULTS = {
   guard: {
@@ -243,6 +297,7 @@ export const battleEffectId = (id: string) => BATTLE_MOVE_FX[id] ? id : "push";
 
 export function rivalCues(cues: BattleCue[], encounter: Encounter, next: BattleState, last: string, player?: { id: number; last: string }) {
   if (next.outcome === "quit") return { cues, last };
+  if (cues.some(cue => cue.finisher)) return { cues, last, lastPlayer: player?.last };
   let index = cues.findLastIndex(cue => !!cue.playerMoment);
   const moment = cues[index]?.playerMoment;
   if (player && moment && random(seedFor(`${next.round}:player-speech`, next.rng)).value < (moment === "success" ? .4 : .3)) {
@@ -250,7 +305,7 @@ export function rivalCues(cues: BattleCue[], encounter: Encounter, next: BattleS
     if (moment !== "success" && start >= 0 && random(seedFor(`${next.round}:player-start`, next.rng)).value < .5) index = start;
     const pool = LINES[`battle_${player.id === 1 ? "domi" : "mine"}_${cues[index].playerMoment}`].filter(line => line !== player.last);
     const line = pool[Math.floor(random(seedFor(`${next.round}:player-line`, next.rng)).value * pool.length)];
-    return { cues: [...cues.slice(0, index + 1), { playerText: line, duration: 1600 }, ...cues.slice(index + 1)], last, lastPlayer: line };
+    return { cues: [...cues.slice(0, index + 1), { playerText: line, duration: 850 }, ...cues.slice(index + 1)], last, lastPlayer: line };
   }
   const candidates = cues.map((cue, index) => ({ moment: cue.rivalMoment, index }));
   if (next.opponent.hp > 0 && next.opponent.hp <= next.opponent.stats.hp * .25) candidates.unshift({ moment: "low", index: Math.max(0, cues.length - 2) });
@@ -259,7 +314,7 @@ export function rivalCues(cues: BattleCue[], encounter: Encounter, next: BattleS
   for (const { moment, index } of candidates) {
     if (!moment) continue;
     const line = encounterLine(encounter, moment, seedFor(`${next.round}:${moment}`, encounter.individual.seed), last, true);
-    if (line) return { cues: [...cues.slice(0, index + 1), { rivalText: line, duration: 1600 }, ...cues.slice(index + 1)], last: line };
+    if (line) return { cues: [...cues.slice(0, index + 1), { rivalText: line, duration: 850 }, ...cues.slice(index + 1)], last: line };
   }
   return { cues, last };
 }
@@ -267,13 +322,22 @@ export function rivalCues(cues: BattleCue[], encounter: Encounter, next: BattleS
 // The engine emits effectiveness before damage; only the presentation order changes.
 export function battleCues(events: readonly BattleEvent[], names: Record<Side, string>, options: { seed?: number; lastResult?: string; state?: BattleState } = {}): BattleCue[] {
   const cues: BattleCue[] = [];
+  const consumed = new Set<BattleEvent>();
   let effectiveness: Extract<BattleEvent, { type: "effectiveness" }> | undefined;
   for (const event of events) {
+    if (consumed.has(event)) continue;
     switch (event.type) {
       case "action": {
         const rawId = battleFxId(event.action), id = rawId ? battleEffectId(rawId) : undefined, fx = id ? BATTLE_MOVE_FX[id] : undefined;
         const move = moveFor(event.action);
-        cues.push({ moveName: event.action.kind === "quit" ? undefined : actionLabel(event.action), side: event.side, seenMove: rawId, duration: event.action.kind === "quit" ? 0 : 1200,
+        if (event.action.kind === "item") {
+          cues.push({ result: `${names[event.side]} · ${actionLabel(event.action)} 사용!`, side: event.side, duration: 1000 });
+          const category = ITEM_BY_ID[event.action.itemId].category;
+          if (category === "cleanse") cues.push({ fx: "cleanse", side: event.side, duration: 500 });
+          if (["critical","survive","cancel"].includes(category ?? "")) cues.push({ fx: "buff", side: event.side, duration: 500 });
+          break;
+        }
+        cues.push({ moveName: event.action.kind === "quit" || move?.finisher ? undefined : actionLabel(event.action), side: event.side, seenMove: rawId, duration: event.action.kind === "quit" || move?.finisher ? 0 : 300,
           playerMoment: event.side === "player" && move?.kind === "defense" ? "start" : undefined,
           rivalMoment: event.side === "opponent" ? move?.finisher ? "finisher" : move?.kind === "defense" ? "guard" : move?.kind === "attack" ? "attack" : "round" : undefined });
         if (fx && (event.action.kind === "rest" || event.action.kind === "move" && (MOVE_BY_ID[event.action.moveId].kind !== "attack" || MOVE_BY_ID[event.action.moveId].mode === "charge" && event.action.phase !== "release"))) {
@@ -283,30 +347,51 @@ export function battleCues(events: readonly BattleEvent[], names: Record<Side, s
       }
       case "hit": case "miss": {
         const id = battleEffectId(event.moveId);
-        cues.push({ motion: "skill", moveFx: id, side: event.side, target: event.target, missed: event.type === "miss", duration: BATTLE_MOVE_FX[id].duration });
-        if (event.type === "miss") cues.push({ result: "빗나갔다!", duration: 1200, rivalMoment: event.side === "opponent" ? "miss" : undefined });
+        const tail = events.slice(events.indexOf(event) + 1);
+        const boundary = tail.findIndex(e => e.type === "hit" || e.type === "miss" || e.type === "action");
+        const impactEvents = boundary < 0 ? tail : tail.slice(0, boundary);
+        const damage = event.type === "hit" ? impactEvents.find((e): e is Extract<BattleEvent, { type: "damage" }> => e.type === "damage" && e.target === event.target && e.side === event.side) : undefined;
+        const effect = impactEvents.find((e): e is Extract<BattleEvent, { type: "effectiveness" }> => e.type === "effectiveness" && e.target === event.target);
+        if (damage) consumed.add(damage);
+        if (effect) consumed.add(effect);
+        const finisher = !!MOVE_BY_ID[event.moveId]?.finisher;
+        const blocked = damage?.amount === 0;
+        const defenseAction = events.slice(0, events.indexOf(event)).findLast(e => e.type === "action" && e.side === event.target);
+        const defense = defenseAction?.type === "action" ? moveFor(defenseAction.action)?.defense : options.state?.[event.target].defense?.kind;
+        const guarded = !!defense && !!damage && !MOVE_BY_ID[event.moveId]?.breaksDefense;
+        const badges = [damage?.critical ? "크리티컬!" : "", effect?.hint === "good" ? "효과가 컸다!" : effect?.hint === "weak" ? "효과가 미미했다…" : ""].filter(Boolean).join(" · ");
+        cues.push({ motion: "skill", moveFx: id, side: event.side, target: event.target, missed: event.type === "miss", event: damage,
+          impactSide: event.target, amount: damage?.amount, critical: damage?.critical, blocked, guarded,
+          fx: damage ? damage.critical || effect?.hint === "good" ? "hit-good" : "hit" : undefined,
+          result: finisher ? undefined : event.type === "miss" ? "빗나갔다!" : blocked ? "막아 냈다!" : badges,
+          finisher: finisher ? "impact" : undefined, finisherId: finisher ? event.moveId : undefined,
+          duration: finisher ? FINISHER_MS.impact : Math.min(550, BATTLE_MOVE_FX[id].duration) });
+        if (finisher) cues.push({ finisher: "afterglow", finisherId: event.moveId, side: event.side, target: event.target, blocked, guarded,
+          result: event.type === "miss" ? "빗나갔다!" : blocked ? defense === "counter" ? "되받아쳤다!" : defense === "evade" ? "흘려 냈다!" : "막아 냈다!" : guarded ? "버텨 냈다!" : "필살!", text: badges || undefined, duration: FINISHER_MS.afterglow });
         break;
       }
       case "effectiveness": effectiveness = event; break;
       case "damage":
-        cues.push({ motion: effectiveness?.hint === "weak" ? "weak-hit" : "hit", fx: event.critical || effectiveness?.hint === "good" ? "hit-good" : "hit", side: event.target, amount: event.amount, critical: event.critical, duration: 500,
+        cues.push({ event, motion: effectiveness?.hint === "weak" ? "weak-hit" : "hit", fx: event.critical || effectiveness?.hint === "good" ? "hit-good" : "hit", side: event.target, amount: event.amount, critical: event.critical, duration: 450,
           rivalMoment: event.critical ? event.side === "opponent" ? "crit_deal" : "crit_take" : event.target === "opponent" ? "hit" : undefined });
-        cues.push({ event, duration: 900 });
-        if (event.critical) cues.push({ result: "크리티컬!", duration: 1200 });
+        if (event.critical) cues[cues.length - 1].result = "크리티컬!";
         if (effectiveness) {
-          if (effectiveness.hint !== "normal") cues.push({ result: effectiveness.hint === "good" ? "효과가 컸다!" : "효과가 미미했다…", motion: effectiveness.hint === "good" ? "effective" : undefined, duration: 1200, rivalMoment: event.side === "opponent" ? effectiveness.hint === "good" ? "effective" : "ineffective" : undefined });
+          if (effectiveness.hint !== "normal") cues[cues.length - 1].result = [cues.at(-1)!.result, effectiveness.hint === "good" ? "효과가 컸다!" : "효과가 미미했다…"].filter(Boolean).join(" · ");
           effectiveness = undefined;
         }
         break;
       case "energy":
-        cues.push({ event, duration: event.amount > 0 ? 300 : 0 });
+        cues.push({ event, side: event.side, fx: event.amount > 0 ? "energy" : undefined, amount: event.amount > 0 ? event.amount : undefined, duration: event.amount > 0 ? 500 : 0 });
         break;
       case "reveal": cues.push({ event, result: event.affinity === "weak" ? "유독 잘 통했다!" : "잘 버텨 낸다…", duration: 1200 }); break;
-      case "momentum": cues.push({ event, duration: 300, rivalMoment: event.side === "opponent" && event.amount > 0 ? "momentum" : undefined }); break;
-      case "finisher": cues.push({ side: event.side, cutin: true, duration: 1200, rivalMoment: event.side === "opponent" ? "finisher" : undefined }); break;
+      case "momentum": cues.push({ event, duration: 0, rivalMoment: event.side === "opponent" && event.amount > 0 ? "momentum" : undefined }); break;
+      case "finisher":
+        cues.push({ side: event.side, cutin: true, finisher: "cutin", finisherId: event.moveId, duration: FINISHER_MS.cutin });
+        cues.push({ side: event.side, finisher: "charge", finisherId: event.moveId, duration: FINISHER_MS.charge });
+        break;
       case "heal": cues.push({ event, motion: "heal", fx: "heal", side: event.side, amount: event.amount, duration: 900 }); break;
-      case "status": cues.push({ event, side: event.side, fx: event.change === "blocked" ? "shield" : event.change === "removed" ? undefined : event.status === "stagger" || event.status === "blur" ? "dizzy" : event.status === "slow" || event.status === "winded" ? "sleepy" : "debuff", duration: 500 }); if (event.status === "open" && event.change === "applied" && !events.some(e => e.type === "action" && e.side === event.side && moveFor(e.action)?.defense === "counter")) cues.push({ result: "빈틈을 보였다…", duration: 1200 }); break;
-      case "buff": cues.push({ event, side: event.side, fx: event.change === "applied" ? "buff" : "debuff", duration: 500 }); break;
+      case "status": cues.push({ event, side: event.side, fx: event.change === "blocked" ? "shield" : event.change === "removed" ? "cleanse" : event.status === "stagger" || event.status === "blur" ? "dizzy" : event.status === "slow" || event.status === "winded" ? "sleepy" : "debuff", duration: 500 }); if (event.status === "open" && event.change === "applied" && !events.some(e => e.type === "action" && e.side === event.side && moveFor(e.action)?.defense === "counter")) cues.push({ result: "빈틈을 보였다…", duration: 1200 }); break;
+      case "buff": cues.push({ event, side: event.side, fx: event.change === "applied" ? events.some(e => e.type === "action" && e.side !== event.side && moveFor(e.action)?.support?.debuff === event.stat) ? "debuff" : "buff" : undefined, duration: 500 }); break;
       case "shield": cues.push({ event, side: event.side, fx: event.change === "applied" ? "shield" : undefined, duration: 500 }); break;
       case "end": cues.push({ motion: "finish", outcome: event.outcome, duration: 600 }); break;
     }

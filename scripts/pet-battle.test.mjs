@@ -17,8 +17,8 @@ const make = (player = "B001", opponent = "B002", level = 10, seed = 27) => crea
 function freeze(value) { Object.freeze(value); for (const child of Object.values(value)) if (child && typeof child === "object" && !Object.isFrozen(child)) freeze(child); return value; }
 function quiet(state) { state.opponentAction = rest; return state; }
 
-test("12종·235기술·8기존아이템과 학습/성장/슬롯 무결성", () => {
-  assert.equal(BREEDS.length,12); assert.equal(MOVES.length,235); assert.equal(ITEMS.length,8);
+test("12견종·305기술·8기존아이템과 학습/성장/슬롯 무결성", () => {
+  assert.equal(BREEDS.length,12); assert.equal(MOVES.length,305); assert.equal(ITEMS.length,8);
   for (const list of [BREEDS,MOVES,ITEMS]) {
     assert.equal(new Set(list.map(v => v.id)).size,list.length);
     assert.equal(new Set(list.map(v => v.name)).size,list.length);
@@ -199,7 +199,7 @@ test("상태 최대 2개·오래된 상태 교체·갱신·면역과 견종 특�
   assert.ok(applied);
   let state = quiet(make("B007","B001"));
   state = stepRound(state,move("T34")).state;
-  assert.equal(state.player.buffs[0].expires,3);
+  assert.equal(state.player.buffs[0].expires,4);
   state = quiet(make("B005","B001")); state.round = 3; state.player.energy = 0;
   assert.equal(stepRound(state,rest).state.player.energy,7);
   state = make("B002","B001");
@@ -564,6 +564,7 @@ test("소모품 8분류·중복 강화·보호·급소·취소·대장·버티�
   assert.ok(crit.events.some(e=>e.type==="damage"&&e.critical)); assert.equal(crit.state.player.guaranteedCritical,false);
   for(const boss of [false,true]) {
     const state=duel("T01","T01",1,{items:["P13"]}); state.opponent.boss=boss;
+    if(boss) { assert.throws(()=>stepRound(state,{kind:"item",itemId:"P13"})); continue; }
     const result=hitResult(state,{kind:"item",itemId:"P13"});
     assert.equal(result.events.some(e=>e.type==="cancel"),!boss);
     assert.equal(result.events.some(e=>e.type==="action"&&e.side==="opponent"),boss);
@@ -576,7 +577,7 @@ test("소모품 8분류·중복 강화·보호·급소·취소·대장·버티�
   assert.equal(dead.state.outcome,"opponent");
   const state=make(); state.opponent.items=["P05"]; state.opponent.energy=0;
   for(let rng=0;rng<50;rng++) assert.notEqual(chooseOpponentAction({...state,rng}).action.kind,"item");
-  state.opponent.owned=true;
+  state.opponent.owned=true; state.aiTier="boss";
   assert.ok(Array.from({length:50},(_,rng)=>chooseOpponentAction({...state,rng}).action).some(a=>a.kind==="item"));
 });
 
@@ -738,7 +739,7 @@ test("3차 등급·기운·레벨·정책 시뮬레이션", () => {
   if(samples>=16) assert.deepEqual(checks,[]);
 });
 
-test("12종×12종 같은 레벨·AI 승률 35~65%",()=>{
+test("15종×15종 같은 레벨·AI 승률 35~65%",()=>{
   const { SPECIES, ELEMENTS }=loadTS("lib/domine/battle/moves.ts");
   const samples=72, results=[], failures=[];
   // Each duel shares a template; cycle all 12 stat/trait templates and six auras, swapping sides.
@@ -765,13 +766,18 @@ test("12종×12종 같은 레벨·AI 승률 35~65%",()=>{
     }
   }
   const summary={min:results.reduce((a,b)=>a.rate<b.rate?a:b),max:results.reduce((a,b)=>a.rate>b.rate?a:b),rounds:rounds/total,limit:limit/total*100,short:short/total*100,stuck:stuck/rounds*100};
+  const guests=["goblin","orc","slime"].map(species=>{
+    const rows=results.filter(r=>SPECIES[r.a]===species);
+    return {species,min:Math.min(...rows.map(r=>r.rate)),max:Math.max(...rows.map(r=>r.rate))};
+  });
+  console.log("손님 종간 승률",JSON.stringify(guests));
   console.log("종간 대진",JSON.stringify({...summary,failures}));
   if(process.env.BATTLE_REPORT==="1") {
     const path="docs/pet-battle-sim.md",f=n=>n.toFixed(2);
-    const report=`Lv.30·양쪽 보통 AI, 12개 공통 스탯/특성 틀 × 6기운 = 72개 고정 시드, 양쪽 자리 교환. 자동 학습·장착과 종 성향을 함께 적용한다. 12×12 행렬의 대진별 승률(무승부는 승리에서 제외)을 검사한다. 전체 11,232판.\n\n종간 최저 ${summary.min.pair} ${f(summary.min.rate)}%, 최고 ${summary.max.pair} ${f(summary.max.rate)}%. 평균 ${f(summary.rounds)}라운드, 12라운드 ${f(summary.limit)}%, 3라운드 이하 ${f(summary.short)}%, 행동 불가 ${f(summary.stuck)}%. 미달 ${failures.length}개.`;
+    const report=`Lv.30·양쪽 보통 AI, 12개 공통 스탯/특성 틀 × 6기운 = 72개 고정 시드, 양쪽 자리 교환. 자동 학습·장착과 종 성향을 함께 적용한다. ${SPECIES.length}×${SPECIES.length} 행렬의 대진별 승률(무승부는 승리에서 제외)을 검사한다. 전체 ${total.toLocaleString("en-US")}판.\n\n종간 최저 ${summary.min.pair} ${f(summary.min.rate)}%, 최고 ${summary.max.pair} ${f(summary.max.rate)}%. 평균 ${f(summary.rounds)}라운드, 12라운드 ${f(summary.limit)}%, 3라운드 이하 ${f(summary.short)}%, 행동 불가 ${f(summary.stuck)}%. 미달 ${failures.length}개.\n\n손님 대 15종 승률 범위: ${guests.map(g=>`${g.species} ${f(g.min)}~${f(g.max)}%`).join(", ")}.`;
     writeFileSync(path,readFileSync(path,"utf8").replace(/<!-- species:start -->[\s\S]*?<!-- species:end -->/,`<!-- species:start -->\n${report}\n<!-- species:end -->`));
   }
-  assert.equal(results.length,144);
+  assert.equal(results.length,SPECIES.length ** 2);
   assert.ok(summary.rounds>=6&&summary.rounds<=10&&summary.limit<=15&&summary.short<=5&&summary.stuck<=10);
   assert.deepEqual(failures,[]);
 });

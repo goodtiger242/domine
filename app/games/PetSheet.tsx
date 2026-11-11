@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useLayoutEffect, useId, useRef, type ReactNode } from "react";
+import { ownPetSheet } from "@/lib/domine/pet-sheet-history";
 
 export default function PetSheet({ title, onClose, onBack, children, toolbar, panel, footer, fullHeight = false }: {
   title: string; onClose: () => void; onBack?: () => boolean; children: ReactNode;
@@ -20,10 +21,7 @@ export default function PetSheet({ title, onClose, onBack, children, toolbar, pa
   }, [hasPanel]);
   useEffect(() => {
     const dialog = ref.current, opener = document.activeElement as HTMLElement | null;
-    const body = document.body, scrollY = window.scrollY;
-    const saved = { overflow: body.style.overflow, position: body.style.position, top: body.style.top, width: body.style.width };
-    let popped = false;
-    Object.assign(body.style, { overflow: "hidden", position: "fixed", top: `-${scrollY}px`, width: "100%" });
+    const release = ownPetSheet(() => latest.current.onBack?.() ?? false, () => latest.current.onClose());
     dialog?.showModal();
     if (!opener?.matches?.(":focus-visible")) dialog?.focus({ preventScroll: true });
     const viewport = window.visualViewport;
@@ -32,17 +30,10 @@ export default function PetSheet({ title, onClose, onBack, children, toolbar, pa
       dialog?.style.setProperty("--pet-keyboard-bottom", `${Math.max(0, window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0))}px`);
     };
     resize(); viewport?.addEventListener("resize", resize); viewport?.addEventListener("scroll", resize);
-    history.pushState({ ...history.state, petSheet: heading }, "");
-    const back = () => {
-      if (latest.current.onBack?.()) { history.pushState({ ...history.state, petSheet: heading }, ""); return; }
-      popped = true; latest.current.onClose();
-    };
-    window.addEventListener("popstate", back);
     return () => {
-      window.removeEventListener("popstate", back);
-      if (!popped && history.state?.petSheet === heading) history.back();
+      release();
       viewport?.removeEventListener("resize", resize); viewport?.removeEventListener("scroll", resize);
-      dialog?.close(); Object.assign(body.style, saved); window.scrollTo({ top: scrollY, behavior: "instant" }); opener?.focus({ preventScroll: true });
+      dialog?.close(); if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, [heading]);
   return <dialog ref={ref} className="pet-sheet" data-full-height={fullHeight} aria-labelledby={heading} tabIndex={-1}

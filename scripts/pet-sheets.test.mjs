@@ -107,8 +107,8 @@ assert.ok(button(shop.tree.props.footer, "착용 해제"));
 
 const poor = mount("PetShopSheet", { state: { ...state, coins: 0 }, petId: 2, disabled: false, notice: "", onClose() {}, execute: async () => assert.fail("insufficient balance must not execute") });
 poor.render(); assert.match(text(cards(poor.tree)[0]), /🪙 40/); cards(poor.tree)[0].props.onClick(); poor.render();
-button(poor.tree.props.footer, "구매 40").props.onClick(); poor.render();
-assert.match(text(poor.tree.props.panel), /40코인 부족해요/);
+assert.equal(button(poor.tree.props.footer, "구매 40").props.disabled, true);
+assert.match(text(poor.tree.props.footer), /40코인 부족해요/);
 
 let selectedPet, openedShop = false;
 const bag = mount("PetShopSheet", { state: { ...state, inventory: ["061", "073"], equipment: [{ pet_id: 1, slot: "wearable", item_id: "061" }] }, bag: true, petId: 1, disabled: false, notice: "", onClose() {}, onSelectPet: id => { selectedPet = id; }, onShop: () => { openedShop = true; }, execute: async command => { calls.push(command); } });
@@ -118,8 +118,10 @@ assert.equal(calls.at(-1).item, null, "one tap on equipped bag item removes it")
 cards(bag.tree)[1].props.onClick(); await Promise.resolve(); bag.render();
 assert.equal(calls.at(-1).item, "073", "one tap on owned bag item equips it");
 button(bag.tree.props.toolbar, "미네").props.onClick(); assert.equal(selectedPet, 2);
-bag.render({ petId: 2, state: { ...state, inventory: [] } }); assert.equal(cards(bag.tree).length, 0);
-button(bag.tree.props.footer, "상점 가기").props.onClick(); assert.ok(openedShop);
+bag.render({ petId: 2, state: { ...state, inventory: [] }, onFindOpponent: () => { openedShop = true; } }); assert.equal(cards(bag.tree).length, 0);
+button(bag.tree.props.footer, "상대 찾기").props.onClick(); assert.ok(openedShop);
+assert.match(text(bag.tree), /승리하면 코인을 얻어요/);
+assert.doesNotMatch(text(bag.tree), /상점 가기|전투 물품이 없어요|가방이 비었어요/);
 
 const album = mount("PetAlbumSheet", { state: { ...state, album: ["001", "061"], season: "advent" }, disabled: false, notice: "", map: "church", execute: async command => calls.push(command), onClose() {} });
 album.render(); assert.equal(cards(album.tree).length, 96);
@@ -144,7 +146,7 @@ const events = new Map(), viewportEvents = new Map();
 const style = { overflow: "auto", position: "", top: "", width: "" };
 globalThis.document = { body: { style }, activeElement: { focus() {}, isConnected: true } };
 globalThis.window = { scrollY: 120, innerHeight: 780, scrollTo(value) { restoredScroll = value.top; }, addEventListener: (key, fn) => events.set(key, fn), removeEventListener: key => events.delete(key), visualViewport: { height: 780, offsetTop: 0, addEventListener: (key, fn) => viewportEvents.set(key, fn), removeEventListener: key => viewportEvents.delete(key) } };
-globalThis.history = { state: { original: true }, pushState(value) { this.state = value; }, back() { backs++; } };
+globalThis.history = { state: { original: true }, pushState(value) { this.state = value; }, back() { backs++; this.state = { original: true }; events.get("popstate")?.(); } };
 const sheet = mount("PetSheet", { title: "가방", children: "목록", onClose() { closed++; }, onBack: () => false });
 sheet.render();
 const dialog = { showModal() {}, close() {}, focus() {}, style: { setProperty() {} } };
@@ -167,6 +169,46 @@ sheet.render({ onBack: () => false }); sheet.flushEffects(); sheet.tree.props.on
 sheet.unmount(); assert.equal(style.position, ""); assert.equal(style.overflow, "auto"); assert.equal(restoredScroll, 120); assert.equal(backs, 1); assert.equal(events.size, 0); assert.equal(viewportEvents.size, 0);
 console.log("Pet sheet shell: 80px drag, scroll-top guard, cancel, backdrop, back navigation and scroll restoration passed.");
 
+// Real asynchronous history order, including a replacement while Back is still in flight.
+{
+  const savedWindow = globalThis.window, savedHistory = globalThis.history;
+  const { ownPetSheet } = loadTS("lib/domine/pet-sheet-history.ts");
+  let now = 0, closed = [], pending = [];
+  const stack = [{ page: "home" }], listeners = new Map();
+  globalThis.window = { scrollY: 120, scrollTo() {}, addEventListener: (key, fn) => listeners.set(key, fn), removeEventListener: key => listeners.delete(key) };
+  globalThis.history = { state: stack[0], pushState(value) { stack.push(value); this.state = value; }, back() {
+    pending.push({ at: now + 300, fn() { stack.pop(); history.state = stack.at(-1); listeners.get("popstate")?.({ state: history.state }); } });
+  } };
+  const tick = ms => { now += ms; while (pending[0]?.at <= now) pending.shift().fn(); };
+  const open = (name, back = () => false) => {
+    const release = ownPetSheet(back, () => { closed.push(name); release(); });
+    return release;
+  };
+  try {
+    const a = open("map"), tokenA = history.state.petSheetOwner; a();
+    const b = open("battle"); tick(299);
+    assert.equal(history.state.petSheetOwner, tokenA); assert.deepEqual(closed, []);
+    tick(1); const tokenB = history.state.petSheetOwner;
+    assert.notEqual(tokenB, tokenA); assert.deepEqual(closed, []);
+    let details = true;
+    const child = open("detail", () => { if (!details) return false; details = false; return true; });
+    history.back(); tick(300); assert.equal(details, false); assert.deepEqual(closed, []);
+    child(); const next = open("shop"); tick(300);
+    assert.deepEqual(closed, []); assert.equal(style.overflow, "hidden");
+    next(); tick(300); assert.equal(history.state.petSheetOwner, tokenB);
+    history.back(); tick(300); assert.deepEqual(closed, ["battle"]);
+    assert.equal(stack.length, 1); assert.equal(style.overflow, "auto");
+    b();
+    // StrictMode setup -> cleanup -> setup and two rapid replacements.
+    const replay = open("replay"); replay();
+    const transient = open("transient"); transient();
+    const final = open("final"); tick(300);
+    assert.deepEqual(closed, ["battle"]); assert.equal(stack.length, 2);
+    final(); tick(300); assert.equal(stack.length, 1); assert.equal(listeners.size, 0);
+  } finally { globalThis.window = savedWindow; globalThis.history = savedHistory; }
+  console.log("Sheet ownership: 300ms delayed Back, rapid replacement, nested owner, StrictMode and shared body lock passed.");
+}
+
 let battlePause = false;
 const battleGame = { ...game, registered: true, worldReady: true, petId: 2, personal: { levels: { 2: 40 } },
   machine: { command: "idle", visual: "idle", committedMap: "E5" },
@@ -186,7 +228,9 @@ for (const cell of ["E5", "D5"]) {
   battleGame.machine.committedMap = cell; battleView.render();
   assert.equal(typeof scene().props.onBattle, "function"); assert.equal(scene().props.encounters.length, 0);
   scene().props.onBattle(); battleView.render(); assert.equal(battlePause, false);
-  button(battleView.tree, "여긴 겨룰 상대가 없어요 · 지도에서 🐾를 찾아보세요").props.onClick(); battleView.render();
+  button(battleView.tree, "상대가 없어요 · 지도에서 찾기").props.onClick(); battleView.render();
+  const map = nodes(battleView.tree, n => "showAnimals" in n.props)[0];
+  assert.equal(map.props.showAnimals, true); map.props.onClose(); battleView.render();
   assert.equal(nodes(battleView.tree, n => n.props?.className === "pet-encounter-notice").length, 0, "tapping the notice closes it");
 }
 const slot = encounterSlot(), found = PET_WORLD.find(cell => spawnsFor(cell.id, 40, slot).length === 1);
@@ -265,3 +309,27 @@ world.render({ wins: [`${slot}:${found.id}`] }); assert.doesNotMatch(place().pro
 world.render({ wins: [], slot: slot + 1 });
 assert.equal(place().props["aria-label"].includes("마리"), !!encounterFor(found.id, 40, slot + 1));
 console.log("Encounter clock: open map/scene refresh, frozen battles, immediate catch-up and map win filtering passed.");
+
+const { CONSUMABLES } = loadTS("lib/domine/battle/data.ts");
+const kingState = { coins: 100, version: 1, features: { items: true }, prices: Object.fromEntries(CONSUMABLES.map(i=>[i.id,i.price])), pets: [{pet:1,inventory:{P01:2}},{pet:2,inventory:{P01:9}}], tickets: [] };
+let buys=0, finishBuy;
+const combat = mount("PetShopSheet", {state,petId:1,disabled:false,notice:"",onClose(){},execute:async()=>{},kingState,buyItem:async(pet,id)=>{assert.equal(pet,1);assert.equal(id,"P01");buys++;await new Promise(resolve=>{finishBuy=resolve});return "구매했어요";}});
+combat.render();button(combat.tree.props.toolbar,"전투 물품").props.onClick();combat.render();
+const products=()=>nodes(combat.tree,n=>n.props.className==="pet-combat-product");
+assert.equal(products().length,14);assert.match(text(products()[0]),/x2/);assert.match(text(products()[0]),/체력 10%/);
+const buy=nodes(combat.tree,n=>n.props["aria-label"]==="작은 물약 구매")[0];buy.props.onClick();buy.props.onClick();combat.render();assert.equal(buys,1);
+finishBuy();await Promise.resolve();await Promise.resolve();combat.render({kingState:{...kingState,coins:85,pets:[{pet:1,inventory:{P01:3}}]}});
+assert.match(text(products()[0]),/x3/);assert.ok(nodes(combat.tree.props.toolbar,n=>n.props["aria-label"]==="우리 코인(공용) 85").length);
+combat.render({petId:2,kingState});assert.ok(nodes(combat.tree,n=>n.props["aria-label"]==="작은 물약 구매")[0].props.disabled);assert.match(text(combat.tree),/최대 9개/);
+combat.render({petId:1,kingState:{...kingState,coins:0}});assert.ok(nodes(combat.tree,n=>n.props["aria-label"]==="작은 물약 구매")[0].props.disabled);assert.match(text(combat.tree),/15코인 부족/);
+console.log("Combat shop: 14 cards, server quantities, cap, coins and duplicate clicks passed.");
+
+const selectedEncounter=PET_WORLD.map(c=>encounterFor(c.id,30,10)).find(Boolean);
+let carried=[];
+const packing=mount("PetEncounterSheet",{encounters:[selectedEncounter],selected:selectedEncounter,petId:1,inventory:{P01:3,P04:2,P06:1,P10:1},items:carried,onItems:next=>{carried=next;},onSelect(){},onStart(){},onClose(){}},{"next/image":{default:"img"}});
+const chip=name=>nodes(packing.tree,n=>n.type==="button"&&text(n).startsWith(name))[0];
+packing.render();
+for(const name of ["작은 물약","시원한 물","힘나는 간식"]) {chip(name).props.onClick();packing.render({items:carried});}
+assert.deepEqual(carried,["P01","P04","P06"]);assert.ok(chip("정신 번쩍 껌").props.disabled);
+chip("작은 물약").props.onClick();packing.render({items:carried});assert.equal(chip("정신 번쩍 껌").props.disabled,false);
+console.log("Encounter items: owned quantities, three-type limit and chip toggle passed.");

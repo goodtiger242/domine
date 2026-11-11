@@ -11,6 +11,7 @@ export type KingFeatures = {
   mastery: boolean; encyclopedia: boolean; certifications: boolean; raids: boolean; drops: boolean;
 };
 export type KingProgress = {
+  wallet?: { coins: number; version: number };
   pet: KingPet; xp: number; streak: number; level: number; allocation: KingAllocation; unspent: number;
   allocationMode: "auto" | "manual"; job: KingJob | null; jobTier: number;
   jobChangedAt: string | null; moves: string[]; version: number;
@@ -31,10 +32,12 @@ export type KingTicket = {
   snapshot: KingProgress; reserved: Record<string, number>;
 };
 export type KingSettlement = {
+  progress?: KingProgress; wallet?: { coins: number; version: number };
   ticket: string; outcome: KingOutcome; xp: number; coins: number; streak: number;
   levelBefore: number; levelAfter: number; eligible: boolean; contribution: number; drop: string | null;
 };
 export type KingState = {
+  resetEpoch?: string;
   coins: number; version: number; features: KingFeatures; pets: KingProgress[];
   slot: number; departed: KingSpawn[]; watching: KingWatching[];
   encyclopedia: KingEncounter[]; certifications: KingCertification[]; raids: KingRaid[];
@@ -68,6 +71,32 @@ export type KingRpc = (name: string, args: {
   p_nickname: string; p_secret: string; p_request_id: string; p_kind: string; p_input: object;
 }) => PromiseLike<{ data: unknown; error: { code?: string; message: string } | null }>;
 
+const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const count = (v: unknown) => Number.isSafeInteger(v) && Number(v) >= 0;
+const counts = (v: unknown) => record(v) && Object.values(v).every(count);
+const wallet = (v: unknown) => record(v) && count(v.coins) && count(v.version);
+const progress = (v: unknown): boolean => record(v) && (v.pet === 1 || v.pet === 2) && count(v.xp)
+  && count(v.version) && count(v.level) && Number(v.level) >= 1 && counts(v.allocation)
+  && ["hp", "attack", "defense", "speed", "focus", "calm"].every(k => record(v.allocation) && count(v.allocation[k]))
+  && counts(v.inventory) && counts(v.mastery) && Array.isArray(v.moves) && v.moves.every(m => typeof m === "string")
+  && (!v.wallet || wallet(v.wallet));
+const settlement = (v: unknown): boolean => record(v) && typeof v.ticket === "string"
+  && ["win", "lose", "draw", "quit"].includes(String(v.outcome)) && count(v.xp) && count(v.coins)
+  && count(v.levelBefore) && count(v.levelAfter) && (!v.progress || progress(v.progress)) && (!v.wallet || wallet(v.wallet));
+const ticket = (v: unknown): boolean => record(v) && typeof v.id === "string" && progress(v.snapshot)
+  && counts(v.reserved) && typeof v.expiresAt === "string" && (!v.result || settlement(v.result));
+function validData(kind: string, v: unknown): boolean {
+  if (kind === "state") return record(v) && wallet(v) && record(v.features) && counts(v.prices)
+    && ["pets", "departed", "watching", "encyclopedia", "certifications", "raids", "tickets"].every(k => Array.isArray(v[k]))
+    && (v.pets as unknown[]).every(progress) && (v.tickets as unknown[]).every(ticket)
+    && ["departed", "watching", "encyclopedia", "certifications", "raids"].every(k => (v[k] as unknown[]).every(record));
+  if (kind === "start") return ticket(v);
+  if (kind === "finish") return settlement(v);
+  if (["allocate", "chooseJob", "equipMoves", "buyItem"].includes(kind)) return progress(v);
+  if (kind === "pickup") return record(v) && typeof v.found === "boolean" && count(v.coins) && typeof v.pouch === "boolean";
+  return true;
+}
+
 /** Keep requestId for uncertain network retries; a cached rejection needs a new requestId. */
 export function createKingApi(rpc: KingRpc) {
   async function call<T>(identity: PetIdentity, requestId: string, kind: string, input: object): Promise<KingReply<T>> {
@@ -81,6 +110,7 @@ export function createKingApi(rpc: KingRpc) {
       || !("code" in data) || typeof data.code !== "string"
       || !("requestId" in data) || data.requestId !== requestId
       || !("serverNow" in data) || typeof data.serverNow !== "string") throw new Error("INVALID_RESPONSE");
+    if (data.ok && (!("data" in data) || !validData(kind, data.data))) throw new Error("INVALID_RESPONSE");
     return { ...data, supported: true } as KingReply<T>;
   }
   return {

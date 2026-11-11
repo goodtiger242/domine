@@ -86,7 +86,8 @@ export function affinity(move: Move, attacker: Fighter, defender: Fighter, known
 }
 export function moveEnergy(move: Move, actor: Fighter): number {
   const job = selectedJob(actor.job);
-  return move.kind !== "attack" && job?.nodes?.[move.id] === 2 ? Math.max(1,move.energy - 1) : move.energy;
+  const cost = move.kind !== "attack" && job?.nodes?.[move.id] === 2 ? Math.max(1,move.energy - 1) : move.energy;
+  return Math.max(0, cost - ("discount" in actor ? Math.floor(Number(actor.discount ?? 0)) : 0));
 }
 export function effectHint(move: Move, attacker: Fighter, defender: Fighter): Hint {
   const rate = move.kind === "attack" ? affinity(move,attacker,defender,true) : 1;
@@ -152,7 +153,7 @@ export function effectiveStat(actor: Fighter | Actor, stat: Exclude<Stat, "hp">,
   let rate = 1;
   if ("buffs" in actor) {
     if (actor.recoil?.stat === stat && actor.recoil.expires >= round) rate *= 1 - (actor.recoil.rate ?? 0);
-    rate *= 1 + Math.max(0,...actor.buffs.filter(b => b.stat === stat && b.expires >= round).map(b => b.rate ?? .15));
+    rate *= 1 + clamp(actor.buffs.filter(b => b.stat === stat && b.expires >= round).reduce((sum,b) => sum + (b.rate ?? .15),0), -.3, .3);
     const penalty = { attack: ["stagger", .85], defense: ["open", .85], speed: ["slow", .8], focus: ["tense", .8] } as const;
     if (stat !== "calm" && actor.statuses.some(s => s.id === penalty[stat][0])) rate *= penalty[stat][1];
   }
@@ -164,7 +165,7 @@ export function normalizedStat(actor: Fighter | Actor, stat: Exclude<Stat,"hp">,
   return effectiveStat(actor,stat,round) / growthScale(actor.level);
 }
 export function critChance(attacker: Fighter | Actor): number {
-  return clamp(5 + normalizedStat(attacker,"focus") * .2 + fighterProfile(attacker).critBonus,5,25);
+  return clamp(5 + normalizedStat(attacker,"focus") * .2 + fighterProfile(attacker).critBonus + ("prepared" in attacker ? attacker.prepared?.critical ?? 0 : 0),5,25);
 }
 export function hitChance(move: Move, attacker: Fighter | Actor, defender: Fighter | Actor, round = 1): number {
   if (move.kind !== "attack") return 100;
@@ -200,7 +201,8 @@ export function damageAt(move: Move, attacker: Fighter | Actor, defender: Fighte
     * 40 / (40 + (defender.baseStats ?? defender.stats)[move.group === "bond" ? "calm" : "defense"] / growthScale(defender.level)) * Math.sqrt(growthScale(attacker.level) * growthScale(defender.level)) * .92;
   const adjusted = (1.5 * power + .45 * offense) / hits * 40 / (40 + defense) * Math.sqrt(growthScale(attacker.level) * growthScale(defender.level)) * .92;
   const sameElement = move.group === (attacker.element ?? a.group) ? 1.15 : 1;
-  const multiplier = clamp(adjusted / base * levelRate * affinity(move,attacker,defender) * sameElement * trait * exposed * finalMultiplier * roll * breakRate,.5,2);
+  const preparation = "prepared" in attacker && attacker.prepared && attacker.prepared.expires >= round ? 1 + attacker.prepared.power + (move.breaksDefense ? attacker.prepared.read : 0) : 1;
+  const multiplier = clamp(preparation * adjusted / base * levelRate * affinity(move,attacker,defender) * sameElement * trait * exposed * finalMultiplier * roll * breakRate,.5,2);
   // Defense and guard timing stay outside the floor: a successful counter must still negate damage.
   return Math.min(Math.floor(defender.stats.hp * (move.finisher || move.mode === "charge" ? .5 : .35) / hits),
     Math.max(1,Math.floor(base * multiplier * shield)));
@@ -210,9 +212,9 @@ export function defenseMultiplier(move: Move, defender: Fighter | Actor, round =
   const defense = "defense" in defender ? defender.defense : undefined;
   if (!defense || defense.expires < round || move.breaksDefense) return 1;
   const reduction = defense.kind === "guard" ? .6 : defense.kind === "stance" ? .3
-    : defense.kind === "counter" ? (move.contact ? 1 : 0)
+    : defense.kind === "counter" ? (move.contact || defense.read ? 1 : 0)
     : move.mode === "multi" ? .5 : move.mode === "charge" || move.finisher ? 1 : 0;
-  return 1 - reduction * defense.strength;
+  return Math.max(0, 1 - reduction * defense.strength);
 }
 // Damage range is conditional on a hit; hitChance is reported separately.
 export function previewDamage(move: Move, attacker: Fighter | Actor, defender: Fighter | Actor, round = 1) {
@@ -241,6 +243,22 @@ export function moveFor(action: Action): Move | undefined {
 export function recoveryLeft(actor: Actor): number {
   return Math.max(0, Math.min(actor.stats.hp - actor.hp, Math.floor(actor.stats.hp * .60) - actor.healed));
 }
+export function itemUnavailable(state: BattleState, side: Side, id: string): string {
+  const actor = state[side], target = state[side === "player" ? "opponent" : "player"], item = ITEM_BY_ID[id];
+  const items = actor.items ?? (actor.consumable ? [actor.consumable] : []);
+  if (!item || !items.includes(id)) return "반입하지 않은 물품";
+  if ((actor.usedItems?.filter(i => i === id).length ?? (actor.itemUsed ? 1 : 0)) >= items.filter(i => i === id).length) return "이미 사용했어요";
+  if (state.outcome) return "끝난 대결이에요";
+  if (actor.charging) return "충전 중이에요";
+  if (item.heal && actor.hp >= actor.stats.hp) return "체력이 가득해요";
+  if (item.heal && !recoveryLeft(actor)) return "회복 한도에 닿았어요";
+  if (item.energy && actor.energy >= MAX_ENERGY) return "기력이 가득해요";
+  if (item.buff && actor.buffs.some(b => b.stat === item.buff && (b.rate ?? .15) > 0 && b.expires >= state.round)) return "이미 강화됐어요";
+  if (item.category === "cleanse" && !actor.statuses.length && !actor.exposedUntil && !actor.buffs.some(b => (b.rate ?? 0) < 0)) return "해제할 상태가 없어요";
+  if (item.category === "protect" && actor.shield || item.category === "critical" && actor.guaranteedCritical || item.category === "survive" && (actor.survival || actor.survivalUsed)) return "이미 사용했어요";
+  if (item.category === "cancel" && target.boss) return "대장에게는 통하지 않아요";
+  return "";
+}
 export function availableActions(state: BattleState, side: Side): Action[] {
   if (state.outcome) return [];
   const actor = state[side];
@@ -248,17 +266,12 @@ export function availableActions(state: BattleState, side: Side): Action[] {
   const result: Action[] = [{ kind: "push" }, { kind: "rest" }];
   for (const id of actor.moves) {
     const move = MOVE_BY_ID[id];
-    if (moveEnergy(move,actor) <= actor.energy && !(move.kind === "defense" && actor.statuses.some(s => s.id === "stagger" && s.expires >= state.round)) && (!move.heal || recoveryLeft(actor) > 0)) result.push({ kind: "move", moveId: id, ...(move.mode === "charge" ? { phase: "prepare" as const } : {}) });
+    if (moveEnergy(move,actor) <= actor.energy && !(move.kind === "defense" && actor.statuses.some(s => s.id === "stagger" && s.expires >= state.round)) && (!move.heal || recoveryLeft(actor) > 0 || move.support?.cleanse && (actor.statuses.length > 0 || actor.buffs.some(b => (b.rate ?? 0) < 0))) && (!move.support?.momentum || (actor.momentumCharged ?? 0) < 60)) result.push({ kind: "move", moveId: id, ...(move.mode === "charge" ? { phase: "prepare" as const } : {}) });
   }
   if ((actor.momentum ?? 0) >= 100 && actor.finisher) result.push({ kind: "move", moveId: actor.finisher });
   const items = actor.items ?? (actor.consumable ? [actor.consumable] : []);
   for (const id of new Set(items)) {
-    const item = ITEM_BY_ID[id];
-    if ((actor.usedItems?.filter(i => i === id).length ?? (actor.itemUsed ? 1 : 0)) >= items.filter(i => i === id).length) continue;
-    if (item.heal && !recoveryLeft(actor) || item.energy && actor.energy >= MAX_ENERGY || item.buff && actor.buffs.some(b => b.stat === item.buff && b.expires >= state.round)
-      || item.category === "cleanse" && !actor.statuses.length && !actor.exposedUntil
-      || item.category === "protect" && actor.shield || item.category === "critical" && actor.guaranteedCritical
-      || item.category === "survive" && (actor.survival || actor.survivalUsed)) continue;
+    if (itemUnavailable(state,side,id)) continue;
     result.push({ kind: "item", itemId: id });
   }
   if (side === "player") result.push({ kind: "quit" });

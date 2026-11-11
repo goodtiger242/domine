@@ -141,7 +141,7 @@ test("성공 대사 40%·시드 재현·직전 대사 회피·라운드 한 번�
       for (const [index, cue] of spoken.cues.entries()) {
         if (!cue.playerText && !cue.rivalText) continue;
         assert.ok(!cue.result && !cue.moveName);
-        assert.equal(cue.duration, 1600);
+        assert.equal(cue.duration, 850);
         if (cue.playerText) {
           count++;
           assert.equal(spoken.cues[index - 1].result, "막아 냈다!");

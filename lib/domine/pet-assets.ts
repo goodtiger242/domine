@@ -1,5 +1,6 @@
 export const itemAsset = (id?: string | null) => id && /^0(6[1-9]|7[0-9]|80)$/.test(id) ? `/pet/catalog/${id}.webp` : null;
 export function prepareImage(src: string, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false);
   return new Promise((resolve) => {
     const image = new Image();
     let settled = false;
@@ -12,7 +13,8 @@ export function prepareImage(src: string, signal: AbortSignal): Promise<boolean>
       resolve(ready);
     };
     const cancel = () => finish();
-    const timer = setTimeout(finish, 4000);
+    // Finish before the controller's 2.5s travel deadline, including decode.
+    const timer = setTimeout(finish, 2000);
     image.onload = () => { void image.decode().then(() => finish(true), cancel); };
     image.onerror = cancel;
     signal.addEventListener("abort", cancel, { once: true });

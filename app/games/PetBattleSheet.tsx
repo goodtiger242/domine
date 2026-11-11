@@ -1,23 +1,25 @@
 ﻿"use client";
 
 import Image from "next/image";
+import { ownPetSheet } from "@/lib/domine/pet-sheet-history";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { availableActions, buildFighter, createBattle, effectHint, stepRound } from "@/lib/domine/battle/engine";
-import { BREED_BY_ID } from "@/lib/domine/battle/data";
-import { MAX_ENERGY, MAX_ROUNDS, REST_ENERGY, critChance, effectiveStat, moveFor, sameAction } from "@/lib/domine/battle/rules";
+import { availableActions, createBattle, effectHint, stepRound } from "@/lib/domine/battle/engine";
+import { itemEffect, selectedItems } from "@/lib/domine/pet-king-items";
+import { BREED_BY_ID, ITEM_BY_ID, MOVE_BY_ID } from "@/lib/domine/battle/data";
+import { MAX_ENERGY, MAX_ROUNDS, REST_ENERGY, critChance, effectiveStat, itemUnavailable, moveFor, sameAction } from "@/lib/domine/battle/rules";
 import { seedFor } from "@/lib/domine/battle/rng";
 import type { Action, BattleState, Condition, Side, Stat, Trait } from "@/lib/domine/battle/types";
 import { BREED_BY_ID as KING_BREEDS } from "@/lib/domine/king/species";
-import { actionCost, actionLabel, battleCues, compactEffect, costBadge, encounterLine, moveDamage, moveDetail, movePages, rivalCues, speciesBadges, GROUP_LABEL, HINT_LABEL, hpColor, MOVE_KIND, moveEffect, showBattleEvent, STAT_LABEL, STATUS_LABEL, TAG_LABEL, type BattleCue, type Encounter, type MoveFilter } from "@/lib/domine/pet-battle-view";
+import { actionCost, actionLabel, battleCues, battlePlayer, compactEffect, costBadge, encounterLine, finisherDuration, moveDamage, moveDetail, movePages, rivalCues, speciesBadges, GROUP_LABEL, HINT_LABEL, hpColor, MOVE_KIND, moveEffect, showBattleEvent, STAT_LABEL, STATUS_LABEL, TAG_LABEL, type BattleCue, type Encounter, type MoveFilter } from "@/lib/domine/pet-battle-view";
 import { battleAssets, battleMoveFx, fxSheets } from "@/lib/domine/pet-battle-fx";
 import type { FxSheet } from "@/lib/domine/pet-fx-sheets";
 import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import type { PetStage } from "@/lib/domine/pet";
 import { cellBackground } from "@/lib/domine/pet-cells";
 import { shortBreedName } from "@/lib/domine/breed-short";
-import { battleFinish, createKingBattle, kingRewardLine, KING_LOCAL_NOTICE, type KingApi } from "@/lib/domine/pet-king-client";
+import { battleFinish, createKingBattle, kingProgress, kingRewardLine, KING_LOCAL_NOTICE, type KingApi } from "@/lib/domine/pet-king-client";
 import type { PetIdentity } from "@/lib/domine/pet-identity";
-import type { KingSettlement } from "@/lib/domine/pet-king-rpc";
+import type { KingProgress, KingSettlement } from "@/lib/domine/pet-king-rpc";
 
 const TRAIT_LABEL: Record<Trait, string> = {
   restDamage: "쉰 뒤 첫 공격 강화", earlySpeed: "초반 민첩 증가", firstTrack: "첫 추적 공격 강화",
@@ -27,7 +29,12 @@ const TRAIT_LABEL: Record<Trait, string> = {
 const imageCache = new Map<string, HTMLImageElement>();
 function warmImage(path: string) {
   if (typeof window === "undefined" || typeof window.Image !== "function") return;
-  if (!imageCache.has(path)) { const image = new window.Image(); image.src = path; imageCache.set(path, image); }
+  if (!imageCache.has(path)) {
+    const image = new window.Image();
+    image.onerror = () => { if (imageCache.get(path) === image) imageCache.delete(path); };
+    if (imageCache.size >= 96) imageCache.delete(imageCache.keys().next().value!);
+    imageCache.set(path, image); image.src = path;
+  }
   return imageCache.get(path);
 }
 export function FxSprite({ sheet, reduced, delay = 0, duration = sheet.duration, tint = "none" }: { sheet: FxSheet; reduced: boolean; delay?: number; duration?: number; tint?: string }) {
@@ -50,36 +57,49 @@ function playbackFor(state: BattleState, next: BattleState, cues: BattleCue[]): 
   return { next, cues, index: 0, shown: state, revealed: 0, line: cues[0].text ?? "" };
 }
 
-export default function PetBattleSheet({ encounter, petId, condition, stage, hour, onClose, onWin, kingApi, identity, firstWin, onSettled }: {
+export default function PetBattleSheet({ encounter, petId, condition, stage, hour, onClose, onWin, kingApi, identity, firstWin, onSettled, baseSpeed = 1.7, items = [], onInventoryRefresh, supportMove, growth }: {
+  supportMove?: string; growth?: KingProgress;
+  items?: readonly string[]; onInventoryRefresh?: () => Promise<void>;
   encounter: Encounter; petId: PetId; condition?: Condition; stage: PetStage; hour: number; onClose: () => void; onWin?: () => void;
-  kingApi?: KingApi; identity?: PetIdentity | null; firstWin?: boolean; onSettled?: (result: KingSettlement) => void;
+  kingApi?: KingApi; identity?: PetIdentity | null; firstWin?: boolean; onSettled?: (result: KingSettlement) => void; baseSpeed?: number;
 }) {
   const attempt = useRef(0);
   const names = { player: PETS[petId].name, opponent: encounter.name };
   const lastRival = useRef("");
   const lastPlayer = useRef(""), lastDefenseResult = useRef("");
-  const start = (roundSeed: number, playerLevel = encounter.playerLevel) => createBattle({
+  const start = (roundSeed: number, playerLevel = encounter.playerLevel, carried = items, snapshot = growth) => createBattle({
     seed: seedFor(`${encounter.cellId}:${petId}:${roundSeed}`, encounter.daySeed),
-    player: buildFighter(petId === 1 ? "B001" : "B002", playerLevel, [], { condition }),
+    player: battlePlayer(petId, snapshot?.level ?? playerLevel, condition, carried, supportMove, snapshot),
     opponent: encounter.fighter, difficulty: encounter.difficulty,
   });
   const introduction = (state: BattleState) => playbackFor(state, state, [
-    { motion: "intro", duration: 2400 },
-    { rivalText: encounterLine(encounter, "enter", encounter.individual.seed), duration: 1600 },
+    { motion: "intro", duration: attempt.current ? 450 : 1000 },
+    { rivalText: encounterLine(encounter, "enter", encounter.individual.seed), duration: 750 },
   ]);
   const [battle, setBattle] = useState(() => start(0));
+  const [itemReady, setItemReady] = useState(false);
   const [serverLine, setServerLine] = useState("");
   const [settlement, setSettlement] = useState<KingSettlement | null>(null);
+  const [settlementState, setSettlementState] = useState<"idle" | "pending" | "failed" | "confirmed">("idle");
+  const [rewardStep, setRewardStep] = useState(0);
   const session = useRef<ReturnType<typeof createKingBattle> | null>(null);
   const accounting = useRef({ rounds: 0, moves: {} as Record<string, number> });
   const finalizing = useRef(false);
   const latestBattle = useRef(battle);
   function beginServer(state: BattleState) {
     const next = createKingBattle(kingApi, identity, petId, encounter, state.player.items ?? []);
-    session.current = next;
+    session.current = next; setItemReady(false);
     void next.start().then(reply => {
-      if (session.current === next && !finalizing.current && (!reply?.supported || !reply.ok)) setServerLine(KING_LOCAL_NOTICE);
-    });
+      if (session.current !== next) return;
+      if (!finalizing.current && accounting.current.rounds === 0 && reply?.supported && reply.ok && reply.data?.snapshot) {
+        const ready = { ...state, player: start(attempt.current, reply.data.snapshot.level, state.player.items ?? [], reply.data.snapshot).player };
+        latestBattle.current = ready; setBattle(ready);
+        setPlayback(previous => previous ? { ...previous, shown: ready, next: ready } : null);
+      }
+      setItemReady(true);
+      void onInventoryRefresh?.();
+      if (!finalizing.current && (!reply?.supported || !reply.ok)) setServerLine(KING_LOCAL_NOTICE);
+    }).catch(() => { if (session.current === next) { setItemReady(true); setServerLine(KING_LOCAL_NOTICE); } });
   }
   useEffect(() => {
     if (!session.current) beginServer(battle);
@@ -91,21 +111,29 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     finalizing.current = true;
     const current = session.current;
     setServerLine("보상 확인 중…");
+    setSettlementState("pending");
     void current.finish(battleFinish(state, accounting.current.rounds, accounting.current.moves)).then(result => {
       if (result.settlement) onSettled?.(result.settlement);
+      void onInventoryRefresh?.();
       if (session.current !== current) return;
       setSettlement(result.settlement ?? null);
+      setSettlementState(result.settlement ? "confirmed" : "failed");
+      if (!result.settlement) finalizing.current = false;
       setServerLine(result.settlement ? kingRewardLine(result.settlement, firstWin) : result.notice);
-    });
+    }).catch(() => { if (session.current === current) { finalizing.current = false; setSettlementState("failed"); setServerLine("보상을 확인하지 못했어요"); } });
   }
   function leave() { finishServer(latestBattle.current); onClose(); }
   const [playback, setPlayback] = useState<Playback | null>(() => introduction(battle));
-  const [menu, setMenu] = useState<"main" | "moves">("main");
+  const [menu, setMenu] = useState<"main" | "moves" | "bag">("main");
   const [preview, setPreview] = useState("");
   const [reducedPref, setReduced] = useState(false);
-  const [speedMode, setSpeedMode] = useState<0 | 1 | 2>(0);
+  const [hidden, setHidden] = useState(false);
+  const [hitStopped, setHitStopped] = useState(false);
+  // The chosen speed (x1 / x3 / skip) is remembered on this device; the base pace itself is already 1.7x faster than before.
+  const [speedMode, setSpeedModeState] = useState<0 | 1 | 2>(() => { try { const saved = Number(window.localStorage.getItem("domine-pet-battle-speed")); return saved === 1 || saved === 2 ? saved : 0; } catch { return 0; } });
+  const setSpeedMode = (mode: 0 | 1 | 2) => { setSpeedModeState(mode); try { window.localStorage.setItem("domine-pet-battle-speed", String(mode)); } catch { /* Session only. */ } };
   const reduced = reducedPref || speedMode === 2;
-  const factor = [1, 3, 14][speedMode];
+  const factor = baseSpeed * [1, 3, 14][speedMode];
   const fast = (ms: number) => ms > 0 ? Math.max(16, Math.round(ms / factor)) : 0;
   const [filter, setFilter] = useState<MoveFilter>("all"), [page, setPage] = useState(0);
   const [previewCost, setPreviewCost] = useState(0);
@@ -113,6 +141,16 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   const [seen, setSeen] = useState<Record<Side, string[]>>({ player: [], opponent: [] });
   const pagesRef = useRef<HTMLDivElement>(null), detailsRef = useRef<HTMLDialogElement>(null);
   const focusPage = useRef(false);
+  const cardPositions = useRef(new Map<string, { left: number; top: number }>());
+  useLayoutEffect(() => {
+    if (menu !== "moves") return;
+    const cards = pagesRef.current?.querySelectorAll<HTMLElement>("[data-action-key]");
+    cards?.forEach(card => {
+      const key = card.dataset.actionKey!, rect = card.getBoundingClientRect(), previous = cardPositions.current.get(key);
+      if (previous && !reducedPref) card.animate?.([{ transform: `translate(${previous.left - rect.left}px, ${previous.top - rect.top}px)` }, { transform: "translate(0, 0)" }], { duration: 150, easing: "ease-out" });
+      cardPositions.current.set(key, { left: rect.left, top: rect.top });
+    });
+  }, [battle, filter, menu, reducedPref]);
   const paused = detailSide !== null || !!preview;
   const detailHeading = useId();
   const dialog = useRef<HTMLDialogElement>(null), message = useRef<HTMLButtonElement>(null);
@@ -122,34 +160,31 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   const playing = useRef(true), held = useRef(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeRef = useRef(leave);
-  useLayoutEffect(() => { closeRef.current = leave; }, [leave]);
+  const backRef = useRef<() => boolean>(() => false);
+  useLayoutEffect(() => {
+    closeRef.current = leave;
+    backRef.current = () => {
+      if (paused) { closeDetail(); return true; }
+      if (menu !== "main" && !playback) { setMenu("main"); setPreview(""); return true; }
+      return false;
+    };
+  }, [leave, paused, menu, playback]);
   const cancelHold = () => { if (holdTimer.current !== null) clearTimeout(holdTimer.current); holdTimer.current = null; };
   useEffect(() => cancelHold, []);
   useEffect(() => {
     const modal = dialog.current, opener = document.activeElement as HTMLElement | null;
-    const body = document.body, scrollY = window.scrollY;
-    const saved = { overflow: body.style.overflow, position: body.style.position, top: body.style.top, width: body.style.width };
-    Object.assign(body.style, { overflow: "hidden", position: "fixed", top: `-${scrollY}px`, width: "100%" });
+    const release = ownPetSheet(() => backRef.current(), () => closeRef.current());
     modal?.showModal();
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const updateMotion = () => setReduced(preference.matches);
     updateMotion(); preference.addEventListener("change", updateMotion);
-    let popped = false, armed = false;
-    const back = () => { popped = true; closeRef.current(); };
-    // The confirm sheet that opened this battle calls history.back() as it closes; that popstate lands a moment later and would
-    // close this battle at once (a second fight never started). Register only after it has passed.
-    const arm = setTimeout(() => {
-      armed = true;
-      history.pushState({ ...history.state, petBattle: heading }, "");
-      window.addEventListener("popstate", back);
-    }, 150);
+    const visibility = () => { setHidden(!!document.hidden); if (document.hidden) navigator.vibrate?.(0); };
+    visibility(); window.addEventListener("visibilitychange", visibility);
     return () => {
-      clearTimeout(arm);
-      if (armed) window.removeEventListener("popstate", back);
+      release(); window.removeEventListener("visibilitychange", visibility);
       preference.removeEventListener("change", updateMotion);
-      if (armed && !popped && history.state?.petBattle === heading) history.back();
-      modal?.close(); Object.assign(body.style, saved);
-      window.scrollTo({ top: scrollY, behavior: "instant" }); opener?.focus({ preventScroll: true });
+      navigator.vibrate?.(0);
+      modal?.close(); opener?.focus({ preventScroll: true });
     };
   }, [heading]);
 
@@ -164,6 +199,13 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     return () => { details?.close(); opener?.focus({ preventScroll: true }); };
   }, [paused]);
   const cue = playback?.cues[playback.index];
+  const cueMs = cue?.finisher ? finisherDuration(cue.finisher, speedMode, reducedPref) : fast(cue?.duration ?? 450);
+  useLayoutEffect(() => {
+    if (cue?.finisher !== "impact" || reducedPref || cue.missed || cue.blocked) { setHitStopped(false); return; }
+    setHitStopped(true);
+    const timer = setTimeout(() => setHitStopped(false), Math.min(80, cueMs / 4));
+    return () => clearTimeout(timer);
+  }, [cue, cueMs, reducedPref]);
   const round = playback?.shown.round ?? battle.round;
   useEffect(() => {
     if (cue?.seenMove && cue.side) {
@@ -173,14 +215,15 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     }
   }, [cue, round]);
   const moveFx = cue?.moveFx ? battleMoveFx(cue.moveFx, round - 1) : undefined;
-  const text = cue?.text ?? "";
+  const text = cue?.finisher ? "" : cue?.text ?? "";
   const characters = Array.from(text);
-  const typing = !!cue?.text && playback!.revealed < characters.length;
+  const typing = !cue?.finisher && !!cue?.text && playback!.revealed < characters.length;
   const intro = cue?.motion === "intro";
   const shown = playback?.shown ?? battle;
   const [displayHp, setDisplayHp] = useState({ player: shown.player.hp, opponent: shown.opponent.hp, playerEnergy: shown.player.energy, opponentEnergy: shown.opponent.energy });
   const hpRef = useRef(displayHp);
   useEffect(() => {
+    if (hidden || paused) return;
     const from = hpRef.current, to = { player: shown.player.hp, opponent: shown.opponent.hp, playerEnergy: shown.player.energy, opponentEnergy: shown.opponent.energy };
     let frame = 0;
     let timer: ReturnType<typeof setTimeout>;
@@ -188,14 +231,22 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
       const progress = reduced ? 1 : 1 - (1 - ++frame / 10) ** 3;
       hpRef.current = { player: Math.round(from.player + (to.player - from.player) * progress), opponent: Math.round(from.opponent + (to.opponent - from.opponent) * progress), playerEnergy: Math.round(from.playerEnergy + (to.playerEnergy - from.playerEnergy) * progress), opponentEnergy: Math.round(from.opponentEnergy + (to.opponentEnergy - from.opponentEnergy) * progress) };
       setDisplayHp(hpRef.current);
-      if (progress < 1) timer = setTimeout(tick, 30);
+      if (progress < 1) timer = setTimeout(tick, cue?.finisher === "impact" ? cueMs / 10 : fast(30));
     };
     if (Object.keys(to).some(key => from[key as keyof typeof to] !== to[key as keyof typeof to])) tick();
     return () => clearTimeout(timer);
-  }, [shown.player.hp, shown.opponent.hp, shown.player.energy, shown.opponent.energy, reduced]);
+  }, [shown.player.hp, shown.opponent.hp, shown.player.energy, shown.opponent.energy, reduced, hidden, paused]);
   const outcome = cue?.outcome ?? (!playback ? battle.outcome : undefined);
   const finished = !playback && !!battle.outcome;
+  const rewardProgress = settlement?.progress ? kingProgress(rewardStep === 0 ? Math.max(0, settlement.progress.xp - settlement.xp) : settlement.progress.xp,
+    rewardStep === 2 ? settlement.levelAfter : settlement.levelBefore) : null;
   const phase = intro ? "intro" : finished ? "result" : playback ? "playback" : "command";
+  useEffect(() => {
+    if (!finished || !settlement || hidden || paused) return;
+    setRewardStep(1);
+    const timer = setTimeout(() => setRewardStep(2), reducedPref ? 0 : 650);
+    return () => clearTimeout(timer);
+  }, [finished, settlement, hidden, paused, reducedPref]);
 
   useLayoutEffect(() => {
     if (!cue?.moveFx || !arena.current) return;
@@ -210,16 +261,16 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   }, [cue]);
 
   function advance() {
-    if (!playback || paused) return;
+    if (!playback || paused || hidden) return;
     const index = playback.index + 1, nextCue = playback.cues[index];
     if (!nextCue) { setBattle(playback.next); setPlayback(null); playing.current = false; return; }
     setPlayback({ ...playback, index, revealed: 0, line: nextCue.text ?? playback.line,
       shown: nextCue.event ? showBattleEvent(playback.shown, nextCue.event, playback.next) : playback.shown });
   }
   useEffect(() => {
-    if (!playback || paused) return;
+    if (!playback || paused || hidden) return;
     const base = typing ? 18 : cue?.text ? 900 : cue?.moveName || cue?.result || cue?.rivalText || cue?.playerText ? cue.duration ?? 1200 : reduced && cue?.motion && !cue.moveFx ? cue.fx || cue.critical ? 300 : 0 : cue?.duration ?? 0;
-    const delay = fast(base);
+    const delay = cue?.finisher ? cueMs : fast(base);
     const timer = setTimeout(() => {
       if (typing) setPlayback({ ...playback, revealed: playback.revealed + 1 });
       else advance();
@@ -227,10 +278,13 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     return () => clearTimeout(timer);
     // Playback owns the immutable cue and text for this timer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playback, reduced, paused, speedMode]);
+  }, [playback, reduced, paused, hidden, speedMode]);
   useEffect(() => {
-    if (!reduced && cue?.motion === "effective") navigator.vibrate?.(30);
-  }, [cue, reduced]);
+    if (reducedPref || hidden || paused) { navigator.vibrate?.(0); return; }
+    if (cue?.finisher === "charge") navigator.vibrate?.([15, 35, 15]);
+    else if (cue?.finisher === "impact" && !cue.missed && !cue.blocked) navigator.vibrate?.(80);
+    else if (cue?.fx === "hit-good") navigator.vibrate?.(25);
+  }, [cue, reducedPref, hidden, paused]);
   useEffect(() => {
     if (phase === "playback" || phase === "intro") message.current?.focus({ preventScroll: true });
     else command.current?.focus({ preventScroll: true });
@@ -241,7 +295,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   }, [page]);
 
   function choose(action: Action) {
-    if (paused || playing.current || !availableActions(battle, "player").some(a => sameAction(a, action))) return;
+    if (paused || playing.current || !!kingApi && !itemReady || !availableActions(battle, "player").some(a => sameAction(a, action))) return;
     const next = stepRound(battle, action);
     if (action.kind !== "quit") accounting.current.rounds++;
     for (const event of next.events) {
@@ -261,24 +315,17 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     lastPlayer.current = spoken.lastPlayer ?? lastPlayer.current;
     setPlayback(playbackFor(battle, next.state, spoken.cues));
   }
-  function bag() {
-    if (playing.current) return;
-    const item = availableActions(battle, "player").find(a => a.kind === "item");
-    if (item) { choose(item); return; }
-    playing.current = true;
-    setPlayback(playbackFor(battle, battle, [{ text: "가방이 비었어요." }]));
-  }
+  function bag() { if (!playing.current) setMenu("bag"); }
   function restart() {
     lastPlayer.current = ""; lastDefenseResult.current = "";
-    const next = start(++attempt.current, settlement?.levelAfter ?? encounter.playerLevel); setSeen({ player: [], opponent: [] }); setFilter("all"); setPage(0);
+    const next = start(++attempt.current, settlement?.levelAfter ?? encounter.playerLevel, selectedItems(items,settlement?.progress?.inventory ?? {}), settlement?.progress ?? growth); setSeen({ player: [], opponent: [] }); setFilter("all"); setPage(0);
     accounting.current = { rounds: 0, moves: {} }; finalizing.current = false;
-    latestBattle.current = next; setSettlement(null); setServerLine(""); beginServer(next);
+    latestBattle.current = next; setSettlement(null); setSettlementState("idle"); setRewardStep(0); setServerLine(""); beginServer(next);
     playing.current = true; cancelHold(); setPreview(""); setPreviewCost(0); setMenu("main"); setBattle(next); setPlayback(introduction(next));
   }
   const actions: Action[] = [...new Set([...battle.player.moves, ...(battle.player.finisher ? [battle.player.finisher] : [])])].map(moveId => ({ kind: "move", moveId }));
   actions.push({ kind: "push" }, { kind: "rest" });
-  actions.sort((a, b) => MOVE_KIND[moveFor(a)?.kind ?? "support"].order - MOVE_KIND[moveFor(b)?.kind ?? "support"].order);
-  const pages = movePages(actions, filter);
+  const pages = movePages(actions, filter, battle);
   function goPage(index: number, keyboard = false) {
     const next = Math.max(0, Math.min(pages.length - 1, index));
     focusPage.current = keyboard;
@@ -305,30 +352,34 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
         </span>
       </div>
       <div className="pet-battle-momentum" role="progressbar" aria-label={`${names[side]} 기세`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={actor.momentum ?? 0} data-full={(actor.momentum ?? 0) >= 100}><span style={{ transform: `scaleX(${(actor.momentum ?? 0) / 100})` }} /></div>
+      <div className="pet-battle-statuses">{actor.statuses.map(s => <span key={s.id} title={STATUS_LABEL[s.id]}>{STATUS_LABEL[s.id].split(" ")[0]} {Math.max(1,s.expires - round + 1)}</span>)}
+        {actor.buffs.map((b,i) => <span key={`${b.stat}-${i}`} title={`${STAT_LABEL[b.stat]} ${Math.round((b.rate ?? .15)*100)}%`}>{STAT_LABEL[b.stat]}{(b.rate ?? .15) < 0 ? "↓" : "↑"}{Math.max(1,b.expires - round + 1)}</span>)}
+        {actor.prepared && <span>준비↑{Math.max(1,actor.prepared.expires - round + 1)}</span>}
+      </div>
     </section>;
   }
   function fighter(side: Side) {
     const motion = outcome && outcome !== "draw" && outcome !== "quit" ? outcome === side ? "win" : "tired" : cue?.side === side ? cue.motion : undefined;
     const animation = moveFx && (cue?.side === side ? `pet-move-${moveFx.motion}` : cue?.target === side ? `pet-react-${cue.missed ? "dodge" : moveFx.reaction}` : undefined);
-    return <div className="pet-battle-fighter" data-side={side}>
+    return <div className="pet-battle-fighter" data-side={side} data-struck={cue?.impactSide === side && !!cue.amount} data-finisher={cue?.finisher === "impact" && cue.target === side && !!cue.amount}>
       <div className="pet-battle-platform" />
-      <div className="pet-battle-entry"><div key={animation ? `${shown.round}-${playback?.index}` : "idle"} className="pet-battle-portrait" data-motion={motion} style={animation ? { animation: `${animation} ${fast(moveFx!.duration)}ms ease-in-out both` } : undefined}>
+      <div className="pet-battle-entry"><div key={animation ? `${shown.round}-${playback?.index}` : "idle"} className="pet-battle-portrait" data-motion={motion} style={animation ? { animation: `${animation} ${cueMs}ms ease-in-out both` } : undefined}>
         {side === "player" ? <Image src={PETS[petId].standing[stage]} alt={names.player} width={320} height={320} sizes="42vw" loading="eager" /> : <BreedPicture key={encounter.id} breedId={shown.opponent.breedId} name={names.opponent} art={encounter.art} />}
         <span className="pet-battle-flash" aria-hidden="true" />
         {motion === "win" && <span className="pet-battle-sparkles" aria-hidden="true">✦ · ✧<br />✧　✦</span>}
       </div></div>
-      {cue?.side === side && cue.fx && <span key={`${shown.round}-${playback?.index}-fx`} className="pet-battle-fx" data-weak={cue.motion === "weak-hit"} aria-hidden="true">
+      {(cue?.impactSide ?? cue?.side) === side && cue?.fx && <span key={`${shown.round}-${playback?.index}-fx`} className="pet-battle-fx" data-weak={cue.motion === "weak-hit"} aria-hidden="true">
         <span className="pet-battle-flash" />
-        <Image src={`/pet/battle/fx-${cue.fx}.webp`} alt="" width={160} height={160} unoptimized loading="eager" onError={e => { e.currentTarget.style.visibility = "hidden"; }} />
+        <Image src={`/pet/battle/fx-${cue.fx === "energy" ? "buff" : cue.fx === "cleanse" ? "heal" : cue.fx}.webp`} alt="" width={160} height={160} unoptimized loading="eager" onError={e => { e.currentTarget.style.visibility = "hidden"; }} />
       </span>}
-      {moveFx && (cue?.target ?? cue?.side) === side && <span key={`${shown.round}-${playback?.index}-art`} className="pet-battle-art" data-side={cue?.side} data-missed={cue?.missed} style={{ "--art-duration": `${fast(moveFx.duration)}ms` } as CSSProperties} aria-hidden="true">
+      {moveFx && (cue?.target ?? cue?.side) === side && <span key={`${shown.round}-${playback?.index}-art`} className="pet-battle-art" data-side={cue?.side} data-missed={cue?.missed} style={{ "--art-duration": `${cueMs}ms` } as CSSProperties} aria-hidden="true">
         {!cue?.missed && moveFx.image && <Image src={moveFx.image} alt="" width={160} height={160} unoptimized onError={e => { e.currentTarget.style.visibility = "hidden"; }} />}
-        {(cue?.missed ? [fxSheets("smoke", shown.round)] : moveFx.sheets ?? []).map((sheet, i) => <FxSprite key={`${sheet.id}-${i}`} sheet={sheet} reduced={reduced} delay={reduced ? 0 : fast(Math.round(moveFx.duration * .2))} tint={moveFx.tint} duration={fast(moveFx.duration * .7)} />)}
+        {(cue?.missed ? [fxSheets("smoke", shown.round)] : moveFx.sheets ?? []).map((sheet, i) => <FxSprite key={`${sheet.id}-${i}`} sheet={sheet} reduced={reduced} delay={0} tint={moveFx.tint} duration={cueMs} />)}
       </span>}
-      {cue?.side === side && (cue.fx || cue.critical) && <span key={`${shown.round}-${playback?.index}-sprite`} className="pet-battle-art" data-critical={cue.critical} aria-hidden="true">
-        <FxSprite sheet={fxSheets(cue.critical ? "particle" : cue.fx === "heal" ? "heal" : cue.fx === "buff" ? "buff" : cue.fx === "shield" ? "shield" : cue.fx === "hit" || cue.fx === "hit-good" ? "impact" : "debuff", cue.critical ? 3 : cue.fx === "buff" ? 4 : shown.round)} reduced={reduced} duration={cue.duration} />
+      {(cue?.impactSide ?? cue?.side) === side && (cue?.fx || cue?.critical) && <span key={`${shown.round}-${playback?.index}-sprite`} className="pet-battle-art" data-critical={cue.critical} aria-hidden="true">
+        <FxSprite sheet={fxSheets(cue.critical ? "particle" : cue.fx === "heal" || cue.fx === "cleanse" ? "heal" : cue.fx === "energy" ? "charge" : cue.fx === "buff" ? "buff" : cue.fx === "shield" ? "shield" : cue.fx === "hit" || cue.fx === "hit-good" ? "impact" : "debuff", cue.critical ? 3 : cue.fx === "buff" ? 4 : shown.round)} reduced={reduced} duration={cue.duration} />
       </span>}
-      {cue?.side === side && cue.amount !== undefined && <strong key={`${shown.round}-${playback?.index}`} className="pet-battle-number" data-critical={cue.critical} data-good={cue.fx === "hit-good"} data-weak={cue.motion === "weak-hit"} data-heal={cue.motion === "heal"} aria-hidden="true">{cue.motion === "heal" ? "+" : "−"}{cue.amount}</strong>}
+      {(cue?.impactSide ?? cue?.side) === side && cue?.amount !== undefined && <strong key={`${shown.round}-${playback?.index}`} className="pet-battle-number" data-finisher={!!cue.finisher} data-critical={cue.critical} data-good={cue.fx === "hit-good"} data-weak={cue.motion === "weak-hit"} data-heal={cue.motion === "heal"} data-energy={cue.fx === "energy"} aria-hidden="true">{cue.motion === "heal" || cue.fx === "energy" ? "+" : "−"}{cue.amount}</strong>}
       {cue?.side === side && cue.moveName && <p key={`${shown.round}-${playback?.index}-name`} className="pet-battle-skill-name" role="status">{cue.moveName}</p>}
       {side === "player" && cue?.playerText && <p className="pet-battle-rival" style={{ left: 0, right: "auto" }} role="status">{cue.playerText}</p>}
       {side === "opponent" && (cue?.rivalText || finished) && <p className="pet-battle-rival" role="status">{cue?.rivalText || encounterLine(encounter, outcome === "quit" ? "flee" : outcome === "player" ? "lose" : outcome === "opponent" ? "win" : "round", seedFor(String(shown.round), encounter.individual.seed), lastRival.current)}</p>}
@@ -362,12 +413,12 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     </>;
   }
 
-  return <dialog ref={dialog} className="pet-battle-screen" style={{ "--arena-bg": `url(${cellBackground(encounter.cellId, hour)})` } as CSSProperties} aria-labelledby={heading} tabIndex={-1} onCancel={e => { e.preventDefault(); if (paused) { closeDetail(); } else if (menu === "moves" && !playback) { setMenu("main"); setPreview(""); } else leave(); }}>
-    <div className="pet-battle-scene" data-phase={phase} data-paused={paused} data-impact={cue?.motion === "effective" || !!cue?.critical} data-heavy={cue?.moveFx === "T63" && !cue.missed} key={attempt.current} onClick={intro && !paused ? advance : undefined}>
+  return <dialog ref={dialog} className="pet-battle-screen" style={{ "--arena-bg": `url(${cellBackground(encounter.cellId, hour)})` } as CSSProperties} aria-labelledby={heading} tabIndex={-1} onCancel={e => { e.preventDefault(); if (!backRef.current()) leave(); }}>
+    <div className="pet-battle-scene" data-phase={phase} data-paused={paused || hidden} data-hitstop={hitStopped} data-reduced={reducedPref} data-finisher={cue?.finisher} data-incoming={cue?.finisher === "impact" && cue.target === "player" && !!cue.amount} data-connected={!!cue?.amount} style={{ "--finisher-time": `${cueMs}ms`, "--hit-stop": `${reducedPref ? 0 : Math.min(80, cueMs / 4)}ms`, "--impact-hp-time": `${cue?.finisher === "impact" ? cueMs : fast(300)}ms` } as CSSProperties} data-impact={cue?.motion === "effective" || !!cue?.critical} data-heavy={cue?.moveFx === "T63" && !cue.missed} key={attempt.current} onClick={intro && !paused ? advance : undefined}>
       <div ref={arena} className="pet-battle-arena">
         <header className="pet-battle-topline"><h2 id={heading} className="pet-battle-sr">동네 겨루기</h2>{!finished && <button type="button" className="pet-battle-speed" aria-label={["배속 보통", "3배속", "빠르게 넘기기"][speedMode]} aria-pressed={speedMode > 0} onClick={() => setSpeedMode(((speedMode + 1) % 3) as 0 | 1 | 2)}>{["▶", "▶▶", "⏭"][speedMode]}</button>}{!finished && <span key={shown.round} className="pet-battle-round" data-urgency={shown.round >= MAX_ROUNDS ? "last" : shown.round >= MAX_ROUNDS - 1 ? "near" : shown.round >= MAX_ROUNDS - 2 ? "late" : undefined}>라운드 {shown.round}/{MAX_ROUNDS}</span>}</header>
         {!finished && hud("opponent")}{fighter("opponent")}{fighter("player")}{!finished && hud("player")}
-        {moveFx && <div key={`${shown.round}-${playback?.index}-move`} className="pet-battle-move-fx" data-side={cue?.side} data-trail={moveFx.trail} data-local={moveFx.reaction === "none"} data-missed={cue?.missed} style={{ "--fx-duration": `${fast(moveFx.duration)}ms` } as CSSProperties} aria-hidden="true">
+        {moveFx && <div key={`${shown.round}-${playback?.index}-move`} className="pet-battle-move-fx" data-side={cue?.side} data-trail={moveFx.trail} data-local={moveFx.reaction === "none"} data-missed={cue?.missed} style={{ "--fx-duration": `${cueMs}ms` } as CSSProperties} aria-hidden="true">
           {moveFx.elements.map((element, i) => <span key={i} className="pet-battle-fx-part" style={{ "--part": i, animationName: `pet-trail-${moveFx.trail}` } as CSSProperties}>
             <span className="pet-battle-fx-glyph" data-shape={element}>
               {element.startsWith("fx-") ? <Image src={`/pet/battle/${element}.webp`} alt="" width={80} height={80} unoptimized loading="eager" onError={e => { e.currentTarget.style.visibility = "hidden"; }} /> : ["ring", "wave", "streak"].includes(element) ? null : element}
@@ -375,15 +426,26 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
           </span>)}
         </div>}
         {cue?.result && <p key={`${shown.round}-${playback?.index}-result`} className="pet-battle-center-result" role="status">{cue.result}</p>}
-        {cue?.cutin && <div className="pet-battle-cutin" data-side={cue.side} aria-hidden="true"><Image src={cue.side === "opponent" ? encounter.art : PETS[petId].standing[stage]} alt="" width={160} height={160} unoptimized /><strong>기세</strong><span>✦ ✧ ✦</span></div>}
+        {cue?.finisher && <div key={`${shown.round}-${playback?.index}-finisher`} className="pet-battle-finisher" data-stage={cue.finisher} data-side={cue.side} data-group={MOVE_BY_ID[cue.finisherId!]?.group} data-blocked={cue.blocked || cue.missed} data-guarded={cue.guarded} aria-hidden="true">
+          {cue.finisher === "cutin" && <div className="pet-battle-finisher-cutin"><Image src={cue.side === "opponent" ? encounter.art : PETS[petId].standing[stage]} alt="" width={200} height={200} unoptimized /><strong>{MOVE_BY_ID[cue.finisherId!]?.name}</strong></div>}
+          {cue.finisher === "charge" && <div className="pet-battle-finisher-charge"><i /><i /><i /><span>✦</span></div>}
+          {cue.finisher === "impact" && <><div className="pet-battle-finisher-flash" /><div className="pet-battle-finisher-burst"><i /><i /><i /></div></>}
+        </div>}
+        {cue?.finisher === "afterglow" && cue.text && <p className="pet-battle-finisher-note" role="status">{cue.text}</p>}
         {finished && <div className="pet-battle-banner" data-victory={outcome === "player"} role="status"><h3>{result}</h3></div>}
-        {finished && settlement && settlement.levelAfter > settlement.levelBefore && <div className="pet-feedback" aria-hidden="true">{Array.from({ length: 12 }, (_, i) => <i key={i} className="pet-level-particle" style={{ left: `${8 + i * 7}%`, animationDelay: `${i * 35}ms` }}>✦</i>)}</div>}
+        {finished && rewardStep === 2 && settlement && settlement.levelAfter > settlement.levelBefore && <div className="pet-feedback" aria-hidden="true">{Array.from({ length: 12 }, (_, i) => <i key={i} className="pet-level-particle" style={{ left: `${8 + i * 7}%`, animationDelay: `${i * 35}ms` }}>✦</i>)}</div>}
       </div>
       <div className="pet-battle-console">
-        {finished ? <div className="pet-battle-result"><p>{outcome === "player" ? "정말 멋진 움직임이었어요!" : outcome === "opponent" ? "끝까지 함께해 줘서 고마워요." : "다음에도 즐겁게 겨뤄요!"}</p>{serverLine && <p className="pet-battle-reward" role="status" title={serverLine}>{serverLine}</p>}<div className="pet-battle-result-actions">{outcome === "opponent" && <button ref={command} type="button" disabled={!!kingApi && serverLine === "보상 확인 중…"} onClick={restart}>다시</button>}<button ref={outcome !== "opponent" ? command : undefined} type="button" onClick={leave}>돌아가기</button></div></div>
+        {finished ? <div className="pet-battle-result"><p>{outcome === "player" ? "정말 멋진 움직임이었어요!" : outcome === "opponent" ? "끝까지 함께해 줘서 고마워요." : "다음에도 즐겁게 겨뤄요!"}</p>{serverLine && <p className="pet-battle-reward" role="status">{settlementState === "confirmed" && settlement ? kingRewardLine({ ...settlement, levelAfter: !rewardProgress && rewardStep === 2 ? settlement.levelAfter : settlement.levelBefore }, firstWin) : serverLine}</p>}
+          {settlement && rewardProgress && <div className="pet-battle-reward-xp" data-step={rewardStep}>
+            <span role="progressbar" aria-label="확정 경험치" aria-valuemin={0} aria-valuemax={rewardProgress.needed || 1} aria-valuenow={rewardProgress.needed ? rewardProgress.current : 1}>
+              <i style={{ transform: `scaleX(${rewardProgress.needed ? rewardProgress.current / rewardProgress.needed : 1})` }} />
+            </span><small>Lv.{rewardProgress.level}{rewardStep === 2 && settlement.levelAfter > settlement.levelBefore ? "!" : ""}</small>
+          </div>}
+          {settlementState === "failed" && kingApi && <button type="button" onClick={() => finishServer(latestBattle.current)}>다시 확인</button>}<div className="pet-battle-result-actions">{outcome === "opponent" && <button ref={command} type="button" disabled={!!kingApi && settlementState !== "confirmed"} onClick={restart}>다시</button>}<button ref={outcome !== "opponent" ? command : undefined} type="button" onClick={leave}>돌아가기</button></div></div>
           : <>
             {playback && <div className={text ? "pet-battle-dialogue" : "pet-battle-sr"}>
-            {playback && <button ref={message} type="button" className={intro ? "pet-battle-sr" : "pet-battle-message"} aria-label={intro ? "등장 연출 건너뛰기" : typing ? "대사 모두 보기" : playback ? "다음 대사" : "대결 안내"} onClick={e => { e.stopPropagation(); if (intro) advance(); else if (typing) setPlayback({ ...playback!, revealed: characters.length }); else if (cue?.text) advance(); }}>
+            {playback && <button ref={message} type="button" className={intro ? "pet-battle-sr" : "pet-battle-message"} aria-label={intro ? "등장 연출 건너뛰기" : typing ? "대사 모두 보기" : playback ? "다음 대사" : "대결 안내"} onClick={e => { e.stopPropagation(); if (intro) advance(); else if (typing) setPlayback({ ...playback!, revealed: characters.length }); else if (cue?.text && !cue.finisher) advance(); }}>
               <span aria-hidden="true">{intro ? "" : typing ? characters.slice(0, playback!.revealed).join("") : text}</span>
               <span className="pet-battle-sr" role="status" aria-live="polite">{intro ? "등장 연출, 눌러서 건너뛰기" : text}</span>
             </button>}
@@ -391,9 +453,21 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
             {!playback ? <div className="pet-battle-command">
               <div className="pet-battle-actions" data-menu={menu} aria-label={menu === "main" ? "대결 명령" : "기술 선택"}>
                 {menu === "main" ? <>
-                  <button ref={command} type="button" className="pet-battle-primary" onClick={() => { setMenu("moves"); setPreview(""); setPage(0); }}><span aria-hidden="true">✦</span> 기술</button>
+                  <button ref={command} type="button" className="pet-battle-primary" disabled={!!kingApi && !itemReady} onClick={() => { setMenu("moves"); setPreview(""); setPage(0); }}><span aria-hidden="true">✦</span> 기술</button>
                   <button type="button" onClick={bag}><span aria-hidden="true">▣</span> 가방</button>
-                  <button type="button" onClick={() => choose({ kind: "quit" })}><span aria-hidden="true">↗</span> 그만하기</button>
+                  <button type="button" disabled={!!kingApi && !itemReady} onClick={() => choose({ kind: "quit" })}><span aria-hidden="true">↗</span> 그만하기</button>
+                </> : menu === "bag" ? <>
+                  <div className="pet-battle-filters"><strong>반입 물품</strong><button ref={command} type="button" className="pet-battle-back" onClick={() => setMenu("main")}>뒤로</button></div>
+                  <div className="pet-battle-item-grid">{(battle.player.items ?? []).map(id => {
+                    const item = ITEM_BY_ID[id], reason = !itemReady ? "반입 확인 중…" : itemUnavailable(battle,"player",id);
+                    const detail = moveDetail({ kind: "item", itemId: id },battle);
+                    return <div className="pet-battle-card" data-kind="support" data-insufficient={!!reason} key={id}>
+                      <button type="button" className="pet-battle-move" data-group="neutral" disabled={!!reason} aria-label={`${item.name} 사용${reason ? `, ${reason}` : ""}`} onClick={() => choose({ kind: "item", itemId: id })}>
+                        <span className="pet-battle-move-copy"><strong>{item.name}</strong><small title={reason || itemEffect(item)}>{reason || itemEffect(item)}</small></span>
+                      </button><button type="button" className="pet-battle-card-info" aria-label={`${item.name} 상세 보기`} onClick={() => setPreview(detail)}>ⓘ</button>
+                    </div>;
+                  })}</div>
+                  {!(battle.player.items?.length) && <p className="pet-battle-empty">반입한 물품이 없어요. 다음 대결 전에 상점에서 준비해요.</p>}
                 </> : <>
                   <div className="pet-battle-filters" role="group" aria-label="기술 분류">
                     {(["all", "attack", "defense", "support"] as const).map(value => <button ref={value === "all" ? command : undefined} type="button" key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); setPage(0); setPreviewCost(0); cancelHold(); pagesRef.current?.scrollTo({ left: 0, behavior: "instant" }); }}>{value === "all" ? "전체" : `${MOVE_KIND[value].icon} ${MOVE_KIND[value].label}`}</button>)}
@@ -409,7 +483,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
                         const enabled = allowed.some(a => sameAction(a, action));
                         const detail = moveDetail(action, battle);
                         const showDetail = () => { setPreview(detail); setPreviewCost(cost); };
-                        return <div key={label} className="pet-battle-card" data-kind={move?.kind ?? "support"} data-insufficient={insufficient}>
+                        return <div key={label} data-action-key={label} className="pet-battle-card" data-kind={move?.kind ?? "support"} data-finisher-ready={!!move?.finisher && enabled} data-insufficient={!enabled}>
                           <button type="button" className="pet-battle-move" data-group={move?.group ?? "neutral"} data-kind={move?.kind ?? "support"} data-hint={hint} aria-disabled={!enabled}
                             aria-label={`${kind.label}, ${label}, ${move ? moveEffect(move, battle) : `기력 +${REST_ENERGY}`}, 기력 ${cost}${insufficient ? ", 기력 부족" : ""}${move?.kind === "attack" ? `, ${HINT_LABEL[hint]}` : ""}`}
                             onFocus={() => setPreviewCost(cost)} onBlur={() => { cancelHold(); if (!preview) setPreviewCost(0); }} onPointerEnter={e => { setPreviewCost(cost); if (e.pointerType === "mouse") { cancelHold(); holdTimer.current = setTimeout(showDetail, 500); } }}

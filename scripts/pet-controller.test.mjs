@@ -155,7 +155,7 @@ mock.api.execute=async()=>{throw new TypeError("Failed to fetch");};
 await h.game.execute({...command,requestId:"network"});await h.flush();
 assert.equal(h.game.machine.command,"uncertain");assert.ok(h.storage.has(`domine-pet-pending:${identity.nickname}`));
 mock.api.execute=execute;h.game.retry();await h.flush();
-assert.equal(h.game.machine.command,"idle");assert.equal(h.game.personal.player.coins,118);
+assert.equal(h.game.machine.command,"idle");assert.equal(h.game.personal.player.coins,100);
 
 mock.api.execute=()=>new Promise(()=>{});
 void h.game.execute({...command,requestId:"timeout"});await h.flush();
@@ -189,7 +189,7 @@ assert.equal(h.game.rewardNotice, "", "care rewards no longer advertise a daily 
 mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 await h.game.execute({kind:"purchase",pet:1,item:"061",requestId:"domi-item"});await h.flush();
 await h.game.execute({...command,pet:1,requestId:"domi-level"});await h.flush();
-assert.equal(h.game.personal.player.level,2);assert.deepEqual(h.game.personal.inventory,["061"]);
+assert.equal(h.game.personal.player.level,1);assert.deepEqual(h.game.personal.inventory,["061"]);
 const state=mock.api.state;let release;
 mock.api.state=async(i,pet)=>{await new Promise(resolve=>{release=resolve;});return state(i,pet);};
 h.game.pause();await h.flush();
@@ -197,14 +197,14 @@ h.game.selectPet(2);await h.flush();
 assert.equal(h.game.petId,2,"bag can switch pets while the sheet keeps the scene paused");
 assert.equal(h.game.machine.visual,"paused");
 assert.equal(h.game.personal.player,undefined);assert.equal(h.game.personal.inventory,undefined,"do not display the previous pet's items while loading");assert.equal(h.game.feedback,null);
-release();await h.flush();assert.equal(h.game.personal.player.level,1);assert.deepEqual(h.game.personal.inventory,[]);assert.equal(h.game.personal.coins,78);
+release();await h.flush();assert.equal(h.game.personal.player.level,1);assert.deepEqual(h.game.personal.inventory,[]);assert.equal(h.game.personal.coins,60);
 mock.api.state=state;
 mock.api.execute=async()=>{throw new TypeError("response lost");};
 await h.game.execute({...command,pet:2,requestId:"mine-pending"});await h.flush();
 h.game.selectPet(1);await h.flush();
 // A committed response for pet 2 must not replace the selected pet 1's inventory/XP.
 mock.api.operation=async()=>({...mock.state(2),version:99,reward:{xp:8,coins:4,levelCoins:0,newEntries:[],newBadges:[]}});
-h.game.retry();await h.flush();assert.equal(h.game.personal.pet,1);assert.deepEqual(h.game.personal.inventory,["061"]);assert.equal(h.game.personal.player.level,2);h.close();
+h.game.retry();await h.flush();assert.equal(h.game.personal.pet,1);assert.deepEqual(h.game.personal.inventory,["061"]);assert.equal(h.game.personal.player.level,1);h.close();
 console.log("Pet controller: registration recovery, retries, per-pet switching and stale result isolation passed.");
 
 // Confirmed travel preserves the old map until both departure and decoding finish.
@@ -277,7 +277,7 @@ assert.equal(h.game.machine.command,"pending","switching does not abort or mark 
 deliver();await h.flush();
 assert.equal(h.game.machine.command,"idle");assert.equal(h.game.personal.pet,2);assert.equal(h.game.personal.player.level,1);
 assert.equal(h.game.machine.visual,"idle","a response for another pet does not animate the current one");
-h.game.selectPet(1);await h.flush();assert.equal(h.game.personal.player.level,2);assert.ok(h.game.busy);h.close();
+h.game.selectPet(1);await h.flush();assert.equal(h.game.personal.player.level,1);assert.ok(h.game.busy);h.close();
 
 mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await login(h);
 h.game.care("treat");await h.flush();assert.equal(h.game.machine.visual,"acting");assert.equal(h.game.cue.action,"treat");
@@ -330,8 +330,12 @@ h.game.care("feed");h.game.localScene({action:"map",to:"F5",id:1});h.game.select
 await h.game.refresh();await h.game.execute({...command,requestId:"battle-must-not-send"});await h.advance(60000);
 assert.equal(h.game.machine.visual,"paused");assert.equal(h.game.petId,petBeforeBattle);
 assert.equal(mock.calls.length,callsBeforeBattle);
-h.game.resume();await h.flush();assert.equal(h.game.machine.visual,"idle");assert.equal(mock.calls.length,callsBeforeBattle);
-await h.game.refresh();assert.equal(mock.calls.length,callsBeforeBattle+1);h.close();
+await h.game.refresh({coins:123,version:100});await h.flush();
+assert.equal(h.game.personal.coins,123);assert.equal(h.game.personal.player.coins,123);
+assert.equal(mock.calls.length,callsBeforeBattle,"settlement applies wallet while battle polling is paused");
+h.game.resume();await h.flush();assert.equal(h.game.machine.visual,"idle");assert.equal(mock.calls.length,callsBeforeBattle+1);
+assert.equal(h.game.personal.coins,123,"older wallet reads cannot undo the settlement");
+await h.game.refresh();assert.equal(mock.calls.length,callsBeforeBattle+2);h.close();
 
 // A timeout is also recovered automatically even if the transport ignores abort.
 mock=createPetMock();h=mount(mock.api,savedToken);await login(h);

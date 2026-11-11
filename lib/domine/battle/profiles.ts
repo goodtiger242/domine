@@ -21,6 +21,9 @@ export const BATTLE_PROFILES: Record<Exclude<Species, "dog"> | `dog_${Size}`, Ba
   raccoon: profile({ evade: 1, statusDealt: 1.15, statTilt: { attack: -.06 } }),
   squirrel: profile({ critBonus: 1, statTilt: { speed: .04, defense: -.06 } }),
   chipmunk: profile({ critBonus: 1, statTilt: { speed: .04, defense: -.06 } }),
+  goblin: profile({ critBonus: 3, statTilt: { hp: -.12 } }),
+  orc: profile({ statTilt: { hp: .12, speed: -.12 } }),
+  slime: profile({ statusTaken: .7, statTilt: { speed: -.08 } }),
 };
 export const BREED_PROFILE_BONUSES: Record<string, { species: Species; bonus: Partial<BattleProfile> }> = {
   B003: { species: "dog", bonus: { momentumRate: 1.05 } },

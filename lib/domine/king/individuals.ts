@@ -3,6 +3,7 @@ import { random, seedFor } from "../battle/rng";
 import { PET_WORLD } from "../pet-world";
 import { BREEDS, GROUPS, SPECIES, type Habitat, type SpeciesKey } from "./species";
 import { habitatOf, levelRange, SAFE_CELLS } from "./world";
+import { GUEST_NAMES } from "./name-pool";
 
 export const FORM_TAGS = ["contact", "sound", "scent", "trick", "multi", "charge", "gaze"] as const;
 export type FormTag = typeof FORM_TAGS[number];
@@ -52,6 +53,7 @@ export function intelligenceFor(temperament: Temperament, level: number): Intell
 export function makeIndividual(speciesKey: SpeciesKey, seed: number): Individual {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError("Invalid individual seed");
   if (!SPECIES.some(s => s.id === speciesKey && s.active)) throw new RangeError(`Inactive species: ${speciesKey}`);
+  const guest = speciesKey === "goblin" || speciesKey === "orc" || speciesKey === "slime";
   const roll = (label: string) => random(seedFor(`${speciesKey}:${label}`, seed)).value;
   const pick = <T,>(items: readonly T[], label: string): T => items[Math.floor(roll(label) * items.length)];
   const scheduled = BREEDS[Math.floor(seed / 8) % BREEDS.length];
@@ -67,7 +69,7 @@ export function makeIndividual(speciesKey: SpeciesKey, seed: number): Individual
   const weakness = pick(FORM_TAGS, "weakness");
   const namePool = NAME_POOLS[speciesKey];
   // A species-wide cyclic permutation keeps all 512 seeds distinct without mutable name tracking.
-  const name = namePool[(seed + seedFor(speciesKey, 17)) % namePool.length];
+  const name = guest ? GUEST_NAMES[speciesKey][local].name : namePool[(seed + seedFor(speciesKey, 17)) % namePool.length];
   const art = pick([{ art: breed.art, look: `${breed.name} 기본 모습` }, ...breed.variants], "art");
   const conditionValue = (key: string) => 20 + Math.floor(roll(key) * 81);
   const condition = (key: string) => owned ? 60 + Math.floor(roll(key) * 41) : conditionValue(key);
@@ -75,11 +77,12 @@ export function makeIndividual(speciesKey: SpeciesKey, seed: number): Individual
   const up = pick(statKeys, "stat-up"), down = pick(statKeys.filter(s => s !== up), "stat-down");
   return {
     id: `resident:${breed.id}:${seed.toString().padStart(3, "0")}`, seed, name, epithet: pick(EPITHETS, "epithet"), species: speciesKey, breedId: breed.id,
-    temperament, homeCellId, habitat, owner, ownerLabel: owner ? `${owner.title} ${owner.name}` : "길에서 지냄",
+    temperament, homeCellId, habitat, owner, ownerLabel: owner ? `${owner.title} ${owner.name}` : guest ? "길 잃은 이세계 손님" : "길에서 지냄",
     appearance: { ...art, scale: pick([.92, 1, 1.08], "scale"), facing: pick(["left", "right"] as const, "facing") },
     group: pick(GROUPS, "aura"), weakness, resistance: pick(FORM_TAGS.filter(t => t !== weakness), "resistance"),
-    intelligence: intelligenceFor(temperament, baseLevel), condition: { fullness: condition("fullness"), mood: condition("mood"), clean: condition("clean") },
+    intelligence: intelligenceFor(temperament, guest ? Math.min(baseLevel, 15) : baseLevel), condition: { fullness: condition("fullness"), mood: condition("mood"), clean: condition("clean") },
     levelOffset, baseLevel, statShift: { [up]: up === "hp" ? 8 : 2, [down]: down === "hp" ? -8 : -2 },
   };
 }
-export const INDIVIDUALS: readonly Individual[] = Array.from({ length: 512 }, (_, seed) => makeIndividual(BREEDS[Math.floor(seed / 8)].species, seed));
+// Preserve residents 0..511; each appended guest breed gets the same eight-seed allocation.
+export const INDIVIDUALS: readonly Individual[] = Array.from({ length: BREEDS.length * 8 }, (_, seed) => makeIndividual(BREEDS[Math.floor(seed / 8)].species, seed));

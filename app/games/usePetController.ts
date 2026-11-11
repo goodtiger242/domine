@@ -1,7 +1,7 @@
 "use client";
 
 import { cellBackground } from "@/lib/domine/pet-cells";
-import { createKingApi } from "@/lib/domine/pet-king-rpc";
+import { createKingApi, type KingSettlement } from "@/lib/domine/pet-king-rpc";
 import type { KingApi } from "@/lib/domine/pet-king-client";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createPetApi, acceptsResult, PetRpcError, supportsExploration, type PetApi, type PetBusy, type PetCapabilities, type PetCommand, type V6Result } from "@/lib/domine/pet-rpc";
@@ -120,7 +120,21 @@ export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi
       }
     }
   }, []);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (wallet?: KingSettlement["wallet"]) => {
+    if (wallet) {
+      ++readSequence.current;
+      for (const pet of [1, 2] as const) {
+        const previous = petStates.current[pet];
+        if (previous && wallet.version >= (previous.version ?? -1)) petStates.current[pet] = { ...previous, ...wallet,
+          player: previous.player ? { ...previous.player, coins: wallet.coins } : undefined };
+      }
+      const previous = personalRef.current;
+      if (previous && wallet.version >= (previous.version ?? -1)) {
+        personalRef.current = { ...previous, ...wallet, player: previous.player ? { ...previous.player, coins: wallet.coins } : undefined };
+        setPersonal(personalRef.current);
+      }
+      return;
+    }
     if (offline.current) return;
     const g = generation.current, selected = petRef.current, i = identityRef.current, seq = ++readSequence.current;
     const started = Date.now();
@@ -496,6 +510,6 @@ export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi
     care, localScene, done, connect, clearIdentity, selectPet, execute, refresh, checkCapabilities,
     retry: () => { if (pending.current) void execute(pending.current, true); },
     pause: (localOnly = false) => { offline.current = localOnly; ++generation.current; mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },
-    resume: () => { const wasOffline = offline.current; offline.current = false; if (activeRef.current) { dispatch({ type: "resume" }); if (!wasOffline) void refresh(); } },
+    resume: () => { offline.current = false; if (activeRef.current) { dispatch({ type: "resume" }); void refresh(); } },
   };
 }

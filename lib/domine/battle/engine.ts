@@ -2,6 +2,7 @@ import { chooseOpponentAction } from "./ai";
 import { BREED_BY_ID, ITEM_BY_ID } from "./data";
 import { actionOrder, availableActions, buildFighter, clamp, critChance, damageAt, affinity, moveEnergy, defenseMultiplier, effectHint, growthScale, hitChance, MAX_ENERGY, MAX_ROUNDS, moveFor, normalizedStat, recoveryLeft, sameAction, START_ENERGY, statusChance, turnOrder } from "./rules";
 import { random } from "./rng";
+import { supportScale } from "./support";
 import { fighterProfile } from "./profiles";
 export { profileFor, BATTLE_PROFILES, BREED_PROFILE_BONUSES } from "./profiles";
 export type { BattleProfile } from "./types";
@@ -15,7 +16,7 @@ export { opponentFor } from "./opponents";
 export { turnOrder, MAX_ENERGY, START_ENERGY, REST_ENERGY } from "./rules";
 
 function cloneActor(actor: Actor): Actor {
-  return { ...actor, stats: { ...actor.stats }, baseStats: actor.baseStats && { ...actor.baseStats }, battleProfile: actor.battleProfile && { ...actor.battleProfile, statTilt: { ...actor.battleProfile.statTilt } }, moves: [...actor.moves], equipment: [...actor.equipment],
+  return { ...actor, prepared: actor.prepared && { ...actor.prepared }, supportChain: actor.supportChain && { ...actor.supportChain }, stats: { ...actor.stats }, baseStats: actor.baseStats && { ...actor.baseStats }, battleProfile: actor.battleProfile && { ...actor.battleProfile, statTilt: { ...actor.battleProfile.statTilt } }, moves: [...actor.moves], equipment: [...actor.equipment],
     items: actor.items && [...actor.items], usedItems: [...(actor.usedItems ?? [])], defense: actor.defense && { ...actor.defense },
     allocation: actor.allocation && { ...actor.allocation }, job: actor.job && (typeof actor.job === "string" ? actor.job : structuredClone(actor.job)), history: actor.history?.map(a => ({ ...a })), condition: actor.condition && { ...actor.condition }, mastery: actor.mastery && { ...actor.mastery },
     habitats: actor.habitats && [...actor.habitats], activeBands: actor.activeBands && [...actor.activeBands], environment: actor.environment && { ...actor.environment }, recoil: actor.recoil && { ...actor.recoil },
@@ -94,7 +95,7 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
   const applyStatus = (side: Side, id: NonNullable<ReturnType<typeof moveFor>>["status"], forced = false) => {
     if (!id) return;
     const actor = state[side];
-    if (!forced && actor.defense?.kind === "stance" && actor.defense.expires >= state.round) {
+    if (!forced && ((actor.immunityUntil ?? 0) >= state.round || actor.defense?.kind === "stance" && actor.defense.expires >= state.round)) {
       emit({ type: "status", side, status: id, change: "blocked" }); return;
     }
     if (!forced && BREED_BY_ID[actor.breedId].trait === "statusImmune" && !actor.traitUsed) {
@@ -119,6 +120,8 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
     if (action.kind === "move" && moveFor(action)?.mode === "charge") action = { ...action, phase: actor.charging ? "release" : "prepare" };
     emit({ type: "action", side, action: { ...action } });
     const lastAction = actor.lastAction;
+    const support = moveFor(action)?.support, scale = support ? supportScale(actor, moveFor(action)!.id) : 1;
+    actor.supportChain = support ? { id: moveFor(action)!.id, count: actor.supportChain?.id === moveFor(action)!.id ? actor.supportChain.count + 1 : 1 } : undefined;
     actor.lastAction = { ...action };
     actor.history = [...(actor.history ?? []), { ...action }].slice(-4);
     if (action.kind === "quit") { finish("quit","quit"); return; }
@@ -134,7 +137,8 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
       }
       if (item.category === "cleanse") {
         for (const status of actor.statuses) emit({ type: "status", side, status: status.id, change: "removed" });
-        actor.statuses = []; delete actor.exposedUntil;
+        for (const buff of actor.buffs.filter(b => (b.rate ?? 0) < 0)) emit({ type: "buff", side, stat: buff.stat, change: "removed" });
+        actor.statuses = []; actor.buffs = actor.buffs.filter(b => (b.rate ?? .15) >= 0); delete actor.exposedUntil;
       }
       if (item.category === "protect") {
         actor.shield = { multiplier: .5, expires: MAX_ROUNDS };
@@ -150,6 +154,7 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
     if (actor.charging === move.id) delete actor.charging;
     else {
       energy(side,-moveEnergy(move,actor),"cost");
+      delete actor.discount;
       if (move.mode === "charge") { actor.charging = move.id; return; }
     }
     if (move.mode === "recoil") actor.recoil = { ...move.recoil, expires: state.round + 1 };
@@ -196,7 +201,7 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
           defense.triggered = true;
           if (targetSide === "player" && input.guardTiming === "perfect") energy(targetSide,1,"trait");
           if (defense.kind === "guard") { energy(targetSide,1,"trait"); momentum(targetSide,10); }
-          if (defense.kind === "counter" && move.contact) {
+          if (defense.kind === "counter" && (move.contact || defense.read)) {
             momentum(targetSide,30); emit({ type: "counter", side: targetSide, target: side });
             const retaliation = Math.max(1,Math.floor((4 + .45 * normalizedStat(target,"defense",state.round)) * growthScale(target.level) * defense.strength));
             const stance = actor.defense?.kind === "stance" && actor.defense.expires >= state.round ? 1 - .3 * actor.defense.strength : 1;
@@ -210,11 +215,14 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
         }
         if (amount > 0 && move.status && Math.floor(draw() * 10000) < statusChance(move,actor,target) * 100) applyStatus(targetSide,move.status);
       }
+      delete actor.prepared;
       if (!connected) return;
     }
     if (move.kind === "defense") {
-      const strength = actor.lastDefense === state.round - 1 && lastAction && moveFor(lastAction)?.defense === move.defense ? .5 : 1;
-      actor.defense = { kind: move.defense ?? "guard", expires: state.round + (move.defense === "stance" ? 1 : 0), strength };
+      const preparation = actor.prepared;
+      const strength = Math.min(1.3, 1 + (preparation?.guard ?? 0)) * (actor.lastDefense === state.round - 1 && lastAction && moveFor(lastAction)?.defense === move.defense ? .5 : 1);
+      delete actor.prepared;
+      actor.defense = { kind: move.defense ?? "guard", expires: state.round + (move.defense === "stance" ? 1 : 0), strength, read: !!preparation?.read && draw() < preparation.read };
       actor.lastDefense = state.round;
       emit({ type: "shield", side, multiplier: 1 - (move.defense === "stance" ? .3 : .6) * strength, change: "applied" });
       const targetAction = targetSide === "player" ? playerAction : state.opponentAction;
@@ -224,15 +232,53 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
         emit({ type: "status", side, status: "open", change: "applied" });
       }
     }
+    if (move.kind === "support" && support) {
+      if (support.restore) energy(side,Math.floor(support.restore * scale),"rest");
+      if (support.discount) actor.discount = support.discount * scale;
+      if (support.cleanse) {
+        for (const status of actor.statuses) emit({ type: "status", side, status: status.id, change: "removed" });
+        for (const buff of actor.buffs.filter(b => (b.rate ?? 0) < 0)) emit({ type: "buff", side, stat: buff.stat, change: "removed" });
+        actor.statuses = []; actor.buffs = actor.buffs.filter(b => (b.rate ?? .15) >= 0);
+        delete actor.exposedUntil; actor.immunityUntil = state.round;
+      }
+      if (support.debuff) {
+        const traitImmune = BREED_BY_ID[target.breedId].trait === "statusImmune" && !target.traitUsed;
+        const immune = traitImmune || (target.immunityUntil ?? 0) >= state.round || target.defense?.kind === "stance" && target.defense.expires >= state.round;
+        if (traitImmune) target.traitUsed = true;
+        if (immune) emit({ type: "status", side: targetSide, status: move.status ?? "blur", change: "blocked" });
+        if (!immune) {
+          const stat = support.debuff;
+          const existing = target.buffs.find(b => b.stat === stat && (b.rate ?? 0) < 0);
+          const rate = -Math.min(.3, (support.rate ?? .2) * scale);
+          if (existing) Object.assign(existing,{ rate, expires: state.round + (support.rounds ?? 2) - 1 });
+          else target.buffs.push({ stat, rate, expires: state.round + (support.rounds ?? 2) - 1 });
+          emit({ type: "buff", side: targetSide, stat, change: "applied" });
+        }
+        if (!immune && move.status && draw() * 100 < statusChance(move,actor,target) * scale) applyStatus(targetSide,move.status);
+      }
+      if (support.nextPower || support.nextCritical || support.nextGuard || support.read) {
+        const prior = previous[targetSide];
+        const repeated = (prior.history ?? []).filter(a => moveFor(a)?.kind === moveFor(prior.lastAction ?? { kind: "rest" })?.kind).length >= 2;
+        actor.prepared = { power: (support.nextPower ?? 0) * scale, critical: (support.nextCritical ?? 0) * scale,
+          guard: (support.nextGuard ?? 0) * scale, read: repeated ? (support.read ?? 0) * scale : 0, expires: state.round + 2 };
+        emit({ type: "buff", side, stat: support.read ? "focus" : "attack", change: "applied" });
+      }
+      if (support.momentum) {
+        const amount = Math.min(60 - (actor.momentumCharged ?? 0), support.momentum * scale);
+        momentum(side,amount / fighterProfile(actor).momentumRate); actor.momentumCharged = (actor.momentumCharged ?? 0) + amount;
+      }
+    }
     if (move.buff) {
       const extra = trait === "longBuff" && !actor.traitUsed ? 1 : 0;
       if (extra) actor.traitUsed = true;
-      const existing = actor.buffs.find(b => b.stat === move.buff);
-      if (existing && !existing.item) existing.expires = state.round + 1 + extra;
-      else if (!existing) actor.buffs.push({ stat: move.buff, expires: state.round + 1 + extra });
+      const existing = actor.buffs.find(b => b.stat === move.buff && (b.rate ?? .15) >= 0);
+      const expires = state.round + (support?.rounds ?? 2) - 1 + extra;
+      const rate = Math.min(.3, (support?.rate ?? .15) * scale);
+      if (existing && !existing.item) Object.assign(existing,{ expires, rate: Math.min(.3, (existing.rate ?? .15) + rate) });
+      else if (!existing) actor.buffs.push({ stat: move.buff, expires, rate });
       emit({ type: "buff", side, stat: move.buff, change: "applied" });
     }
-    if (move.heal) heal(side,move.heal);
+    if (move.heal) heal(side,(move.heal + (support?.lowHeal ?? 0) * (1 - actor.hp / actor.stats.hp)) * scale);
   };
   const order = turnOrder(state,playerAction);
   if (actionOrder(state,playerAction) === 0) draw();
@@ -240,6 +286,7 @@ export function stepRound(previous: BattleState, playerAction: Action, input: Ro
   for (const [side,action] of turns) { execute(side,action); if (state.outcome) return { state, events }; }
   for (const side of ["player","opponent"] as const) {
     const actor = state[side];
+    if (actor.prepared && actor.prepared.expires <= state.round) delete actor.prepared;
     for (const status of actor.statuses) if (status.expires <= state.round) emit({ type: "status", side, status: status.id, change: "removed" });
     actor.statuses = actor.statuses.filter(s => s.expires > state.round);
     for (const buff of actor.buffs) if (buff.expires <= state.round) emit({ type: "buff", side, stat: buff.stat, change: "removed" });
