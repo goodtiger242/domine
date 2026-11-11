@@ -1,3 +1,5 @@
+import { powerBudget } from "./move-budget";
+import { EXPANDED_MOVES, describeMove } from "./moves";
 import type { Breed, Group, Item, Move, Stats } from "./types";
 
 const stats = (hp: number, attack: number, defense: number, speed: number, focus: number, calm: number): Stats => ({ hp, attack, defense, speed, focus, calm });
@@ -22,17 +24,10 @@ export const BREEDS: readonly Breed[] = [
   { id: "B022", name: "보더 콜리", group: "track", temperament: "careful", size: "medium", base: stats(200,15,15,25,28,16), growth: "G4", trait: "longBuff", learn: learn(28,31,34,14,26,65) },
 ];
 
-export const POWER_DEDUCTIONS = { status: .10, priority: .10, buff: .10, multi: .05, charge: .05, breaksDefense: .10 } as const;
-export function powerBudget(energy: number, extra: Partial<Move> = {}): number {
-  const deduction = (extra.status ? POWER_DEDUCTIONS.status : 0) + (extra.priority ? POWER_DEDUCTIONS.priority : 0)
-    + (extra.buff ? POWER_DEDUCTIONS.buff : 0) + (extra.breaksDefense ? POWER_DEDUCTIONS.breaksDefense : 0)
-    + (extra.mode === "multi" ? POWER_DEDUCTIONS.multi : extra.mode === "charge" ? POWER_DEDUCTIONS.charge : 0);
-  const adjustment = deduction === 0 && energy > 0 ? energy <= 2 ? .9 : 1.09 : 1;
-  return Math.round((10 + 4 * energy) * (1 - deduction) * adjustment * 100) / 100;
-}
+export { POWER_DEDUCTIONS, powerBudget } from "./move-budget";
 const attack = (id: string, name: string, group: Move["group"], accuracy: number, energy: number, extra: Partial<Move> = {}): Move => ({ id, name, kind: "attack", mode: "normal", group, power: powerBudget(energy,extra), accuracy, energy, priority: 0, contact: group !== "bond" && group !== "track", ...extra });
 const support = (id: string, name: string, group: Group, kind: "defense" | "support", energy: number, extra: Partial<Move> = {}): Move => ({ id, name, group, kind, mode: "normal", power: 0, accuracy: 100, energy, priority: kind === "defense" ? 1 : 0, ...extra });
-export const MOVES: readonly Move[] = [
+const LEGACY_MOVES: Move[] = [
   attack("T01","앞발 밀기","rush",96,2),
   attack("T03","어깨 자리잡기","rush",94,3),
   attack("T13","옆걸음 톡","trick",97,2),
@@ -67,6 +62,7 @@ export const MOVES: readonly Move[] = [
   attack("K02","어깨 틈새치기","rush",97,4,{ common: true, breaksDefense: true }),
   attack("K03","시선 뒤집기","trick",97,4,{ common: true, breaksDefense: true, contact: false }),
 ];
+export const MOVES: readonly Move[] = [...LEGACY_MOVES.map(describeMove), ...EXPANDED_MOVES];
 export const FINISHERS: readonly Move[] = (["rush","trick","track","guard","bond","endure"] as Group[]).map((group,i) => ({
   ...attack(`F0${i+1}`,["돌진의 한걸음","기교의 원무","추적의 일격","수호의 반향","교감의 울림","지구의 전진"][i],group,98,0),
   power: 34, finisher: true,

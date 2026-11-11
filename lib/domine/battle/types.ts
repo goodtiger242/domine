@@ -1,4 +1,9 @@
 export type Group = "rush" | "trick" | "track" | "guard" | "bond" | "endure";
+export type MoveTag = "contact" | "sound" | "scent" | "trick" | "multi" | "charge" | "gaze";
+export type Species = "dog" | "cat" | "pigeon" | "magpie" | "sparrow" | "bulbul" | "duck" | "deer" | "boar" | "raccoon" | "squirrel" | "chipmunk";
+export type JobId = "rush" | "guard" | "trick" | "track" | "bond";
+export type Job = { id: JobId; tier: 1 | 2 | 3; nodes?: Readonly<Record<string, 1 | 2>> };
+export type AiTier = "gentle" | "normal" | "veteran" | "boss" | "king";
 export type Temperament = "lively" | "careful" | "kind" | "steady";
 export type Size = "small" | "medium" | "large";
 export type Stat = "hp" | "attack" | "defense" | "speed" | "focus" | "calm";
@@ -11,7 +16,9 @@ export interface BattleEnvironment { habitat?: Habitat; time?: TimeBand; weather
 export interface FighterOptions {
   moves?: readonly string[]; consumable?: string;
   items?: readonly string[]; owned?: boolean; boss?: boolean; equipmentStats?: boolean; finisher?: string;
-  allocation?: Partial<Stats>; job?: Partial<Stats>; condition?: Condition; mastery?: Readonly<Record<string, number>>;
+  allocation?: Partial<Stats>; job?: Partial<Stats> | Job | JobId; condition?: Condition; mastery?: Readonly<Record<string, number>>;
+  species?: Species; signatureBreedId?: string; element?: Group; weakTag?: MoveTag; resistTag?: MoveTag;
+  knownWeakTag?: boolean; knownResistTag?: boolean; aiTier?: AiTier;
   movementType?: MovementType; habitats?: readonly Habitat[]; activeBands?: readonly TimeBand[];
   environment?: BattleEnvironment;
 }
@@ -22,6 +29,9 @@ export interface Breed {
   base: Stats; growth: string; trait: Trait; learn: readonly { level: number; move: string }[];
 }
 export interface Move {
+  tags?: readonly MoveTag[]; fx?: string;
+  source?: "common" | "element" | "species" | "breed" | "job";
+  learn?: { level: number; species?: Species; breedId?: string; job?: JobId; tier?: 1 | 2 | 3; prerequisite?: string };
   id: string; name: string; kind: "attack" | "defense" | "support";
   group: Group | "neutral"; power: number; accuracy: number; energy: number; priority: number;
   buff?: Exclude<Stat, "hp">; heal?: number; status?: Status; chance?: number;
@@ -42,6 +52,7 @@ export interface Fighter extends FighterOptions {
   equipment: readonly string[]; consumable?: string;
 }
 export interface Actor extends Fighter {
+  history?: Action[];
   hp: number; energy: number; healed: number; itemUsed: boolean;
   statuses: { id: Status; applied: number; expires: number }[];
   buffs: { stat: Exclude<Stat, "hp">; expires: number; rate?: number; item?: boolean }[];
@@ -61,11 +72,14 @@ export type Hint = "good" | "normal" | "weak";
 export type Timing = "miss" | "good" | "perfect";
 export interface RoundInput { attackTiming?: Timing; guardTiming?: Timing }
 export interface BattleState {
+  aiTier?: AiTier;
+  opponentHint?: { obscured: boolean; clue: string };
   round: number; rng: number; player: Actor; opponent: Actor; difficulty: Difficulty;
   opponentAction: Action; outcome?: Outcome;
   criticals?: boolean;
 }
 export type BattleEvent = { round: number } & (
+  | { type: "reveal"; side: Side; tag: MoveTag; affinity: "weak" | "resist" }
   | { type: "action"; side: Side; action: Action }
   | { type: "hit" | "miss"; side: Side; target: Side; moveId: string }
   | { type: "effectiveness"; side: Side; target: Side; hint: Hint; multiplier: number }

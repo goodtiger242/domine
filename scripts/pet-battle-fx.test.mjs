@@ -3,15 +3,15 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { loadTS } from "./pet-test-loader.mjs";
 
-const { MOVES, PUSH } = loadTS("lib/domine/battle/data.ts");
+const { MOVES, PUSH, FINISHERS } = loadTS("lib/domine/battle/data.ts");
 const { BATTLE_MOVE_FX, battleFxId } = loadTS("lib/domine/pet-battle-fx.ts");
-const { actionLabel, battleCues, battleEffectId, moveEffect } = loadTS("lib/domine/pet-battle-view.ts");
+const { actionLabel, battleCues, battleEffectId, moveEffect, compactEffect, movePages, costBadge } = loadTS("lib/domine/pet-battle-view.ts");
 const { buildFighter, createBattle, previewDamage } = loadTS("lib/domine/battle/engine.ts");
 const css = readFileSync("app/games/pet-game.css", "utf8");
 const names = { player: "미네", opponent: "친구" };
 
 test("26개 기술: 빠짐·중복 없는 모션/궤적과 0.5~1.1초 길이, 실제 CSS 정의", () => {
-  assert.ok(Object.keys(BATTLE_MOVE_FX).every(id => ["push", "rest"].includes(id) || MOVES.some(move => move.id === id)));
+  assert.ok(Object.keys(BATTLE_MOVE_FX).every(id => ["push", "rest"].includes(id) || [...MOVES, ...FINISHERS].some(move => move.id === id)));
   for (const move of MOVES) assert.ok(BATTLE_MOVE_FX[battleEffectId(move.id)]);
   for (const field of ["motion", "trail", "suffix"]) assert.equal(new Set(Object.values(BATTLE_MOVE_FX).map(f => f[field])).size, 26);
   for (const fx of Object.values(BATTLE_MOVE_FX)) {
@@ -56,27 +56,37 @@ test("양쪽 공격·빗나감·방어·보조·숨 고르기 모두 기술별 �
   }
 });
 
-test("390×844 글자 폭 예산: 전체 기술 이름·효과·비용/부족/상성 3줄", () => {
-  // Conservative font budget: Hangul 1em, ASCII .65em, symbols 1em; no clipping/ellipsis.
-  const width = (s, size) => Array.from(s).reduce((n, c) => n + (c.charCodeAt(0) < 128 ? .65 : 1) * size, 0);
-  const copyWidth = 390 - 24 - 2 - 12 - 42 - 8;
-  let longest = 0;
-  for (const level of [1, 10, 30]) for (const breedId of ["B001", "B002", "B020"]) {
-    const state = createBattle({ seed: 1, player: buildFighter(breedId, level), opponent: buildFighter("B020", 30) });
-    for (const move of [...MOVES, PUSH]) {
-      const effect = moveEffect(move, state);
-      longest = Math.max(longest, width(effect, 12));
-      assert.ok(width(move.name, 15) + 23 <= copyWidth, move.name);
-      assert.ok(width(effect, 12) <= copyWidth, `${effect}: ${width(effect, 12)} > ${copyWidth}`);
-      if (move.kind === "attack") {
-        const damage = previewDamage(move, state.player, state.opponent, state.round);
-        assert.ok(effect.includes(`${damage.min}~${damage.max}`));
-        if (move.status) assert.ok(effect.includes(`${Math.round(damage.statusChance)}%`));
-      }
+test("390×844 고정 패널: 2열×3행, 요약·배지 폭, 이름은 말줄임과 상세", () => {
+  const width = (s, size) => Array.from(s).reduce((n, c) => n + (c.charCodeAt(0) < 128 ? .6 : 1) * size, 0);
+  const cardWidth = (390 - 24 - 6) / 2;
+  const copyWidth = cardWidth - 6 - 44 - 8 - 16 - 3;
+  assert.ok(copyWidth >= 100, copyWidth);
+  for (const level of [1, 10, 30]) {
+    const state = createBattle({ seed: 1, player: buildFighter("B001", level), opponent: buildFighter("B020", 30) });
+    for (const move of [...MOVES, ...FINISHERS, PUSH]) {
+      assert.ok(width(costBadge(move.energy), 12) <= 40);
+      assert.ok(width(compactEffect(move, state), 12) <= copyWidth, compactEffect(move, state));
+      assert.ok(move.name.length > 0);
     }
   }
-  assert.ok(width("기력 ●●●●● 기력 부족 잘 안 통해요", 12) + 10 < copyWidth);
-  assert.ok(844 * .42 > 4 * 76 + 3 * 8 + 5, "four complete rows fit; remaining rows scroll");
-  assert.match(css, /data-menu=moves[^}]*overflow-y: auto/);
-  assert.ok(longest > 0);
+  const panelHeight = 44 + 3 * 52 + 2 * 6 + 44 + 2 * 4;
+  assert.equal(panelHeight, 264);
+  assert.ok(844 - panelHeight - 8 - 34 >= 500, "safe area and command panel leave 500px arena");
+  assert.match(css, /grid-template-rows: repeat\(3, 52px\)/);
+  assert.match(css, /scroll-snap-type: x mandatory/);
+  assert.match(css, /pet-battle-move-copy strong[^}]*text-overflow: ellipsis/);
+  assert.doesNotMatch(css, /pet-battle-cost-dots/);
+});
+
+test("6칸 페이지와 분류, 0·2·8 비용 배지", () => {
+  const actions = MOVES.map(move => ({ kind: "move", moveId: move.id }));
+  assert.equal(movePages(actions.slice(0, 6), "all").length, 1);
+  assert.equal(movePages(actions.slice(0, 7), "all").length, 2);
+  assert.equal(movePages(actions, "all").length, Math.ceil(actions.length / 6));
+  for (const kind of ["attack", "defense", "support"]) {
+    const ids = movePages(actions, kind).flat().map(a => a.moveId);
+    assert.deepEqual(ids, MOVES.filter(m => m.kind === kind).map(m => m.id));
+  }
+  assert.deepEqual(movePages([], "attack"), [[]]);
+  assert.deepEqual([0, 2, 8].map(costBadge), ["⚡0", "⚡2", "⚡8"]);
 });

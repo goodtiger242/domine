@@ -5,6 +5,7 @@ import type { PetCommand, V6Result } from "@/lib/domine/pet-rpc";
 import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import PetSheet from "./PetSheet";
 import PetItemIcon from "./PetItemIcon";
+import { usePetProgressNumbers } from "./PetProgress";
 export default function PetShopSheet({ state, petId, disabled, notice, execute, onClose, bag = false, onSelectPet, onShop, multiPet = true }: {
   bag?: boolean; state: V6Result | null; petId: PetId; disabled: boolean; notice: string; execute: (c: PetCommand) => Promise<void>; onClose: () => void;
   onSelectPet?: (id: PetId) => void; onShop?: () => void; multiPet?: boolean;
@@ -16,6 +17,7 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
   const [pending, setPending] = useState<string | null>(null);
   const busy = useRef(false);
   const dog = PETS[petId].name, coins = state?.coins ?? state?.player?.coins ?? 0;
+  const display = usePetProgressNumbers(0, coins);
   const owned = (item: CatalogEntry) => state?.inventory?.includes(item.id);
   const equipped = (item: CatalogEntry) => state?.equipment?.some((e) => e.pet_id === petId && e.item_id === item.id);
   const blocked = disabled || pending !== null;
@@ -44,7 +46,7 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
   return <PetSheet title={bag ? `${dog}의 가방` : "상점"} onClose={onClose} onBack={back}
     toolbar={<>
       {bag && onSelectPet && <div className="pet-chips" role="group" aria-label="가방 강아지 선택">{([1, 2] as const).filter(id => multiPet || id === 1).map(id => <button type="button" key={id} aria-pressed={petId === id} disabled={blocked} onClick={() => { if (id === petId) return; setAsked(null); setDone(""); onSelectPet(id); }}>{PETS[id].name}</button>)}</div>}
-      <p className="pet-shop-coins" aria-label={`우리 코인(공용) ${coins}`}>🪙 {coins}</p>
+      <p className="pet-shop-coins" aria-label={`우리 코인(공용) ${coins}`}>🪙 {display.coins}</p>
       {!bag && <div className="pet-chips" role="group" aria-label="상품 분류">{["전체", "옷", "장난감"].map(value => <button type="button" key={value} aria-pressed={category === value} onClick={() => setCategory(value)}>{value}</button>)}</div>}
     </>}
     panel={!bag && selected && <div className="pet-product-detail">

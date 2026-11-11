@@ -1,4 +1,6 @@
-import type { Action } from "./battle/types";
+import type { Action, Move } from "./battle/types";
+import { MOVE_BY_ID, PUSH } from "./battle/data";
+import { PET_FX_SHEETS, type FxSheet } from "./pet-fx-sheets";
 
 export type BattleMoveFx = {
   motion: string;
@@ -7,10 +9,13 @@ export type BattleMoveFx = {
   reaction: string;
   duration: number;
   suffix: string;
+  image?: string;
+  sheets?: readonly FxSheet[];
+  tint?: string;
 };
 
 // Presentation only: no damage, status rolls or engine state changes here.
-export const BATTLE_MOVE_FX: Readonly<Record<string, BattleMoveFx>> = {
+const ORIGINAL_MOVE_FX: Readonly<Record<string, BattleMoveFx>> = {
   T01: { motion: "paw-push", trail: "paw-pop", elements: ["🐾"], reaction: "tap", duration: 550, suffix: "앞발로 툭!" },
   T03: { motion: "shoulder-bump", trail: "dust-cloud", elements: ["☁", "☁", "☁"], reaction: "recoil", duration: 750, suffix: "몸을 낮추고, 어깨로 쿵!" },
   T13: { motion: "side-step", trail: "side-tap", elements: ["·", "✦"], reaction: "tilt", duration: 650, suffix: "왼쪽, 오른쪽, 톡!" },
@@ -38,6 +43,45 @@ export const BATTLE_MOVE_FX: Readonly<Record<string, BattleMoveFx>> = {
   push: { motion: "light-nudge", trail: "little-pop", elements: ["·"], reaction: "tap", duration: 500, suffix: "가볍게 톡!" },
   rest: { motion: "energy-breath", trail: "energy-dots", elements: ["●", "●", "●", "●"], reaction: "none", duration: 1100, suffix: "천천히 숨 쉬며 기력을 채워요." },
 };
+
+export const moveImage = (id: string) => `/pet/battle/move/${id.toLowerCase()}.webp`;
+const GROUP_FX = {
+  rush: { categories: ["impact", "fire"], tint: "grayscale(1) sepia(1) saturate(5) hue-rotate(345deg)" },
+  trick: { categories: ["slash", "arcane"], tint: "grayscale(1) sepia(1) saturate(4) hue-rotate(215deg)" },
+  track: { categories: ["nature", "particle"], tint: "grayscale(1) sepia(1) saturate(4) hue-rotate(60deg)" },
+  guard: { categories: ["water", "shield"], tint: "grayscale(1) sepia(1) saturate(4) hue-rotate(150deg)" },
+  bond: { categories: ["light", "arcane"], tint: "grayscale(1) sepia(1) saturate(4) hue-rotate(265deg)" },
+  endure: { categories: ["smoke", "impact"], tint: "sepia(1) saturate(.8) brightness(.8)" },
+  neutral: { categories: ["impact", "particle"], tint: "none" },
+};
+export function fxSheets(category: string, variant = 0): FxSheet {
+  const pool = PET_FX_SHEETS.filter(sheet => sheet.category === category);
+  return pool[Math.abs(variant) % pool.length];
+}
+export function moveVisual(move: Move, variation = 0): BattleMoveFx {
+  const family = GROUP_FX[move.group], n = (Number(move.id.replace(/\D/g, "")) || 0) + variation;
+  const local = move.kind !== "attack";
+  const base = ORIGINAL_MOVE_FX[move.id] ?? (local ? ORIGINAL_MOVE_FX.T43 : move.group === "trick" ? ORIGINAL_MOVE_FX.T18 : ORIGINAL_MOVE_FX.push);
+  const category = move.heal ? "heal" : move.kind === "defense" ? "shield" : move.buff && local ? "buff" : move.mode === "charge" ? "charge" : family.categories[0];
+  return { ...base, reaction: local ? "none" : base.reaction, image: moveImage(move.id), tint: family.tint,
+    sheets: [fxSheets(category, n), fxSheets(move.finisher ? "lightning" : move.mode === "multi" ? "slash" : move.mode === "recoil" || move.breaksDefense ? "impact" : family.categories[1], n + 1)] };
+}
+export const BATTLE_MOVE_FX: Readonly<Record<string, BattleMoveFx>> = {
+  ...Object.fromEntries([...Object.values(MOVE_BY_ID), PUSH].map(move => [move.id, moveVisual(move)])),
+  rest: { ...ORIGINAL_MOVE_FX.rest, image: moveImage("rest"), sheets: [fxSheets("charge"), fxSheets("buff")] },
+};
+
+export function battleMoveFx(id: string, variation = 0): BattleMoveFx {
+  const move = id === "push" ? PUSH : MOVE_BY_ID[id];
+  return move ? moveVisual(move, variation) : BATTLE_MOVE_FX[id] ?? BATTLE_MOVE_FX.push;
+}
+
+export function battleAssets(moveIds: readonly string[]) {
+  return [...new Set([...moveIds, "push", "rest"].flatMap(id => {
+    const fx = BATTLE_MOVE_FX[id];
+    return fx ? [fx.image!, ...(fx.sheets ?? []).map(sheet => sheet.path)] : [];
+  }))];
+}
 
 export function battleFxId(action: Action): string | undefined {
   return action.kind === "move" ? action.moveId : action.kind === "push" || action.kind === "rest" ? action.kind : undefined;

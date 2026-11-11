@@ -8,10 +8,10 @@ import { loadTS } from "./pet-test-loader.mjs";
 const require = createRequire(import.meta.url);
 const engine = loadTS("lib/domine/battle/engine.ts");
 const { encounterFor, showBattleEvent, actionLabel, battleCues, battleEffectId, hpColor, HINT_ICON, MOVE_KIND, moveEffect } = loadTS("lib/domine/pet-battle-view.ts");
-const { MOVES, PUSH } = loadTS("lib/domine/battle/data.ts");
+const { MOVES, PUSH, FINISHERS } = loadTS("lib/domine/battle/data.ts");
 const { BATTLE_MOVE_FX } = loadTS("lib/domine/pet-battle-fx.ts");
 const { seedFor } = loadTS("lib/domine/battle/rng.ts");
-const { moveFor, sameAction } = loadTS("lib/domine/battle/rules.ts");
+const { moveFor, sameAction, REST_ENERGY, MAX_ENERGY, effectiveStat } = loadTS("lib/domine/battle/rules.ts");
 const { PET_WORLD } = loadTS("lib/domine/pet-world.ts");
 const source = ts.transpileModule(readFileSync("app/games/PetBattleSheet.tsx", "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
@@ -99,7 +99,7 @@ test("조우: 1000개 구간에서 30% 출현, 같은 구간·칸은 모두에�
   assert.equal(encounter("F5", NaN).playerLevel, 1);
 });
 
-test("버틸 힘 색: 50%, 20% 경계와 빈 막대", () => {
+test("체력 색: 50%, 20% 경계와 빈 막대", () => {
   for (const [hp, max, color] of [[100,100,"green"],[51,100,"green"],[50,100,"yellow"],[21,100,"yellow"],[20,100,"red"],[0,100,"red"],[0,0,"red"]]) assert.equal(hpColor(hp,max), color);
 });
 
@@ -109,7 +109,7 @@ test("등장 2.4초, 18ms 타이핑, 탭 완성·진행, 기술↔뒤로, 가방
   h.advance(2399); assert.equal(h.phase, "intro"); h.advance(1); assert.equal(h.phase, "command");
   assert.equal(nodes(h.tree, n => n.props.className === "pet-battle-message").length, 0);
   const visible = () => text(nodes(h.tree, n => n.props.className === "pet-battle-message")[0].props.children[0]);
-  h.click("기술"); assert.equal(h.actions().length, 5);
+  h.click("기술"); assert.equal(h.actions().length, initialFor(encounter(), 1).player.moves.length + 3);
   for (const b of h.actions()) assert.ok(b.props["aria-label"].includes("기력"));
   h.click("뒤로"); assert.equal(h.actions().length, 0);
   h.click("가방"); assert.equal(h.phase, "playback"); h.click("대사 모두 보기"); assert.match(visible(), /가방이 비었어요/); h.click("다음 대사"); assert.equal(h.phase, "command");
@@ -149,7 +149,7 @@ for (const [petId, cell, level, expected] of [[1, "F5", 30, "player"], [2, "J10"
   });
 }
 
-test("연출 순서: 대사→돌진→피격→HP→상성, 기력 점은 하나씩", () => {
+test("연출 순서: 대사→돌진→피격→HP→상성, 기력은 한 번에 갱신하고 숫자는 0.3초 보간", () => {
   const events = [
     { type: "action", side: "player", action: { kind: "push" }, round: 1 },
     { type: "hit", side: "player", target: "opponent", moveId: "push", round: 1 },
@@ -163,7 +163,7 @@ test("연출 순서: 대사→돌진→피격→HP→상성, 기력 점은 하�
   assert.equal(cues[2].motion, "hit"); assert.equal(cues[2].event, undefined);
   assert.equal(cues[3].event.type, "damage"); assert.equal(cues[3].duration, 900);
   assert.equal(cues[4].text, "효과가 좋아요!"); assert.equal(cues[4].motion, "effective");
-  assert.deepEqual(cues.slice(5).map(c => c.event.energy), [7, 8]); assert.deepEqual(events, before);
+  assert.deepEqual(cues.slice(5).map(c => c.event.energy), [8]); assert.deepEqual(events, before);
   const weak = battleCues(events.map(e => e.type === "effectiveness" ? { ...e, hint: "weak" } : e), { player: "미네", opponent: "삽살개" });
   assert.ok(!weak.some(c => c.motion === "effective"));
 });
@@ -173,13 +173,13 @@ test("기력 조건, 길게 누르기·취소, Escape 뒤로, 재생 중 닫기 
   const h = mount(t, { encounter: e, petId: 1, stage: "baby", onClose() {} }, state);
   h.settle(); h.click("기술");
   for (const b of h.actions()) {
-    const action = [...state.player.moves.map(moveId => ({ kind: "move", moveId })), { kind: "push" }].find(a => actionLabel(a) === text(nodes(b, n => n.type === "strong")[0]));
+    const action = [...[...state.player.moves, state.player.finisher].filter(Boolean).map(moveId => ({ kind: "move", moveId })), { kind: "push" }, { kind: "rest" }].find(a => actionLabel(a) === text(nodes(b, n => n.type === "strong")[0]));
     assert.equal(b.props.disabled, !engine.availableActions(state, "player").some(a => sameAction(a, action)));
   }
   const push = () => h.button("가볍게 밀기");
   push().props.onPointerDown({ isPrimary: true, button: 0 }); h.advance(500);
   assert.match(text(h.tree), /예상 피해.*명중 시/);
-  push().props.onPointerUp(); push().props.onClick(); h.render(); assert.equal(h.phase, "command", "long press must not choose");
+  push().props.onPointerUp(); push().props.onClick(); h.render(); assert.equal(h.phase, "command", "long press must not choose"); h.click("상세 닫기");
   push().props.onPointerDown({ isPrimary: true, button: 0 }); push().props.onPointerCancel(); h.advance(1000); assert.equal(h.timerCount, 0);
   h.tree.props.onCancel({ preventDefault() {} }); h.render(); assert.equal(h.actions().length, 0);
   h.click("기술"); h.click("가볍게 밀기"); assert.equal(h.phase, "playback"); h.unmount();
@@ -192,13 +192,13 @@ test("기력이 충분해도 회복 불가능한 기술은 비활성", t => {
   h.settle(); h.click("기술"); assert.equal(h.button(actionLabel({ kind: "move", moveId: "T60" })).props.disabled, true); h.unmount();
 });
 
-test("기술 버튼은 이름·아이콘만, 상세는 접근성 이름에 유지하고 공격→방어→보조 순서", t => {
+test("기술 카드: 이름·요약·숫자 비용·상성, 공격→방어→보조 순서", t => {
   const e = encounter("F5", 30), state = initialFor(e, 1);
   state.player.moves = MOVES.map(m => m.id).reverse(); state.player.energy = 0;
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
   h.settle();
   assert.equal(h.button("숨 고르기").props["data-kind"], "support");
-  assert.match(text(h.button("숨 고르기")), /기력 \+4/);
+  assert.ok(text(h.button("숨 고르기")).includes(`기력 +${REST_ENERGY}`));
   h.click("기술");
   const orders = h.actions().map(b => MOVE_KIND[b.props["data-kind"]].order);
   assert.deepEqual(orders, [...orders].sort());
@@ -207,7 +207,9 @@ test("기술 버튼은 이름·아이콘만, 상세는 접근성 이름에 유�
     assert.equal(text(nodes(button, n => n.props.className === "pet-battle-kind")[0]), kind.icon);
     assert.equal(nodes(button, n => n.props.className === "pet-battle-effect").length, 0);
     assert.ok(button.props["aria-label"].includes(moveEffect(move, state)));
-    assert.equal(nodes(button, n => n.props.className === "pet-battle-matchup").length, 0);
+    const card = nodes(h.tree, n => n.props.className === "pet-battle-card" && text(n).includes(move.name))[0];
+    assert.ok(text(card).includes(`⚡${move.energy}`));
+    assert.equal(card.props["data-insufficient"], move.energy > state.player.energy);
     if (move.energy) { assert.equal(button.props.disabled, true); assert.match(button.props["aria-label"], /기력 부족/); }
     if (move.kind === "attack") {
       const damage = engine.previewDamage(move, state.player, state.opponent, state.round);
@@ -254,28 +256,18 @@ test("이동 줄이기에도 기술 아이콘과 대사를 읽을 시간이 남�
   h.advance(1); assert.notEqual(fx()?.key, key); h.settle(); h.unmount();
 });
 
-test("배운 기술만 표시, 속성 이미지 실패 대체, 미리보기는 길게 누르는 동안만", t => {
-  const e = encounter("F5", 1), state = initialFor(e, 1);
-  const h = mount(t, { encounter: e, petId: 1, stage: "baby", onClose() {} }, state);
-  h.settle(); h.click("기술");
-  assert.equal(h.actions().length, state.player.moves.length + 1);
-  assert.doesNotMatch(text(h.tree), /아직 배우는 중|예상 피해/);
-  const dialogue = nodes(h.tree, n => n.props.className === "pet-battle-dialogue")[0];
-  assert.ok(nodes(dialogue, n => n.props.className === "pet-battle-back").length);
-  for (const action of h.actions()) {
-    const icon = nodes(action, n => n.props.className === "pet-battle-type")[0];
-    assert.equal(icon.props.src, `/pet/battle/type-${action.props["data-group"]}.webp`);
-    const currentTarget = { style: {} }; icon.props.onError({ currentTarget });
-    assert.equal(currentTarget.style.display, "none");
-    assert.ok(action.props["data-group"], "the group color stripe survives image failure");
-  }
-  const push = h.button("가볍게 밀기");
-  assert.equal(push.props.onFocus, undefined);
+test("장착 기술·결정기·기본 행동, 정보 버튼과 길게 누름은 상세를 열고 선택하지 않는다", t => {
+  const e = encounter(), state = initialFor(e, 1); state.player.moves = ["T01", "T43"];
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
+  h.settle(); h.click("기술"); assert.equal(h.actions().length, 5);
+  assert.equal(h.actions().some(b => text(b).includes("코끝 집중")), false);
+  h.click("앞발 밀기 상세"); assert.match(text(h.tree), /명중.*예상 피해/);
+  h.click("상세 닫기");
+  let push = h.button("가볍게 밀기");
   push.props.onKeyDown({ key: " ", repeat: false }); h.advance(500);
   assert.match(text(h.tree), /예상 피해/);
-  push.props.onKeyUp(); push.props.onClick(); h.render();
-  assert.doesNotMatch(text(h.tree), /예상 피해/); assert.equal(h.phase, "command");
-  h.unmount();
+  push.props.onKeyUp(); push.props.onClick(); h.render(); assert.equal(h.phase, "command");
+  h.click("상세 닫기"); assert.doesNotMatch(text(h.tree), /예상 피해/); h.unmount();
 });
 
 test("효과는 맞은 쪽에 연결되고 상태 해제에는 부여 효과를 재생하지 않는다", () => {
@@ -364,7 +356,7 @@ for (const outcome of ["player", "opponent", "draw", "quit"]) test(`결과 ${out
   const visible = visibleTextNodes(h.tree);
   assert.equal(visible.length, outcome === "opponent" ? 4 : 3, visible.join(" / "));
   assert.equal(nodes(h.tree, n => n.props.className === "pet-battle-result")[0].props.children.filter(Boolean).length, 2);
-  assert.doesNotMatch(visible.join(" "), /겨루기 종료|수고했어요|꾸벅|보상|라운드|버틸 힘|기력/);
+  assert.doesNotMatch(visible.join(" "), /겨루기 종료|수고했어요|꾸벅|보상|라운드|체력|기력/);
   h.unmount();
 });
 
@@ -374,4 +366,78 @@ test("승리는 한 번 기록하고 그만두기·패배는 기록하지 않는
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {}, onWin: () => wins++ }, state);
   h.settle(); h.click("기술"); h.click("가볍게 밀기"); h.settle();
   assert.equal(h.phase, "result"); assert.equal(wins, 1); h.unmount();
+});
+
+
+test("페이지 화살표·스와이프·필터 초기화와 비활성 페이지 포커스 제외", t => {
+  const e = encounter(), state = initialFor(e, 1); state.player.moves = MOVES.map(m => m.id);
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
+  h.settle(); h.click("기술");
+  const pages = () => nodes(h.tree, n => n.props.className === "pet-battle-page");
+  assert.equal(pages().length, Math.ceil((MOVES.length + 3) / 6));
+  assert.equal(pages().filter(p => !p.props.inert).length, 1);
+  assert.ok(pages().every(p => nodes(p, n => n.props.className === "pet-battle-card").length <= 6));
+  h.click("다음 기술 페이지"); assert.equal(pages()[1].props.inert, false);
+  h.click("🛡 방어"); assert.equal(pages()[0].props.inert, false);
+  assert.ok(h.actions().every(b => b.props["data-kind"] === "defense"));
+  h.click("✨ 보조"); assert.ok(h.actions().every(b => b.props["data-kind"] === "support"));
+  h.click("전체");
+  const viewport = () => nodes(h.tree, n => n.props.className === "pet-battle-pages")[0];
+  viewport().props.onScroll({ currentTarget: { clientWidth: 366, scrollLeft: 732 } }); h.render();
+  assert.equal(pages()[2].props.inert, false);
+  viewport().props.onKeyDown({ key: "ArrowLeft", preventDefault() {} }); h.render();
+  assert.equal(pages()[1].props.inert, false);
+  h.unmount();
+});
+
+test("기력 막대는 MAX_ENERGY 칸, 포커스한 비용만 미리보기", t => {
+  const e = encounter(), state = initialFor(e, 1); state.player.energy = 6;
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
+  h.settle(); h.click("기술");
+  const bars = () => nodes(h.tree, n => n.props.className === "pet-battle-energy-bar");
+  assert.equal(nodes(bars()[1], n => n.type === "i").length, MAX_ENERGY);
+  h.button("앞발 밀기").props.onFocus(); h.render();
+  assert.equal(nodes(bars()[1], n => n.props["data-spend"]).length, 2);
+  assert.equal(nodes(bars()[0], n => n.props["data-spend"]).length, 0);
+  h.button("앞발 밀기").props.onBlur(); h.render();
+  assert.equal(nodes(bars()[1], n => n.props["data-spend"]).length, 0);
+  h.unmount();
+});
+
+test("동물 상세: 강화·약화 스탯, 상대 미공개 기술 숨김, 재생 일시정지·재개", t => {
+  const e = encounter(), state = initialFor(e, 1);
+  state.player.buffs = [{ stat: "attack", rate: .2, expires: 3 }];
+  state.player.statuses = [{ id: "slow", applied: 1, expires: 2 }];
+  state.opponentAction = { kind: "move", moveId: state.opponent.moves[0] };
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
+  nodes(h.tree, n => n.props.className === "pet-battle-info")[1].props.onClick({ stopPropagation() {} }); h.render();
+  const detail = () => nodes(h.tree, n => n.props.className === "pet-battle-details")[0];
+  const meters = nodes(detail(), n => n.type === "meter");
+  assert.equal(meters.length, 6);
+  assert.equal(meters.find(m => m.props["aria-label"] === "공격력").props.value, effectiveStat(state.player, "attack", 1));
+  assert.equal(meters.find(m => m.props["aria-label"] === "민첩").props.value, effectiveStat(state.player, "speed", 1));
+  assert.match(text(detail()), /크리티컬/); assert.match(text(detail()), /느려짐 · 2라운드/);
+  h.advance(10000); assert.equal(h.phase, "intro");
+  h.click("상세 닫기"); h.settle();
+  const opponentInfo = nodes(h.tree, n => n.props.className === "pet-battle-info")[0];
+  opponentInfo.props.onClick({ stopPropagation() {} }); h.render();
+  const known = () => nodes(detail(), n => n.props.className === "pet-battle-known-moves")[0];
+  assert.equal(text(known()), "?".repeat(state.opponent.moves.length + (state.opponent.finisher ? 1 : 0))); assert.doesNotMatch(text(detail()), /크리티컬/);
+  h.click("상세 닫기"); h.click("숨 고르기"); h.settle();
+  nodes(h.tree, n => n.props.className === "pet-battle-info")[0].props.onClick({ stopPropagation() {} }); h.render();
+  assert.ok(text(known()).includes(actionLabel(state.opponentAction)));
+  const overlay = detail(); overlay.props.onClick({ target: overlay, currentTarget: overlay }); h.render();
+  assert.equal(detail(), undefined); h.unmount();
+});
+
+
+test("충전 해방은 기력 비용 0, 부족 표시 없음", t => {
+  const e = encounter(), state = initialFor(e, 1);
+  state.player.moves = ["C01"]; state.player.charging = "C01"; state.player.energy = 0;
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
+  h.settle(); h.click("기술");
+  const card = nodes(h.tree, n => n.props.className === "pet-battle-card" && text(n).includes("웅크려 큰걸음"))[0];
+  assert.match(text(card), /⚡0/); assert.equal(card.props["data-insufficient"], false);
+  assert.equal(h.button("웅크려 큰걸음").props.disabled, false);
+  h.click("웅크려 큰걸음 상세"); assert.match(text(h.tree), /충전 완료/); h.click("상세 닫기"); h.unmount();
 });

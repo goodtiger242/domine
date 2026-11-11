@@ -17,6 +17,12 @@ function mount(file, props, imports = {}) {
   };
   const source = ts.transpileModule(readFileSync(`app/games/${file}.tsx`, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {};
+  if (file === "PetShopSheet") {
+    const progress = ts.transpileModule(readFileSync("app/games/PetProgress.tsx", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+    const shared = {};
+    new Function("require", "exports", progress)(name => name === "react" ? hooks : name.startsWith("@/") ? loadTS(`${name.slice(2)}.ts`) : require(name), shared);
+    imports["./PetProgress"] = shared;
+  }
   new Function("require", "exports", source)(name => imports[name] ?? (name === "react" ? hooks : name.startsWith("@/") ? loadTS(`${name.slice(2)}.ts`) : name.startsWith("./") ? loadTS(`app/games/${name.slice(2)}.tsx`) : require(name)), exports);
   return { render(next = {}) { Object.assign(props, next); cursor = 0; tree = (exports.default ?? exports.PetGame)(props); return tree; }, get tree() { return tree; }, flushEffects() { while (effects.length) effects.shift()(); }, unmount() { slots.forEach(slot => slot?.cleanup?.()); } };
 }
