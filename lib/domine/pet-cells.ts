@@ -9,5 +9,6 @@ export function cellBackground(id: string, hour: number) {
 
 /** 장면에 크게 세울 실제 가게 이름(리뷰 많은 순, 최대 2개). */
 export function cellShops(id: string): string[] {
-  return CELL_DATA[id]?.shops ?? [];
+  // Drop the branch suffix ("… 군포당동점") so the sign fits on a phone.
+  return (CELL_DATA[id]?.shops ?? []).map((name) => name.replace(/\s+\S*점$/, ""));
 }
