@@ -34,6 +34,37 @@ for (const stage of ["baby", "young", "adult"]) {
     assert.ok(fallback.includes(`href="/pet/${stage === "adult" ? "adult" : "puppy"}.webp"`));
   }
 }
+// Render the scene without effects or network calls, at two feeding depths.
+const sceneModule = { exports: {} };
+let sceneState = {};
+const sceneSource = ts.transpileModule(readFileSync(new URL("../app/games/PetScene.tsx", import.meta.url), "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+}).outputText;
+new Function("require", "exports", sceneSource)((name) => {
+  if (name === "./PetDog") return dogModule.exports;
+  if (name.startsWith("@/lib/domine/")) return require(`../lib/domine/${name.split("/").pop()}.ts`);
+  if (name === "react") return {
+    ...require("react"),
+    useState: (initial) => require("react").useState(initial?.fx ? { ...initial, ...sceneState } : initial),
+  };
+  return require(name);
+}, sceneModule.exports);
+const renderScene = () => renderToStaticMarkup(createElement(sceneModule.exports.PetScene, {
+  stage: "adult", face: "happy", light: 0.8, hour: 22, collar: "purple", cue: null, onSay() {},
+}));
+assert.ok(!renderScene().includes("/pet/art/bowl.webp"));
+const scales = [];
+for (const y of [77, 88]) {
+  sceneState = { y, bowl: 110 };
+  const scene = renderScene();
+  const bowl = scene.match(/<g transform="translate\(110 ([\d.]+)\) scale\(([\d.]+)\)"[^>]*>(.*?)<\/g>/);
+  assert.ok(bowl, "Feeding bowl renders at the dog's depth");
+  assert.equal(Number(bowl[1]), y + 1);
+  assert.ok(bowl[3].includes("/pet/art/bowl.webp"));
+  assert.ok(bowl[3].includes("<ellipse"), "Bowl has a contact shadow");
+  scales.push(Number(bowl[2]));
+}
+assert.ok(scales[1] > scales[0], "Foreground bowl is larger than distant bowl");
 let total = 0;
 for (const src of [...Object.values(BACKGROUNDS), ...Object.values(POSES).map((p) => p.src)]) {
   const file = new URL(`../public${src}`, import.meta.url);
@@ -43,4 +74,4 @@ for (const src of [...Object.values(BACKGROUNDS), ...Object.values(POSES).map((p
   total += bytes;
 }
 assert.ok(total < 600 * 1024);
-console.log(`Pet photos: time boundaries, poses and asset budget passed (${total} bytes).`);
+console.log(`Pet photos: time boundaries, poses, feeding depth/shadows and asset budget passed (${total} bytes).`);

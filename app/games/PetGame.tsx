@@ -36,21 +36,22 @@ function safeGet(key: string): string {
   }
 }
 
-function Mini({ icon, label, value, color }: { icon: string; label: string; value: number; color: string }) {
+function Mini({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <span className="flex items-center gap-1" title={`${label} ${value}`}>
-      <span aria-hidden className="text-[11px] leading-none">
-        {icon}
+    <span className="min-w-0 flex-1">
+      <span className="mb-2 flex items-baseline justify-between gap-1 text-[12px] text-[var(--lit-ink-muted)]">
+        <span>{label}</span>
+        <span className="tabular-nums text-[var(--lit-ink)]">{value}<span className="sr-only"> / 100</span></span>
       </span>
       <span
-        className="h-1.5 w-8 overflow-hidden rounded-full bg-white/30"
+        className="block h-1 overflow-hidden rounded-full bg-[var(--lit-border)]"
         role="progressbar"
         aria-label={label}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={value}
       >
-        <span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${value}%`, background: color }} />
+        <span className="block h-full origin-left rounded-full transition-transform duration-700 motion-reduce:transition-none" style={{ transform: `scaleX(${value / 100})`, background: color }} />
       </span>
     </span>
   );
@@ -71,7 +72,6 @@ export function PetGame() {
   const [sound, setSound] = useState(false);
   const [streak, setStreak] = useState(0);
   const [bubble, setBubble] = useState("");
-  const [dogX, setDogX] = useState(78);
   const [sceneBusy, setSceneBusy] = useState(false);
   const sceneBusyRef = useRef(false);
   const startScene = useCallback((action: PetAction) => {
@@ -93,7 +93,7 @@ export function PetGame() {
   // 말풍선은 한 줄씩 충분히 읽을 시간 동안 보여 주고, 그사이 새 말은 줄을 세운다(밀리면 오래된 것부터 버림)
   const sayQueue = useRef<string[]>([]);
   const sayBusy = useRef(false);
-  const pump = useCallback(() => {
+  const pump = useCallback(function nextBubble() {
     if (sayBusy.current) return;
     const next = sayQueue.current.shift();
     if (!next) return;
@@ -103,7 +103,7 @@ export function PetGame() {
     setBubble(next);
     window.setTimeout(() => {
       sayBusy.current = false;
-      pump();
+      nextBubble();
     }, ms);
   }, []);
   const say = useCallback(
@@ -224,12 +224,12 @@ export function PetGame() {
   const collar = collarToday();
 
   const head = (
-    <div className="mb-2 flex items-center justify-between gap-3">
+    <div className="mb-3 flex min-h-11 items-center justify-between gap-3">
       <h2 className="t-heading text-[var(--lit-ink)]">우리 강아지 도미</h2>
       {nick ? (
         <button
           type="button"
-          className="t-caption shrink-0 text-[var(--lit-ink-subtle)] underline underline-offset-2"
+          className="t-caption min-h-11 shrink-0 rounded-lg px-2 text-[var(--lit-ink-muted)] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
           onClick={() => {
             try {
               localStorage.removeItem(NICK_KEY);
@@ -270,8 +270,13 @@ export function PetGame() {
   return (
     <div>
       {head}
-      <div className="space-y-2.5">
-      <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] shadow-[var(--lit-paper-shadow-soft)]">
+      <div className="space-y-3">
+      <div className="overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)]" aria-busy={status === "loading"}>
+        <div className="flex items-center justify-between gap-3 px-4 py-3 text-[12px] text-[var(--lit-ink-muted)]">
+          <span>{pet ? STAGE_LABEL[stage] : "함께 키우는 강아지"}</span>
+          <span className="tabular-nums">함께한 돌봄 <span className="font-semibold text-[var(--lit-ink)]">{pet ? pet.care_total.toLocaleString("ko-KR") : "—"}</span></span>
+        </div>
+        <div className="relative aspect-[16/9] overflow-hidden bg-[var(--lit-bg)]">
         {pet && <PetScene
           stage={stage}
           face={face}
@@ -280,36 +285,26 @@ export function PetGame() {
           collar={collar.hex}
           cue={cue}
           onSay={say}
-          onMove={setDogX}
           onDone={endScene}
         />}
-        <div className="pointer-events-none absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-white backdrop-blur-sm">
-          <span className="text-[13px] font-semibold leading-none">도미</span>
-          <span className="text-[10px] leading-none opacity-80">
-            {STAGE_LABEL[stage]} · 돌봄 {pet?.care_total ?? 0}
-          </span>
+          {!pet && <p role="status" className="absolute inset-0 flex items-center justify-center text-[13px] text-[var(--lit-ink-muted)]">도미가 오는 중이에요…</p>}
         </div>
-        <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-2 rounded-full bg-black/40 px-2.5 py-1.5 text-white backdrop-blur-sm">
-          <Mini icon="🍖" label="배부름" value={pet?.fullness ?? 0} color="#f0b45a" />
-          <Mini icon="💛" label="기분" value={pet?.mood ?? 0} color="#f27d8c" />
-          {avail.length > 3 ? <Mini icon="🫧" label="청결" value={pet?.clean ?? 0} color="#6fc0f0" /> : null}
-        </div>
-        {bubble ? (
-          <p
-            key={bubble}
-            className={`fade-in pointer-events-none absolute top-11 max-w-[58%] rounded-xl bg-white/95 px-2.5 py-1.5 text-[12px] leading-snug text-[#1f2433] shadow ${
-              dogX < 80 ? "right-2" : "left-2"
-            }`}
-            aria-live="polite"
-          >
-            {bubble}
+        <div className="px-4 pb-4">
+          <p className="flex min-h-16 items-center gap-3 py-3 text-[13px] leading-relaxed text-[var(--lit-ink)]" role="status" aria-atomic="true">
+            <span aria-hidden="true" className="shrink-0 text-[11px] font-semibold text-[var(--lit-ink-muted)]">도미</span>
+            <span className="break-keep">{bubble || "잠깐만 기다려 주시오…"}</span>
           </p>
-        ) : null}
+          {pet && <div className="flex gap-5 border-t border-[var(--lit-border)] pt-3">
+            <Mini label="배부름" value={pet.fullness} color="#b78b4e" />
+            <Mini label="기분" value={pet.mood} color="#b97582" />
+            {avail.length > 3 ? <Mini label="청결" value={pet.clean} color="#64949c" /> : null}
+          </div>}
+        </div>
       </div>
 
       {nick ? (
         <>
-          <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="도미 돌보기">
+          <div className="grid grid-cols-4 gap-2" role="group" aria-label="도미 돌보기" aria-busy={busy || sceneBusy}>
             {avail.map((a) => {
               const w = wait[a];
               return (
@@ -318,10 +313,11 @@ export function PetGame() {
                   type="button"
                   onClick={() => care(a)}
                   disabled={busy || sceneBusy || w > 0 || status !== "ready"}
-                  className="flex min-h-[3.4rem] flex-col items-center justify-center rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-1 py-1 text-[var(--lit-ink)] transition duration-150 active:scale-[0.96] enabled:hover:border-[var(--lit-border-strong)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
+                  data-active={sceneBusy && cue?.action === a}
+                  className="flex min-h-[4.25rem] flex-col items-center justify-center rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-1 py-2 text-[var(--lit-ink)] transition duration-150 enabled:active:scale-[0.96] enabled:hover:border-[var(--lit-border-strong)] disabled:opacity-45 data-[active=true]:border-[var(--lit-ink-muted)] data-[active=true]:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] motion-reduce:transition-none"
                 >
-                  <span className="flex items-center gap-1 leading-none">
-                    <span aria-hidden className="text-[17px]">
+                  <span className="flex flex-col items-center gap-2 leading-none">
+                    <span aria-hidden className="text-[20px]">
                       {ACTION_ICON[a]}
                     </span>
                     <span className="text-[12px] font-semibold">{ACTION_LABEL[a]}</span>
@@ -333,6 +329,7 @@ export function PetGame() {
               );
             })}
           </div>
+          <p role="status" className="min-h-5 break-keep px-1 text-[12px] leading-relaxed text-[var(--lit-ink-muted)]">{message || "마음 가는 대로 도미를 돌봐 주세요."}</p>
         </>
       ) : (
         <form
@@ -353,12 +350,12 @@ export function PetGame() {
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              className="h-11 min-w-0 flex-1 rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 text-[15px] text-[var(--lit-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-[var(--lit-border)] bg-[var(--lit-bg)] px-3 text-base text-[var(--lit-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)]"
               placeholder="예: 별명"
             />
             <button
               type="submit"
-              className="h-11 shrink-0 rounded-lg bg-[var(--lit-ink)] px-5 text-[15px] font-semibold text-[var(--lit-bg-elevated)] transition active:scale-[0.97]"
+              className="h-11 shrink-0 rounded-lg bg-[var(--lit-ink)] px-5 text-[15px] font-semibold text-[var(--lit-bg-elevated)] transition active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none"
             >
               시작
             </button>
@@ -369,7 +366,7 @@ export function PetGame() {
 
       {pet && (pet.today_top.length > 0 || pet.recent.length > 0) ? (
         <details className="rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-3 py-2">
-          <summary className="t-label cursor-pointer select-none text-[var(--lit-ink-muted)]">
+          <summary className="t-label min-h-11 cursor-pointer select-none content-center rounded text-[var(--lit-ink-muted)] focus-visible:outline-2 focus-visible:outline-offset-2">
             오늘의 기록 보기
           </summary>
           <div className="mt-2 grid gap-3 sm:grid-cols-2">

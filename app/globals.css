@@ -104,8 +104,7 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* 도미를 돌볼 때의 짧은 반응(간식·공놀이·빗질·목욕·쓰다듬기·밥·산책)은
-     눌러서 보는 피드백이라 시스템 '동작 줄이기'에서도 남겨 둔다. 계속 도는 장식 움직임만 끈다. */
+  /* 반복 장식을 멈춘다. 도미의 행동 모션은 아래 .pet-scene 규칙에서 줄인다. */
   html {
     scroll-behavior: auto;
   }
@@ -766,6 +765,13 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .pet-photo-fade { transition: none; }
   .pet-photo-pan { animation: none; }
+  /* 대본의 자세·소품·대사는 유지하고 회전·흔들림·화면 이동만 줄인다. */
+  .pet-scene * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .pet-scene .pet-roll { transform: rotate(-180deg); }
+  .pet-scene .pet-lie { transform: translateY(1px) scale(1.07, 0.56) rotate(-1.5deg); }
 }
 
 .pet-sit {

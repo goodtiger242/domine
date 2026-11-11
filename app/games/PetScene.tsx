@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { PetAction, PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
 import { ART, BALL, BOWL, preloadArt } from "@/lib/domine/pet-art";
@@ -393,17 +393,16 @@ type Props = {
   /** 새 행동이 시작될 때마다 id 가 바뀐다 */
   cue: { action: PetAction; id: number } | null;
   onSay: (text: string) => void;
-  /** 한쪽에 말풍선을 두려고 도미의 가로 위치를 알려 준다 */
-  onMove?: (x: number) => void;
   /** 연출이 끝났을 때 */
   onDone?: () => void;
 };
 
-export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove, onDone }: Props) {
+export function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone }: Props) {
+  const shadowId = useId();
   const [s, setS] = useState<S>(HOME);
   const timers = useRef<number[]>([]);
-  const latest = useRef({ stage, onSay, onMove, onDone });
-  latest.current = { stage, onSay, onMove, onDone };
+  const latest = useRef({ stage, onSay, onDone });
+  latest.current = { stage, onSay, onDone };
   const running = useRef(false);
   const period = backgroundAt(hour);
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
@@ -452,7 +451,6 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
         window.setTimeout(() => {
           const { say, ...rest } = patch;
           if (say) latest.current.onSay(say);
-          if (rest.x !== undefined) latest.current.onMove?.(rest.x);
           setS((prev) => ({ ...prev, ...rest }));
         }, t * SLOW)
       );
@@ -488,11 +486,16 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
   return (
     <svg
       viewBox="0 6 160 90"
-      className="block w-full"
+      className="pet-scene block w-full"
       role="img"
       aria-label={`${stage === "baby" ? "아기" : stage === "young" ? "어린" : "다 큰"} 강아지 도미`}
     >
       <defs>
+        <radialGradient id={shadowId}>
+          <stop offset="0" stopColor="#17231d" stopOpacity="0.4" />
+          <stop offset="0.45" stopColor="#17231d" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#17231d" stopOpacity="0" />
+        </radialGradient>
         <linearGradient id="pet-sky" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0" stopColor={c.top} />
           <stop offset="1" stopColor={c.bot} />
@@ -533,14 +536,16 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
       </g>
 
       {s.bowl !== null ? (
-        <g transform={`translate(${s.bowl} ${HOME.y + 1})`} className="fade-in">
+        <g transform={`translate(${s.bowl} ${s.y + 1}) scale(${sc})`} className="fade-in" style={{ filter: `brightness(${light})` }}>
+          <ellipse cy="1" rx="13" ry="2.5" fill={`url(#${shadowId})`} />
           <image href={BOWL} x={-12} y={-13} width={24} height={14} />
         </g>
       ) : null}
 
       {/* 도미 (가로 위치·방향·깊이는 transition 으로 부드럽게) */}
       <g style={move(s.x, s.y, s.dur, ` scale(${s.dir * sc}, ${sc})`)}>
-        <ellipse cx="0" cy="1" rx={w * 0.42} ry="3" fill="#000" opacity="0.28" />
+        <ellipse cx="0" cy="1.8" rx={w * 0.5} ry="5" fill={`url(#${shadowId})`} />
+        <ellipse cx="0" cy="1" rx={w * 0.3} ry="1.5" fill={`url(#${shadowId})`} />
         {s.carry ? (
           <g
             transform={`translate(${{ mouth: w * 0.47, back: 0, tail: -w * 0.47, head: w * 0.34 }[s.carry]} ${{ mouth: -h * 0.76, back: -h * 0.8, tail: -h * 0.33, head: -h * 1.0 }[s.carry]})`}
@@ -617,6 +622,7 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
       </g>
 
       {/* 도구·공·손 */}
+      <g style={{ filter: `brightness(${light}) drop-shadow(0 0.5px 0.5px #17231d40)` }}>
       {s.ball ? (
         <g style={move(s.ball.x, s.ball.y, s.ball.dur)}>
           <Ball />
@@ -629,11 +635,12 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onMove,
       ) : null}
       {s.hand ? (
         <g style={move(s.hand.x, s.hand.y, s.hand.dur)} pointerEvents="none">
-          <g className={s.hand.stroke ? "pet-stroke" : undefined} style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,.35))" }}>
+          <g className={s.hand.stroke ? "pet-stroke" : undefined}>
             <Prop e={s.hand.e} size={15} />
           </g>
         </g>
       ) : null}
+      </g>
     </svg>
   );
 }
