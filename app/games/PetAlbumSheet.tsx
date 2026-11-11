@@ -13,17 +13,35 @@ const explanations: Record<string, string> = {
 export default function PetAlbumSheet({ state, disabled, notice, map, execute, onClose }: {
   state: V6Result | null; disabled: boolean; notice: string; map: string; execute: (c: PetCommand) => Promise<void>; onClose: () => void;
 }) {
-  const [count, setCount] = useState(24), [detail, setDetail] = useState<string | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
+  const [filter, setFilter] = useState("전체"), [category, setCategory] = useState("전체");
   const found = state?.album ?? [];
-  const core = CATALOG.filter((i) => i.core && found.includes(i.id)).length;
-  return <PetSheet title="도감" onClose={onClose} onBack={() => { if (!detail) return false; setDetail(null); return true; }}>
+  const core = CATALOG.filter(i => i.core && found.includes(i.id)).length;
+  const discovered = CATALOG.filter(i => found.includes(i.id)).length;
+  const item = CATALOG.find(i => i.id === detail);
+  const visible = CATALOG.filter(i => (category === "전체" || i.category === category) && (filter === "전체" || found.includes(i.id) === (filter === "발견")));
+  return <PetSheet title="도감" onClose={onClose} onBack={() => { if (!detail) return false; setDetail(null); return true; }}
+    toolbar={<>
+      <label className="pet-album-progress">발견 {discovered} / {CATALOG.length}<progress value={discovered} max={CATALOG.length} /></label>
+      <div className="pet-chips" role="group" aria-label="발견 필터">{["전체", "발견", "미발견"].map(value => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value}</button>)}</div>
+      <div className="pet-chips" role="group" aria-label="도감 분류">{["전체", ...new Set(CATALOG.map(i => i.category))].map(value => <button type="button" key={value} aria-pressed={category === value} onClick={() => setCategory(value)}>{value}</button>)}</div>
+    </>}
+    footer={item && <section className="pet-album-detail" aria-label="도감 설명" aria-live="polite">
+      <div><h3>{item.name}</h3><button type="button" aria-label="설명 닫기" onClick={() => setDetail(null)}>×</button></div>
+      <p>{item.category} · {item.rarity} · {found.includes(item.id) ? "✓ 기록함" : "미발견"}</p>
+      <p>{explanations[item.id] ?? catalogHint(item)}</p>
+      {explanations[item.id] && <p>게임의 확인 기록이며 실제 미사 참석이나 신앙 활동의 증명은 아니에요.</p>}
+      {item.storage === "device" && <p>기기 산책 기념 · 다음 단계 준비 중</p>}
+    </section>}>
     <p className="pet-sheet-note">상시 {core}/80 · 전례 기록 12 · 기기 산책 기념 4</p>
     <p className="pet-sheet-note" role="status">{notice || "맵 이동·산책 뒤 같은 맵에서 15초 머무르면 탐색해요. 발견 확률 75%, 발견 시 일반 65% · 특별 25% · 희귀 8% · 아주 드묾 2%. 새 발견 없이 4회면 다음 탐색에서 가능한 미발견 하나를 보장해요."}</p>
-    {detail ? <div className="pet-product-detail"><button type="button" onClick={() => setDetail(null)}>‹ 목록으로</button><h3>{CATALOG.find((i) => i.id === detail)?.name}</h3><p>{explanations[detail]}</p><p>게임의 확인 기록이며 실제 미사 참석이나 신앙 활동의 증명은 아니에요.</p></div>
-      : <><div className="pet-catalog-grid">{CATALOG.slice(0, count).map((item) => <div key={item.id} className="pet-catalog-card" data-found={found.includes(item.id)}>
-        <PetItemIcon item={item} discovered={found.includes(item.id)} /><small>{item.id} · {item.rarity}</small><strong>{item.name}</strong><span>{found.includes(item.id) ? item.condition : catalogHint(item)}{item.storage === "device" ? " · 다음 단계 준비 중" : ""}</span>
-        {explanations[item.id] && <button type="button" onClick={() => { setDetail(item.id); if (!disabled && map === "church" && seasonIds[state?.season ?? ""]?.includes(item.id)) void execute({ kind: "record_season", entry: item.id, requestId: crypto.randomUUID() }); }}>설명 읽기{found.includes(item.id) ? " ✓" : ""}</button>}
-        {found.includes(item.id) && <small>✓ 기록함</small>}
-      </div>)}</div>{count < 96 && <button type="button" className="pet-more" onClick={() => setCount(count + 24)}>24개 더 보기 ({count}/96)</button>}</>}
+    <div className="pet-catalog-grid pet-album-grid">{visible.map(item => <button type="button" key={item.id} className="pet-catalog-card" data-found={found.includes(item.id)} aria-pressed={detail === item.id} onClick={() => {
+      setDetail(item.id);
+      if (explanations[item.id] && !disabled && map === "church" && seasonIds[state?.season ?? ""]?.includes(item.id)) void execute({ kind: "record_season", entry: item.id, requestId: crypto.randomUUID() });
+    }}>
+      <PetItemIcon item={item} discovered={found.includes(item.id)} /><strong>{item.name}</strong>
+      <span>{found.includes(item.id) ? "✓ 발견" : catalogHint(item)}</span>
+    </button>)}</div>
+    {!visible.length && <p className="pet-sheet-note">이 분류에는 아직 기록이 없어요.</p>}
   </PetSheet>;
 }

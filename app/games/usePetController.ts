@@ -403,7 +403,7 @@ export function usePetController(injectedApi?: PetApi) {
   }, [personal?.ticket, personal?.serverNow, machine.committedMap, machine.command, active, execute]);
 
   function selectPet(id: PetId) {
-    if (visualLocked(machineRef.current) || id === petRef.current) return;
+    if ((machineRef.current.visual !== "paused" && visualLocked(machineRef.current)) || id === petRef.current) return;
     ++generation.current; ++readSequence.current; abort.current?.abort();
     if (pending.current) dispatch({ type: "uncertain", id: pending.current.requestId });
     petRef.current = id; setPetId(id); setCue(null); setShared(null);

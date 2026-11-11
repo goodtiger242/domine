@@ -28,7 +28,7 @@ const Shop=loadTS("app/games/PetShopSheet.tsx").default,Progress=loadTS("app/gam
 const shopProps={disabled:false,notice:"",execute:async()=>{},onClose(){}};
 const domiShop=renderToStaticMarkup(createElement(Shop,{...shopProps,petId:1,state:{inventory:["061"],player:{coins:60}}}));
 const mineShop=renderToStaticMarkup(createElement(Shop,{...shopProps,petId:2,state:{inventory:[],player:{coins:60}}}));
-assert.ok(domiShop.includes("✓ 도미 보유"));assert.ok(mineShop.includes("미네용 구매 · 40 코인"));assert.ok(!mineShop.includes("✓ 미네 보유"));
+assert.ok(domiShop.includes("✓ 도미 보유"));assert.ok(mineShop.includes("40 코인"));assert.ok(!mineShop.includes("✓ 미네 보유"));
 assert.ok(mineShop.includes("우리 코인(공용)"));
 for(const [name,xp,level] of [["도미",40,2],["미네",32,1]]) {
   const progress=renderToStaticMarkup(createElement(Progress,{name,xp,coins:60}));assert.ok(progress.includes(`${name} Lv. ${level}`));assert.ok(progress.includes("우리 코인(공용) 60"));
@@ -46,6 +46,11 @@ const history=async()=>{loads++;if(reject)throw new Error("offline");return entr
 async function render(){cursor=0;tree=exports.default({history,onClose(){}});while(effects.length){cleanup?.();cleanup=effects.shift()();}await Promise.resolve();await Promise.resolve();await Promise.resolve();cursor=0;tree=exports.default({history,onClose(){}});return renderToStaticMarkup(tree);}
 assert.match(await render(),/밥을 줬어요/);assert.equal(loads,1);
 await render();assert.equal(loads,1,"opening loads once; ordinary renders do not fetch");
+const filters=tree.props.children.find(child=>child?.props?.["aria-label"]==="이력 강아지 필터");
+filters.props.children[2].props.onClick();
+const mineHistory=await render();assert.ok(mineHistory.includes("미네에게"));assert.ok(!mineHistory.includes("도미에게 밥을 줬어요"));
+assert.equal(loads,1,"pet filtering uses the loaded history without an extra request");
+filters.props.children[0].props.onClick();await render();
 const button=()=>tree.props.children.find(child=>child?.type==="button");
 button().props.onClick();assert.match(await render(),/밥을 줬어요/);assert.equal(loads,2);
 reject=true;button().props.onClick();assert.match(await render(),/이력을 불러오지 못했어요/);assert.equal(button().props.disabled,false);

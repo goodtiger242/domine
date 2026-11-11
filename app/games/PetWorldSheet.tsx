@@ -18,7 +18,12 @@ export default function PetWorldSheet({ current, visited, onMove, onClose }: {
   const [selected, setSelected] = useState(current);
   const cell = worldCell(selected);
   const [zoom, setZoom] = useState(false);
-  return <PetSheet title="우리 동네 지도" onClose={onClose}>
+  return <PetSheet title="우리 동네 지도" onClose={onClose} footer={selected !== current && <div className="pet-world-confirm" role="alertdialog" aria-label={`${cell.name}(으)로 이동할까요?`}>
+    <p><strong>{THEMES[cell.theme][0]} {cell.name}</strong><small>{cell.id} · {cell.kind}</small></p>
+    <p>이곳으로 이동할까요?</p>
+    <div><button type="button" onClick={() => setSelected(current)}>아니요</button>
+      <button type="button" data-primary onClick={() => onMove(cell.id)}>이동하기</button></div>
+  </div>}>
     <p className="pet-sheet-note">가고 싶은 칸을 누르면 이름이 나오고, 이동할지 물어봐요. 한 칸은 약 200m예요.<br />🐕 현재 위치 · ✓ 다녀온 곳 <button type="button" className="pet-world-zoom" aria-pressed={zoom} onClick={() => { setZoom(!zoom); if (!zoom) requestAnimationFrame(() => document.querySelector(".pet-world-grid [aria-current=location]")?.scrollIntoView({ block: "center", inline: "center" })); }}>{zoom ? "전체 보기" : "확대"}</button></p>
     <div className="pet-world-scroll" data-zoom={zoom} tabIndex={0} aria-label="동네 지도, 확대하면 상하좌우로 스크롤">
       <div className="pet-world-grid" role="group" aria-label="서쪽 A열부터 동쪽 J열, 북쪽 1행부터 남쪽 10행">
@@ -35,12 +40,6 @@ export default function PetWorldSheet({ current, visited, onMove, onClose }: {
         })}
       </div>
     </div>
-    {selected !== current && <div className="pet-world-confirm" role="alertdialog" aria-label={`${cell.name}(으)로 이동할까요?`}>
-      <p><strong>{THEMES[cell.theme][0]} {cell.name}</strong><small>{cell.id} · {cell.kind}</small></p>
-      <p>이곳으로 이동할까요?</p>
-      <div><button type="button" onClick={() => setSelected(current)}>아니요</button>
-        <button type="button" data-primary onClick={() => onMove(cell.id)}>이동하기</button></div>
-    </div>}
     <p className="pet-world-info" role="status">{cell.id} · {cell.name} · {cell.kind}</p>
     <p className="pet-sheet-note">지도 © OpenStreetMap contributors. D5 집 마당은 가상 장소이고, 가게 위치는 대략이에요.</p>
   </PetSheet>;

@@ -118,7 +118,7 @@ const sheetSource = ts.transpileModule(readFileSync("app/games/PetWorldSheet.tsx
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 new Function("require", "exports", sheetSource)((name) => {
-  if (name === "./PetSheet") return { default: ({ children }) => children };
+  if (name === "./PetSheet") return { default: ({ children, footer }) => createElement("div", null, children, footer) };
   if (name.startsWith("@/")) return loadTS(`${name.slice(2)}.ts`);
   if (name === "react") return { useState: () => [selectedCell, (id) => { selectedCell = id; }] };
   if (name === "react/jsx-runtime") {

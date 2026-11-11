@@ -8,5 +8,5 @@ export default function PetItemIcon({ item, discovered = true }: { item: Catalog
     // Optimized transparent WebP is shared with SVG equipment; loaded only inside an open sheet.
     // eslint-disable-next-line @next/next/no-img-element
     ? <img src={item.asset} width={96} height={96} loading="lazy" decoding="async" alt="" onError={() => setFailed(true)} />
-    : <span className="pet-silhouette" aria-label={`${item.category} 실루엣`}>{glyph}</span>;
+    : <span className="pet-silhouette" data-undiscovered={!discovered} aria-label={`${item.category} 실루엣`}>{glyph}</span>;
 }

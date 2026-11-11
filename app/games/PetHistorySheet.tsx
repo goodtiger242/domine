@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { CATALOG } from "@/lib/domine/pet-catalog";
-import { PETS } from "@/lib/domine/pet-photos";
+import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import { timeAgo } from "@/lib/domine/pet";
 import type { PetApi, PetHistoryEntry } from "@/lib/domine/pet-rpc";
 import PetSheet from "./PetSheet";
@@ -27,6 +27,7 @@ export function PetHistoryList({ entries }: { entries: PetHistoryEntry[] }) {
 }
 
 export default function PetHistorySheet({ history, onClose }: { history: PetApi["history"]; onClose: () => void }) {
+  const [pet, setPet] = useState<PetId | null>(null);
   const [entries, setEntries] = useState<PetHistoryEntry[]>([]);
   const [refresh, setRefresh] = useState(0), [loading, setLoading] = useState(true), [error, setError] = useState("");
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function PetHistorySheet({ history, onClose }: { history: PetApi[
     <p className="pet-sheet-note">모두가 함께한 최근 30건 · 최대 100건, 14일간 보관해요.</p>
     <button type="button" disabled={loading} onClick={() => { setLoading(true); setError(""); setRefresh(n => n + 1); }}>새로고침</button>
     <p role="status" className="pet-sheet-note">{loading ? "이력을 불러오는 중…" : error || (!entries.length ? "아직 이력이 없어요." : "")}</p>
-    <PetHistoryList entries={entries} />
+    <div className="pet-chips" role="group" aria-label="이력 강아지 필터">{([null, 1, 2] as const).map(id => <button type="button" key={id ?? "all"} aria-pressed={pet === id} onClick={() => setPet(id)}>{id === null ? "전체" : PETS[id].name}</button>)}</div>
+    <PetHistoryList entries={entries.filter(row => pet === null || row.pet === pet)} />
   </PetSheet>;
 }
