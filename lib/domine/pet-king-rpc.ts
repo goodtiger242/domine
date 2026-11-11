@@ -3,7 +3,7 @@ import type { PetIdentity } from "./pet-identity";
 export type KingPet = 1 | 2;
 export type KingStat = "hp" | "attack" | "defense" | "speed" | "focus" | "calm";
 export type KingAllocation = Record<KingStat, number>;
-export type KingRank = "resident" | "chief" | "lieutenant" | "boss" | "gatekeeper" | "king";
+export type KingRank = "resident" | "veteran" | "guest" | "chief" | "lieutenant" | "boss" | "gatekeeper" | "king";
 export type KingJob = "striker" | "defender" | "trickster" | "tracker" | "empath";
 export type KingOutcome = "win" | "lose" | "draw" | "quit";
 export type KingFeatures = {
@@ -11,7 +11,7 @@ export type KingFeatures = {
   mastery: boolean; encyclopedia: boolean; certifications: boolean; raids: boolean; drops: boolean;
 };
 export type KingProgress = {
-  pet: KingPet; xp: number; level: number; allocation: KingAllocation; unspent: number;
+  pet: KingPet; xp: number; streak: number; level: number; allocation: KingAllocation; unspent: number;
   allocationMode: "auto" | "manual"; job: KingJob | null; jobTier: number;
   jobChangedAt: string | null; moves: string[]; version: number;
   mastery: Record<string, number>; inventory: Record<string, number>;
@@ -31,7 +31,7 @@ export type KingTicket = {
   snapshot: KingProgress; reserved: Record<string, number>;
 };
 export type KingSettlement = {
-  ticket: string; outcome: KingOutcome; xp: number; coins: number;
+  ticket: string; outcome: KingOutcome; xp: number; coins: number; streak: number;
   levelBefore: number; levelAfter: number; eligible: boolean; contribution: number; drop: string | null;
 };
 export type KingState = {
@@ -61,6 +61,8 @@ export type KingAllocate = {
 };
 export type KingChooseJob = { pet: KingPet; expectedVersion: number; job: KingJob; tier: 1 | 2 | 3 };
 export type KingEquipMoves = { pet: KingPet; expectedVersion: number; moves: string[] };
+export type KingPickup = { cell: string; slot: number };
+export type KingPickupResult = { found: boolean; coins: number; pouch: boolean };
 export type KingBuyItem = { pet: KingPet; item: string; quantity: number };
 export type KingRpc = (name: string, args: {
   p_nickname: string; p_secret: string; p_request_id: string; p_kind: string; p_input: object;
@@ -88,6 +90,7 @@ export function createKingApi(rpc: KingRpc) {
     allocate: (identity: PetIdentity, requestId: string, input: KingAllocate) => call<KingProgress>(identity, requestId, "allocate", input),
     chooseJob: (identity: PetIdentity, requestId: string, input: KingChooseJob) => call<KingProgress>(identity, requestId, "chooseJob", input),
     equipMoves: (identity: PetIdentity, requestId: string, input: KingEquipMoves) => call<KingProgress>(identity, requestId, "equipMoves", input),
+    pickup: (identity: PetIdentity, requestId: string, input: KingPickup) => call<KingPickupResult>(identity, requestId, "pickup", input),
     buyItem: (identity: PetIdentity, requestId: string, input: KingBuyItem) => call<KingProgress>(identity, requestId, "buyItem", input),
     spawns: (identity: PetIdentity, requestId = crypto.randomUUID()) => call<{ slot: number; departed: KingSpawn[] }>(identity, requestId, "spawns", {}),
     watching: (identity: PetIdentity, requestId = crypto.randomUUID()) => call<KingWatching[]>(identity, requestId, "watching", {}),

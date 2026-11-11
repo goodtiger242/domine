@@ -78,7 +78,7 @@ test("twenty duplicate finishes pay once; ticket ownership and elapsed time", as
   const results = await Promise.all(Array.from({ length: 20 }, () => api.finish(alice, id(), input)));
   for (const result of results) assert.deepEqual(ok(result), ok(results[0]));
   const s = await state(api);
-  assert.equal(s.pets[0].xp, 32); assert.equal(s.coins, 1002);
+  assert.equal(s.pets[0].xp, 76); assert.equal(s.coins, 1006);
   assert.equal(s.pets[0].mastery.push, 3);
   assert.equal(server.inspect().history.filter(h => h.kind === "battle").length, 1);
   assert.equal(ok(await api.ranking(bob, id()))[0].wins, 1);
@@ -132,7 +132,7 @@ test("loss/draw keep spawn, weak opponent gives no rewards or mastery", async ()
   t = await start(api, server, { individualId: "retry", opponentLevel: 7 });
   assert.equal((await finish(api, server, t, { outcome: "lose" })).xp, 4);
   t = await start(api, server, { individualId: "retry", opponentLevel: 7 });
-  assert.equal((await finish(api, server, t, { outcome: "draw" })).xp, 6);
+  assert.equal((await finish(api, server, t, { outcome: "draw" })).xp, 5);
   assert.equal(ok(await api.spawns(alice, id())).departed.length, 1);
 });
 
@@ -146,7 +146,7 @@ test("starting snapshot remains frozen; independent finishes add to latest XP", 
   ok(await api.allocate(alice, id(), { pet: 1, expectedVersion: after.pets[0].version, allocation: { ...zero, hp: 1 } }));
   await finish(api, server, b, { moveCounts: { T01: 3 } }, bob);
   const end = await state(api);
-  assert.equal(end.pets[0].xp, xpAfter + 32); assert.equal(end.pets[0].allocation.hp, 1);
+  assert.equal(end.pets[0].xp, xpAfter + 80); assert.equal(end.pets[0].allocation.hp, 1);
   assert.equal(server.inspect().tickets[b.id].snapshot.level, 1);
   assert.equal(server.inspect().tickets[b.id].snapshot.allocation.hp, 0);
   assert.equal(end.pets[0].mastery.T01, 6);
@@ -204,10 +204,10 @@ test("weekly raids off by default, once-only shared completion and no carry into
   server.advance(6000);
   const results = await Promise.all(tickets.map(t => api.finish(alice, id(), { ticket: t.id, outcome: "win", rounds: 6, remainingHp: 0, maxHp: 100 })));
   assert.equal(results.reduce((sum, r) => sum + ok(r).contribution, 0), 5000);
-  assert.equal(results.reduce((sum, r) => sum + ok(r).coins, 0), 50);
-  assert.equal((await state(api)).coins, 1050);
+  assert.equal(results.reduce((sum, r) => sum + ok(r).coins, 0), 130);
+  assert.equal((await state(api)).coins, 1130);
   assert.equal((await state(api)).raids[0].completed, true);
-  assert.equal((await state(api)).pets[0].xp, 0);
+  assert.equal((await state(api)).pets[0].xp, 1119);
   server.advance(7 * 86400000);
   assert.deepEqual((await state(api)).raids, []);
   assert.equal(ok(await api.ranking(alice, id())).length, 0);
@@ -252,4 +252,141 @@ test("SQL static invariants, seed prices and public dispatch coverage", () => {
   assert.match(sql, /grant execute on function public\.domine_pet_king_v17/);
   const seededPrices = [...sql.matchAll(/\('(P\d{2})',(\d+)\)/g)].map(([, item, price]) => [item, Number(price)]);
   assert.deepEqual(seededPrices.map(([, price]) => price), [15, 35, 70, 12, 30, 25, 25, 25, 25, 20, 30, 40, 35, 60]);
+});
+
+test("v18 reward boundaries, all ranks, loss 30%, draw 40% and quit", async () => {
+  for (const [opponentLevel, xp, coins] of [[6, 0, 0], [7, 21, 4], [10, 48, 6], [16, 105, 7], [17, 110, 7]]) {
+    const { api, server } = setup({ xp: { 1: kingXpForLevel(10) } });
+    const result = await finish(api, server, await start(api, server, { opponentLevel }));
+    assert.equal(result.xp, xp, `level ${opponentLevel}`); assert.equal(result.coins, coins);
+  }
+  for (const [opponentRank, xp, coins] of [
+    ["resident", 48, 6], ["veteran", 57, 7], ["lieutenant", 57, 7], ["chief", 72, 12],
+    ["boss", 144, 30], ["gatekeeper", 192, 48], ["king", 288, 90], ["guest", 72, 12],
+  ]) {
+    const { api, server } = setup({ xp: { 1: kingXpForLevel(10) } });
+    const result = await finish(api, server, await start(api, server, { opponentLevel: 10, opponentRank }));
+    assert.equal(result.xp, xp, opponentRank); assert.equal(result.coins, coins, opponentRank);
+  }
+  for (const [outcome, xp] of [["lose", 9], ["draw", 12], ["quit", 0]]) {
+    const { api, server } = setup({ xp: { 1: kingXpForLevel(10) } });
+    const result = await finish(api, server, await start(api, server), { outcome });
+    assert.equal(result.xp, xp); assert.equal(result.coins, 0); assert.equal(result.streak, 0);
+  }
+  for (const outcome of ["win", "draw", "lose", "quit"]) {
+    const { api, server } = setup({ xp: { 1: kingXpForLevel(10) } });
+    const result = await finish(api, server, await start(api, server, { opponentLevel: 6 }), { outcome });
+    assert.equal(result.xp, 0); assert.equal(result.coins, 0);
+  }
+  const { api, server } = setup({ xp: { 1: kingXpForLevel(4) } });
+  assert.equal((await finish(api, server, await start(api, server, { opponentLevel: 1 }), { outcome: "lose" })).xp, 2);
+  assert.equal((await api.start(alice, id(), startInput(server, { opponentRank: "invented" }))).code, "INVALID_INPUT");
+});
+
+test("v18 first win is shared; streak belongs to each pet, caps at five and resets on loss/quit", async () => {
+  const { api, server } = setup({ xp: { 1: kingXpForLevel(100), 2: kingXpForLevel(100) }, features: { encyclopedia: false, drops: false } });
+  const fight = async (pet, outcome = "win", who = alice) => {
+    server.advance(1800000);
+    return finish(api, server, await start(api, server, { pet, opponentLevel: 100 }, who), { outcome }, who);
+  };
+  for (const [index, xp] of [318, 222, 233, 243, 265, 265].entries()) {
+    const result = await fight(1, "win", index % 2 ? bob : alice);
+    assert.equal(result.xp, xp); assert.equal(result.streak, index + 1);
+    assert.equal(result.coins, index === 0 ? 33 : 22);
+  }
+  assert.equal((await fight(2, "win", bob)).xp, 212, "first-win bonus is shared across pets and players");
+  assert.deepEqual((await state(api)).pets.map(p => p.streak), [6, 1]);
+  const draw = await fight(1, "draw");
+  assert.equal(draw.streak, 6); assert.equal(draw.xp, 106); assert.equal(draw.coins, 0);
+  const loss = await fight(1, "lose");
+  assert.equal(loss.streak, 0); assert.equal(loss.xp, 63);
+  assert.equal((await fight(1)).xp, 212);
+  const quit = await fight(1, "quit");
+  assert.equal(quit.streak, 0); assert.equal(quit.xp, 0); assert.equal(quit.coins, 0);
+  assert.equal((await state(api)).pets[1].streak, 1);
+});
+
+test("v18 pickup distribution over 10,000 intervals and deterministic placement", async t => {
+  let found = 0, pouches = 0;
+  for (let slot = 1; slot <= 10000; slot++) {
+    const { api } = setup({ now: slot * 1800000 });
+    const result = ok(await api.pickup(alice, id(), { cell: "E1", slot }));
+    if (result.found) {
+      found++; pouches += Number(result.pouch);
+      assert.ok(result.coins >= (result.pouch ? 10 : 1) && result.coins <= (result.pouch ? 20 : 5));
+    } else assert.deepEqual(result, { found: false, coins: 0, pouch: false });
+    if (slot <= 20) {
+      const other = setup({ now: slot * 1800000 });
+      assert.deepEqual(ok(await other.api.pickup(bob, id(), { cell: "E1", slot })), result);
+    }
+  }
+  t.diagnostic(`found=${found}/10000 (${found / 100}%), pouch=${pouches}/${found} (${(pouches / found * 100).toFixed(3)}%)`);
+  assert.ok(found >= 1100 && found <= 1300);
+  assert.ok(pouches / found >= .015 && pouches / found <= .025);
+});
+
+test("v18 pickups serialize across players, cache retries, validate slots and log once per request", async () => {
+  const { api, server } = setup();
+  let input, first, request;
+  for (let i = 0; i < 100; i++) {
+    input = { cell: `${String.fromCharCode(65 + Math.floor(i / 10))}${i % 10 + 1}`, slot: server.slot() };
+    request = id(); first = await api.pickup(alice, request, input);
+    if (ok(first).found) break;
+  }
+  assert.equal(ok(first).found, true);
+  const before = server.inspect();
+  assert.deepEqual(await api.pickup(alice, request, input), first);
+  assert.deepEqual(server.inspect(), before);
+  const repeats = await Promise.all(Array.from({ length: 20 }, () => api.pickup(bob, id(), input)));
+  for (const reply of repeats) assert.deepEqual(ok(reply), { found: false, coins: 0, pouch: false });
+  assert.equal(server.inspect().coins, before.coins);
+  assert.equal(server.inspect().history.length, before.history.length + 20);
+  assert.equal((await api.pickup(alice, request, { ...input, slot: input.slot + 1 })).code, "REQUEST_CONFLICT");
+  for (const offset of [-1, 1]) ok(await api.pickup(bob, id(), { cell: "J10", slot: server.slot() + offset }));
+  for (const slot of [server.slot() - 2, server.slot() + 2]) {
+    const request = id(), input = { cell: "A1", slot };
+    const rejection = await api.pickup(alice, request, input);
+    assert.equal(rejection.code, "PICKUP_EXPIRED");
+    assert.deepEqual(await api.pickup(alice, request, input), rejection);
+  }
+  for (const input of [{ cell: "K1", slot: server.slot() }, { cell: "A0", slot: server.slot() },
+    { cell: "A1", slot: -1 }, { cell: "A1", slot: 1.5 }, { cell: "A1", slot: null }]) {
+    assert.equal((await api.pickup(alice, id(), input)).code, "INVALID_INPUT");
+  }
+  assert.equal((await api.pickup({ ...alice, secret: bob.secret }, id(), input)).code, "AUTH_FAILED");
+  server.advance(3600000);
+  assert.deepEqual(await api.pickup(alice, request, input), first, "replay survives the slot window");
+});
+
+test("v18 SQL safety, no care rewards, preserved busy locks and capabilities", () => {
+  const sql = readFileSync("supabase/migrations/20261112200000_domine_pet_v18_rewards.sql", "utf8");
+  assert.equal((sql.match(/[^\x00-\x7f]/g) ?? []).length, 0);
+  assert.doesNotMatch(sql, /#variable_conflict|(?:command_v6|domine_pet_king_v17|cmd)\s*\.\s*\w+/);
+  const code = sql.replace(/--[^\n]*/g, "").replace(/'(?:''|[^'])*'/g, "''");
+  assert.doesNotMatch(code, /\bdrop\b/i);
+  const refs = [...code.replace(/revoke[^;]*;/gi, "").replace(/is distinct from/gi, "<>")
+    .replace(/for update/gi, "").matchAll(/\b(?:from|join|into|update|table|references)\s+(?:if\s+not\s+exists\s+|strict\s+)?([a-z_][a-z_0-9.]*)/gi)]
+    .map(m => m[1]).filter(ref => !ref.includes(".") && !ref.startsWith("v_") && !["if", "set"].includes(ref));
+  assert.deepEqual(refs, [], "unqualified table references");
+  for (const declaration of code.matchAll(/\bdeclare\s+([\s\S]*?)\bbegin\b/gi)) {
+    for (const variable of declaration[1].split(";").map(x => x.trim()).filter(Boolean))
+      assert.match(variable, /^v_\w+\s/, "all local variables use v_");
+  }
+  const functions = [...sql.matchAll(/create or replace function ([\w.]+)\([\s\S]*?\$\$;/g)];
+  assert.deepEqual(functions.map(m => m[1]), ["domine_pet_v6.command_v6", "domine_pet_v17.pet_state", "public.domine_pet_king_v17", "public.domine_pet_capabilities_v6"]);
+  for (const [body] of functions) assert.match(body, /set search_path=''/);
+  const care = functions[0][0];
+  assert.equal((care.match(/v_xp_gain:=0; v_coin_gain:=0;/g) ?? []).length, 3);
+  assert.match(care, /v_level_coins:=0;/);
+  assert.doesNotMatch(care, /v_coin_gain:=v_coin_gain\+|select x,c into|sum\(10\+2/);
+  assert.match(care, /pg_advisory_xact_lock\(20261111,120000\)/);
+  assert.match(care, /insert into domine_pet_v16\.busy/);
+  assert.match(care, /public\.domine_pet_care_for/);
+  assert.match(care, /domine_pet_v10\.log_v10/);
+  assert.match(sql, /primary key\(slot,cell\)/);
+  assert.match(sql, /on conflict\(slot,cell\) do nothing/);
+  assert.match(sql, /pg_get_constraintdef/);
+  assert.match(sql, /pg_get_expr/);
+  assert.match(sql, /"busyLock":true,"king":true,"rewardsV18":true/);
+  assert.match(sql, /begin;[\s\S]*commit;\s*$/);
 });

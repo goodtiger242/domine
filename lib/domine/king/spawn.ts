@@ -40,8 +40,9 @@ export function pickSpawns(cellId: string, slot: number, careLevel: number): Spa
       }
       const individual = candidates[Math.floor(roll(`individual:${i}`) * candidates.length)];
       used.add(individual.id);
-      const range = levelRange(cellId);
-      const level = Math.max(1, (range[0] + range[1]) / 2 + individual.levelOffset);
+      // Residents scale with our dog: farther regions add +0..+3, each animal −3..+3, never more than 5 above us.
+      const tier = Math.floor((levelRange(cellId)[0] - 1) / 18);
+      const level = Math.max(1, Math.min(999, playerLevel + 5, playerLevel + tier + individual.levelOffset));
       spawns.push({ individual: { ...individual, intelligence: intelligenceFor(individual.temperament, level) }, kind: "resident", cellId, slot, level });
     }
   }

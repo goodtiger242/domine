@@ -1,10 +1,11 @@
+import { createHash } from "node:crypto";
 import type {
   KingAllocation, KingEncounter, KingFeatures, KingPet, KingProgress, KingRank,
   KingRpc, KingSettlement, KingStart, KingTicket, KingCertification, KingRaid,
 } from "../../lib/domine/pet-king-rpc";
 
 const stats = ["hp", "attack", "defense", "speed", "focus", "calm"] as const;
-const ranks: KingRank[] = ["resident", "chief", "lieutenant", "boss", "gatekeeper", "king"];
+const ranks: KingRank[] = ["resident", "veteran", "guest", "chief", "lieutenant", "boss", "gatekeeper", "king"];
 const prices: Record<string, number> = Object.fromEntries([15, 35, 70, 12, 30, 25, 25, 25, 25, 20, 30, 40, 35, 60]
   .map((price, i) => [`P${String(i + 1).padStart(2, "0")}`, price]));
 const emptyAllocation = (): KingAllocation => ({ hp: 0, attack: 0, defense: 0, speed: 0, focus: 0, calm: 0 });
@@ -56,7 +57,7 @@ type Ticket = KingTicket & {
   status: "active" | "settled" | "cancelled" | "expired"; result: KingSettlement | null;
 };
 type Store = {
-  coins: number; version: number; pets: Record<KingPet, KingProgress>; tickets: Record<string, Ticket>;
+  pickups: Record<string, string>; coins: number; version: number; pets: Record<KingPet, KingProgress>; tickets: Record<string, Ticket>;
   departed: { slot: number; cell: string; individualId: string }[]; encounters: Record<string, KingEncounter>;
   certifications: KingCertification[]; wins: Record<string, number>; raids: Record<string, KingRaid>;
   contributions: { ticket: string; nickname: string; week: string; amount: number }[];
@@ -75,13 +76,13 @@ export function createKingMock(options: {
   const operations = new Map<string, { kind: string; payload: string; result: unknown }>();
   const makePet = (pet: KingPet): KingProgress => {
     const xp = options.xp?.[pet] ?? 0;
-    const progress: KingProgress = { pet, xp, level: kingLevelForXp(xp), allocation: emptyAllocation(), unspent: 0,
+    const progress: KingProgress = { pet, xp, streak: 0, level: kingLevelForXp(xp), allocation: emptyAllocation(), unspent: 0,
       allocationMode: options.allocationMode ?? "auto", job: null, jobTier: 0, jobChangedAt: null,
       moves: [], version: 0, mastery: {}, inventory: {} };
     if (progress.allocationMode === "auto") autoAllocate(progress);
     return progress;
   };
-  let store: Store = { coins: options.coins ?? 1000, version: 0, pets: { 1: makePet(1), 2: makePet(2) },
+  let store: Store = { pickups: {}, coins: options.coins ?? 1000, version: 0, pets: { 1: makePet(1), 2: makePet(2) },
     tickets: {}, departed: [], encounters: {}, certifications: [], wins: {}, raids: {}, contributions: [], history: [], changes: [] };
   const slot = () => Math.floor(now / 1800000);
   const week = () => {
@@ -120,6 +121,25 @@ export function createKingMock(options: {
       .map(name => ({ nickname: name, wins: store.wins[name] ?? 0, raidContribution: store.contributions
         .filter(c => c.nickname === name && c.week === week()).reduce((sum, c) => sum + c.amount, 0) }))
       .sort((a, b) => b.wins - a.wins || b.raidContribution - a.raidContribution || a.nickname.localeCompare(b.nickname));
+    if (kind === "pickup") {
+      const cell = text(input.cell, /^[A-J](10|[1-9])$/), band = integer(input.slot, 0, Number.MAX_SAFE_INTEGER);
+      if (Math.abs(band - slot()) > 1) fail("PICKUP_EXPIRED");
+      const key = `${band}:${cell}`;
+      let found = false, pouch = false, coins = 0;
+      if (!store.pickups[key]) {
+        store.pickups[key] = nickname;
+        const digest = createHash("sha256").update(key).digest();
+        found = digest.readUInt16BE(0) < 7864;
+        if (found) {
+          pouch = digest.readUInt16BE(2) < 1311;
+          coins = pouch ? 10 + digest.readUInt16BE(4) % 11 : 1 + digest.readUInt16BE(4) % 5;
+          store.coins += coins; store.version++;
+        }
+      }
+      const result = { found, coins, pouch };
+      store.history.push({ kind: "pickup", pet: 1, nickname, detail: JSON.stringify({ ...result, cell, slot: band }) });
+      return result;
+    }
     if (kind === "finish") {
       const id = text(input.ticket, uuidPattern), t = store.tickets[id];
       if (!t || t.owner !== nickname) fail("TICKET_NOT_FOUND");
@@ -154,9 +174,18 @@ export function createKingMock(options: {
         || (known.resistances.length && resistances.length && known.resistances[0] !== resistances[0])
         || known.weaknesses.includes(resistances[0]) || known.resistances.includes(weaknesses[0]))) fail("TAG_CONFLICT");
       const p = store.pets[t.pet], before = petState(t.pet), levelBefore = before.level;
-      const eligible = t.input.mode !== "raid" && outcome !== "quit" && t.input.opponentLevel > t.snapshot.level - 4;
-      const xp = eligible && features.growth ? outcome === "win" ? (12 + 2 * t.input.opponentLevel) : outcome === "draw" ? 6 : 4 : 0;
-      let coins = eligible && outcome === "win" ? Math.min(6, 2 + Math.floor((Number(t.region.slice(1)) - 1) / 2)) : 0;
+      const difference = t.input.opponentLevel - t.snapshot.level, eligible = outcome !== "quit" && difference > -4;
+      const first = outcome === "win" && !(known?.wins);
+      p.streak = outcome === "lose" || outcome === "quit" ? 0 : outcome === "win" ? p.streak + 1 : p.streak;
+      // Integer factors match PostgreSQL numeric exactly before the final floor.
+      const streakPercent = p.streak >= 5 ? 125 : 100 + Math.max(0, p.streak - 1) * 5;
+      const levelPercent = difference >= 0 ? 100 + Math.min(6, difference) * 10 : 100 + difference * 15;
+      const xpRank = { resident: 10, veteran: 12, lieutenant: 12, chief: 15, boss: 30, gatekeeper: 40, king: 60, guest: 15 }[t.input.opponentRank];
+      const coinRank = { resident: 10, veteran: 12, lieutenant: 12, chief: 20, boss: 50, gatekeeper: 80, king: 150, guest: 20 }[t.input.opponentRank];
+      const xp = eligible && features.growth ? Math.max(1, Math.floor((12 + 2 * t.input.opponentLevel)
+        * (outcome === "win" ? 10 : outcome === "draw" ? 4 : 3) * levelPercent * xpRank
+        * (first ? 15 : 10) * streakPercent / 10000000)) : 0;
+      const coins = eligible && outcome === "win" ? Math.floor((2 + Math.floor(t.input.opponentLevel / 5)) * coinRank * (first ? 15 : 10) / 100) : 0;
       let contribution = 0, drop: string | null = null;
       if (eligible && features.mastery) for (const [move, raw] of Object.entries(moves)) p.mastery[move] = (p.mastery[move] ?? 0) + Math.min(3, Number(raw));
       for (const [item, quantity] of Object.entries(t.reserved)) p.inventory[item] = (p.inventory[item] ?? 0) + quantity - Number(used[item] ?? 0);
@@ -176,8 +205,9 @@ export function createKingMock(options: {
           }
         }
       }
-      const encounter = store.encounters[t.input.individualId];
-      if (features.encyclopedia && encounter) {
+      const encounter = store.encounters[t.input.individualId] ??= { individualId: t.input.individualId,
+        name: t.input.opponentName, encounters: 0, wins: 0, losses: 0, weaknesses: [], resistances: [] };
+      if (encounter) {
         encounter.wins += outcome === "win" ? 1 : 0; encounter.losses += outcome === "lose" ? 1 : 0;
         encounter.weaknesses = [...new Set([...encounter.weaknesses, ...weaknesses])].sort();
         encounter.resistances = [...new Set([...encounter.resistances, ...resistances])].sort();
@@ -189,7 +219,6 @@ export function createKingMock(options: {
         contribution = t.week === week() ? Math.min(raid.target - raid.progress, Math.floor(1000 * (1 - remainingHp / maxHp))) : 0;
         store.contributions.push({ ticket: id, nickname, week: t.week, amount: contribution });
         raid.progress += contribution;
-        if (contribution > 0 && !raid.completed && raid.progress === raid.target) coins = 40 + 10 * Number(t.region.slice(1));
         raid.completed = raid.progress === raid.target;
       }
       p.xp += xp; p.level = kingLevelForXp(p.xp); p.version++;
@@ -200,7 +229,7 @@ export function createKingMock(options: {
         store.history.push({ kind: "levelup", pet: t.pet, nickname, detail: String(p.level) });
       }
       store.history.push({ kind: "battle", pet: t.pet, nickname, detail: `${t.input.opponentName} - ${outcome}` });
-      t.result = { ticket: id, outcome, xp, coins, levelBefore, levelAfter: p.level, eligible, contribution, drop };
+      t.result = { ticket: id, outcome, xp, coins, streak: p.streak, levelBefore, levelAfter: p.level, eligible, contribution, drop };
       t.status = outcome === "quit" ? "cancelled" : "settled";
       return t.result;
     }
@@ -286,7 +315,7 @@ export function createKingMock(options: {
         region, week: week(), snapshot: before, reserved, status: "active", result: null,
         startedAt: new Date(now).toISOString(), expiresAt: new Date(now + 1800000).toISOString() };
       store.tickets[id] = t; p.version++;
-      if (features.encyclopedia) {
+      {
         store.encounters[individualId] ??= { individualId, name: opponentName, encounters: 0, wins: 0, losses: 0, weaknesses: [], resistances: [] };
         store.encounters[individualId].encounters++;
       }

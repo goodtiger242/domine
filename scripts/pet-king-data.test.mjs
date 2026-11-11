@@ -162,13 +162,14 @@ test("1000구간×98칸 출몰 분포와 입력 재현·서식 가중치·개체
     assert.equal(new Set(spawns.map(s => s.individual.id)).size, spawns.length);
     if (slot < 3) {
       assert.deepEqual(spawns, pickSpawns(cell.id, slot, 1));
-      assert.deepEqual(spawns, pickSpawns(cell.id, slot, 999).filter(s => s.kind === "resident"));
+      const high = pickSpawns(cell.id, slot, 50).filter(s => s.kind === "resident");
+      assert.deepEqual(high.map(s => s.individual.id), spawns.map(s => s.individual.id), "same animals for every level");
+      for (const s of high) assert.ok(s.level >= 47 && s.level <= 55, "residents scale with our level");
     }
-    const habitat = habitatOf(cell.id), [min, max] = levelRange(cell.id);
+    const habitat = habitatOf(cell.id), tier = Math.floor((levelRange(cell.id)[0] - 1) / 18);
     for (const spawn of spawns) {
       assert.equal(spawn.kind, "resident");
-      assert.ok(spawn.level >= min && spawn.level <= max);
-      assert.ok(Math.abs(spawn.level - (min + max) / 2) <= 3);
+      assert.ok(spawn.level >= 1 && spawn.level <= Math.min(6, 1 + tier + 3), "level near ours (Lv.1 here)");
       assert.ok(BREED_BY_ID[spawn.individual.breedId].habitat.includes(habitat));
       assert.ok(HABITAT_WEIGHTS[habitat][spawn.individual.species] > 0);
       const key = `${habitat}:${spawn.individual.species}`;
