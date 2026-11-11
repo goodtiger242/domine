@@ -70,15 +70,17 @@ export function usePetController(injectedApi?: PetApi) {
   const pendingKey = (i: PetIdentity) => `domine-pet-pending:${i.nickname.toLowerCase()}`;
   const current = useCallback((g: number, i: PetIdentity | null, selected: PetId) => alive.current && generation.current === g && identityRef.current === i && petRef.current === selected, []);
   const apply = useCallback((result: V6Result, show = false) => {
+    if (result.pet !== undefined && result.pet !== petRef.current) return;
     const prior = personalRef.current;
+    const previousLevel = prior?.levels?.[petRef.current] ?? prior?.player?.level ?? result.player?.level ?? 1;
     if (acceptsResult(prior, result)) {
       personalRef.current = result;
       setPersonal(result);
       if (show && result.reward && (result.version ?? 0) > (prior?.version ?? -1)) {
-        setFeedback({ id: ++idCounter.current, result, previousLevel: prior?.player?.level ?? 1 });
+        setFeedback({ id: ++idCounter.current, result, previousLevel });
         if (result.reward.skipped === "DAILY_CAP") setRewardNotice(rewardDisplay(result.reward).notice);
         else if (result.reward.xp + result.reward.coins + result.reward.levelCoins > 0) setRewardNotice("");
-        if ((result.player?.level ?? 1) > (prior?.player?.level ?? 1)) vibrate([15, 40, 20]);
+        if ((result.player?.level ?? 1) > previousLevel) vibrate([15, 40, 20]);
         else if (result.reward.newEntries.length) vibrate(20);
         else if (result.reward.coins + result.reward.levelCoins > 0) vibrate(15);
       }
@@ -140,6 +142,7 @@ export function usePetController(injectedApi?: PetApi) {
       dispatch({ type: "settled", id: command.requestId });
       apply(result, true);
       ++readSequence.current;
+      if (result.pet !== undefined && result.pet !== selected) void refresh();
       if (result.shared && (command.kind === "action" || command.kind === "equip") && command.pet === selected) setShared(result.shared.pet);
       if (!result.ok && !["ALREADY_OWNED", "TOO_EARLY", "EXPIRED"].includes(result.code)) setMessage(errorText[result.code] ?? "개인 기록을 확인하지 못했어요.");
       else setMessage("");
@@ -151,12 +154,12 @@ export function usePetController(injectedApi?: PetApi) {
         pending.current = null;
         try { localStorage.removeItem(pendingKey(i)); } catch { /* Same ID remains safe to replay. */ }
         dispatch({ type: "settled", id: command.requestId });
-        setMessage("서버 점검 중이에요. 잠시 후 다시 해 주세요");
+        setMessage(`서버 점검 중이에요. 잠시 후 다시 해 주세요 (${command.kind} · ${error.message})`);
       } else dispatch({ type: "uncertain", id: command.requestId });
     } finally {
       if (abort.current === controller && commandTimer.current) clearTimeout(commandTimer.current);
     }
-  }, [api, apply, current, dispatch]);
+  }, [api, apply, current, dispatch, refresh]);
 
   const startExploration = useCallback((map: PetMap, source: "map" | "walk") => {
     void execute({ kind: "explore_begin", map, source, requestId: crypto.randomUUID() });
@@ -359,7 +362,7 @@ export function usePetController(injectedApi?: PetApi) {
     const ticket = personal?.ticket;
     if (!active || !ticket || ticket.map_id !== worldCell(machine.committedMap).theme || machine.command !== "idle") return;
     const delay = Math.max(250, Date.parse(ticket.eligible_at) - Date.parse(personal.serverNow) + 200);
-    const timer = setTimeout(() => { void execute({ kind: "explore_finish", ticket: ticket.id, requestId: crypto.randomUUID() }); }, delay);
+    const timer = setTimeout(() => { void execute({ kind: "explore_finish", pet: petRef.current, ticket: ticket.id, requestId: crypto.randomUUID() }); }, delay);
     return () => clearTimeout(timer);
   }, [personal?.ticket, personal?.serverNow, machine.committedMap, machine.command, active, execute]);
 
@@ -368,6 +371,11 @@ export function usePetController(injectedApi?: PetApi) {
     ++generation.current; ++readSequence.current; abort.current?.abort();
     if (pending.current) dispatch({ type: "uncertain", id: pending.current.requestId });
     petRef.current = id; setPetId(id); setCue(null); setShared(null);
+    setFeedback(null);
+    if (personalRef.current) {
+      personalRef.current = { ...personalRef.current, pet: id, coins: personalRef.current.coins ?? personalRef.current.player?.coins, player: undefined, inventory: undefined };
+      setPersonal(personalRef.current);
+    }
     try { localStorage.setItem("domine-pet-selected", String(id)); } catch { /* Optional preference. */ }
     void refresh();
   }

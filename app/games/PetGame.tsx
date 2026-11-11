@@ -15,9 +15,10 @@ import "./pet-game.css";
 const PetShopSheet = dynamic(() => import("./PetShopSheet"));
 const PetAlbumSheet = dynamic(() => import("./PetAlbumSheet"));
 const PetAchievementSheet = dynamic(() => import("./PetAchievementSheet"));
+const PetHistorySheet = dynamic(() => import("./PetHistorySheet"));
 const PetWorldSheet = dynamic(() => import("./PetWorldSheet"));
 const PetSheet = dynamic(() => import("./PetSheet"));
-type Sheet = "map" | "shop" | "album" | "achievements" | "record" | null;
+type Sheet = "map" | "shop" | "bag" | "album" | "achievements" | "history" | "record" | null;
 
 function Mini({ label, icon, value, color }: { label: string; icon: string; value: number; color: string }) {
   return (
@@ -75,7 +76,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       <div role="group" aria-label="강아지 선택">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeech({ text: "", speaker: "dog" }); }}>{PETS[id].name}</button>)}</div>
       <button type="button" className="pet-record-button" onClick={() => open("record")}>내 별명 바꾸기</button>
     </div>
-    <div className="pet-progress-row"><PetProgress xp={personal?.player?.xp ?? 0} coins={personal?.player?.coins ?? 0} />
+    <div className="pet-progress-row">{personal && !personal.player ? <span role="status">{PETS[game.petId].name} 진행 불러오는 중… · 우리 코인(공용) {personal.coins ?? 0}</span> : <PetProgress name={PETS[game.petId].name} xp={personal?.player?.xp ?? 0} coins={personal?.coins ?? personal?.player?.coins ?? 0} />}
       {game.capability === "missing" && <span className="pet-preparing">준비 중</span>}
       {machine.command === "uncertain" && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>
@@ -112,12 +113,13 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
         <span aria-hidden="true">{action === "sleep" ? LOCAL_ACTIONS.sleep.icon : ACTION_ICON[action]}</span><span>{action === "sleep" ? LOCAL_ACTIONS.sleep.label : ACTION_LABEL[action]}</span>
       </button>)}
     </div>)}
-    <nav className="pet-menu" aria-label="개인 진행"><button type="button" onClick={() => open("shop")}>상점</button><button type="button" onClick={() => open("album")}>도감</button><button type="button" onClick={() => open("achievements")}>업적</button></nav>
+    <nav className="pet-menu" aria-label="진행과 기록"><button type="button" onClick={() => open("shop")}>상점</button><button type="button" onClick={() => open("bag")}>가방</button><button type="button" onClick={() => open("album")}>도감</button><button type="button" onClick={() => open("achievements")}>업적</button><button type="button" onClick={() => open("history")}>이력</button></nav>
     {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
-    {sheet === "shop" && <PetShopSheet state={personal} petId={game.petId} disabled={disabled} notice={notice} execute={game.execute} onClose={close} />}
+    {(sheet === "shop" || sheet === "bag") && <PetShopSheet key={`${game.petId}${sheet}`} bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={game.execute} onClose={close} />}
     {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}
     {sheet === "achievements" && <PetAchievementSheet badges={personal?.badges ?? []} notice={notice} onClose={close} />}
+    {sheet === "history" && <PetHistorySheet history={game.api.history} onClose={close} />}
     {sheet === "record" && <PetSheet title="내 기록" onClose={close}>
       <p className="pet-sheet-note" role="status">{game.message || notice || `${game.nickname}님의 개인 기록이에요.`}</p>
       <form className="pet-record-form" onSubmit={(e) => { e.preventDefault(); void connect(nickInput); }}><label htmlFor={`${tabsId}-nick`}>별명 · 한글, 영문, 숫자 1~8자</label>

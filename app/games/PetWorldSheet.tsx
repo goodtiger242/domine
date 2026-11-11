@@ -17,18 +17,19 @@ export default function PetWorldSheet({ current, visited, onMove, onClose }: {
 }) {
   const [selected, setSelected] = useState(current);
   const cell = worldCell(selected);
+  const [zoom, setZoom] = useState(false);
   return <PetSheet title="우리 동네 지도" onClose={onClose}>
-    <p className="pet-sheet-note">가고 싶은 칸을 누르면 이름이 나오고, 이동할지 물어봐요.<br />🐕 현재 위치 · ✓ 다녀온 곳</p>
-    <div className="pet-world-scroll" tabIndex={0} aria-label="동네 지도, 좁은 화면에서는 좌우로 스크롤">
+    <p className="pet-sheet-note">가고 싶은 칸을 누르면 이름이 나오고, 이동할지 물어봐요. 한 칸은 약 200m예요.<br />🐕 현재 위치 · ✓ 다녀온 곳 <button type="button" className="pet-world-zoom" aria-pressed={zoom} onClick={() => { setZoom(!zoom); if (!zoom) requestAnimationFrame(() => document.querySelector(".pet-world-grid [aria-current=location]")?.scrollIntoView({ block: "center", inline: "center" })); }}>{zoom ? "전체 보기" : "확대"}</button></p>
+    <div className="pet-world-scroll" data-zoom={zoom} tabIndex={0} aria-label="동네 지도, 확대하면 상하좌우로 스크롤">
       <div className="pet-world-grid" role="group" aria-label="서쪽 A열부터 동쪽 J열, 북쪽 1행부터 남쪽 10행">
         {PET_WORLD.map((place) => {
-          const here = place.id === current, seen = visited.includes(place.id);
-          return <button type="button" key={place.id} style={{ backgroundColor: THEMES[place.theme][1] }}
-            aria-label={`${place.id} ${place.name}${here ? ", 현재 위치" : ", 이동"}${seen ? ", 방문함" : ""}`}
-            aria-current={here ? "location" : undefined} aria-pressed={place.id === selected}
-            data-neighbor={!here} data-selected={place.id === selected}
+          const isHere = place.id === current, seen = visited.includes(place.id);
+          return <button type="button" key={place.id}
+            aria-label={`${place.id} ${place.name}${isHere ? ", 현재 위치" : ", 이동"}${seen ? ", 방문함" : ""}`}
+            aria-current={isHere ? "location" : undefined} aria-pressed={place.id === selected}
+            data-neighbor={!isHere} data-selected={place.id === selected}
             onClick={() => setSelected(place.id)}>
-            <span aria-hidden="true">{here ? "🐕" : THEMES[place.theme][0]}</span>
+            <span aria-hidden="true">{isHere ? "🐕" : ""}</span>
             <small>{place.id}{seen && <i aria-hidden="true">✓</i>}</small>
           </button>;
         })}
@@ -41,6 +42,6 @@ export default function PetWorldSheet({ current, visited, onMove, onClose }: {
         <button type="button" data-primary onClick={() => onMove(cell.id)}>이동하기</button></div>
     </div>}
     <p className="pet-world-info" role="status">{cell.id} · {cell.name} · {cell.kind}</p>
-    <p className="pet-sheet-note">실제 동네를 압축한 게임 지도예요. A5 들판과 D5 집 마당은 가상 장소예요.</p>
+    <p className="pet-sheet-note">지도 © OpenStreetMap contributors. D5 집 마당은 가상 장소이고, 가게 위치는 대략이에요.</p>
   </PetSheet>;
 }

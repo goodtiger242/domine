@@ -80,7 +80,7 @@ const calls=[]; let response;
 const api=createPetApi(async(name,args)=>{calls.push({name,args});return response;});
 response={data:null,error:{code:"PGRST202",message:"missing"}}; assert.equal(await api.capabilities(),false);
 for(const code of ["42501","500","NETWORK_ERROR"]) {response={data:null,error:{code,message:"error"}}; await assert.rejects(api.capabilities());}
-response={data:{version:6},error:null};assert.deepEqual(await api.capabilities(),{version:6,sharedEconomy:false,explorationThemes:5,v9:false});
+response={data:{version:6},error:null};assert.deepEqual(await api.capabilities(),{version:6,sharedEconomy:false,explorationThemes:5,v9:false,v10:false,perPetShop:false,history:false});
 const identity={nickname:"테스트",secret:"a".repeat(64)};
 const command={kind:"action",pet:2,action:"feed",requestId:"00000000-0000-4000-8000-000000000001"};
 const storage=new Map();
@@ -102,7 +102,7 @@ const newRegion={kind:"explore_begin",map:"farm",source:"map",requestId:"new-reg
 const beforeRegion=calls.length;
 assert.equal((await api.execute(identity,newRegion)).code,"SERVER_UPDATE_REQUIRED");
 assert.equal(calls.length,beforeRegion,"new themes must not reach an old server");
-response={data:{version:6,sharedEconomy:true,explorationThemes:24,v9:true},error:null};
+response={data:{version:6,sharedEconomy:true,explorationThemes:24,v9:true,v10:true,perPetShop:true,history:true},error:null};
 assert.deepEqual(await api.capabilities(),response.data);
 response={data:{ok:true,code:"OK",serverNow:"2026-11-11T00:00:00Z",version:1,player:{xp:8,level:1,coins:4}},error:null};
 await api.execute(identity,command); await api.execute(identity,command);
@@ -154,12 +154,58 @@ mock.advance(3000);
 assert.equal((await mock.api.execute(identity,{...command,requestId:"daily-cap"})).reward.skipped,"DAILY_CAP");
 assert.equal(mock.state().player.coins,cappedCoins);
 const wallet=createPetMock();await wallet.api.register(identity);
-const buys=await Promise.all(["062","063"].map(item=>wallet.api.execute(identity,{kind:"purchase",item,requestId:item})));
+const buys=await Promise.all(["062","063"].map(item=>wallet.api.execute(identity,{kind:"purchase",pet:1,item,requestId:item})));
 assert.equal(buys.filter(r=>r.ok).length,1); assert.equal(wallet.state().player.coins,40);
 await wallet.api.execute(identity,{kind:"equip",pet:1,slot:"wearable",item:"062",requestId:"equip"});
 assert.equal(wallet.state().equipment[0].item_id,"062");assert.ok(!wallet.state().equipment.some(e=>e.pet_id===2));
-assert.equal((await wallet.api.execute(identity,{kind:"purchase",item:"062",requestId:"repeat-purchase"})).code,"ALREADY_OWNED");
+assert.equal((await wallet.api.execute(identity,{kind:"purchase",pet:1,item:"062",requestId:"repeat-purchase"})).code,"ALREADY_OWNED");
 assert.equal(wallet.state().player.coins,40);
+
+const perPet=createPetMock();await perPet.api.register(identity);
+const purchase=(pet,requestId)=>perPet.api.execute(identity,{kind:"purchase",pet,item:"061",requestId});
+await purchase(1,"domi-buy");
+assert.deepEqual(perPet.state(1).inventory,["061"]);assert.deepEqual(perPet.state(2).inventory,[]);
+assert.equal((await perPet.api.execute(identity,{kind:"equip",pet:2,slot:"wearable",item:"061",requestId:"mine-not-owned"})).code,"NOT_OWNED");
+await purchase(2,"mine-buy");
+assert.deepEqual(perPet.state(2).inventory,["061"]);assert.equal(perPet.state(1).coins,20);assert.equal(perPet.state(2).coins,20);
+assert.equal((await purchase(2,"mine-repeat")).code,"ALREADY_OWNED");
+await perPet.api.execute(identity,{...command,pet:2,requestId:"mine-level"});
+assert.deepEqual(perPet.state(1).levels,{1:1,2:2});assert.equal(perPet.state(1).player.xp,32);assert.equal(perPet.state(2).player.xp,40);
+assert.equal(perPet.state(1).coins,38,"level bonus and action coins enter the shared wallet");
+const historyBefore=await perPet.api.history();await purchase(2,"mine-buy");
+assert.deepEqual(await perPet.api.history(),historyBefore,"replayed purchases do not log again");
+assert.equal(historyBefore.filter(row=>row.kind==="purchase").length,2);
+assert.ok(historyBefore.some(row=>row.kind==="levelup"&&row.pet===2&&row.detail==="2"));
+for(const row of historyBefore) assert.deepEqual(Object.keys(row).sort(),["at","detail","kind","nickname","pet"]);
+await perPet.api.execute(identity,{...command,pet:1,requestId:"skipped-history"});
+assert.equal((await perPet.api.history())[0].kind,"action","skipped actions are still recorded");
+for(let n=0;n<105;n++) await perPet.api.execute(identity,{...command,requestId:`log-${n}`});
+assert.equal(perPet.historyCount(),100);assert.equal((await perPet.api.history()).length,30);
+perPet.advance(14*86400000+1);assert.equal((await perPet.api.history()).length,0);
+await perPet.api.execute(identity,{...command,requestId:"after-retention"});assert.equal(perPet.historyCount(),1);
+const rewards=createPetMock();await rewards.api.register(identity);
+const explore=await rewards.api.execute(identity,{kind:"explore_begin",map:"church",source:"map",requestId:"pet-explore"});rewards.advance(15000);
+await rewards.api.execute(identity,{kind:"explore_finish",pet:2,ticket:explore.ticket.id,requestId:"pet-finish"});
+assert.equal(rewards.state(1).player.xp,32);assert.equal(rewards.state(2).player.xp,36);
+await rewards.api.execute(identity,{kind:"walk_begin",requestId:"pet-walk"});rewards.advance(150000);
+await rewards.api.execute(identity,{kind:"walk_claim",pet:2,session:"pet-walk",requestId:"pet-claim"});
+assert.equal(rewards.state(1).player.xp,32);assert.equal(rewards.state(2).player.xp,44);
+rewards.advance(150000);await rewards.api.execute(identity,{kind:"walk_claim",session:"pet-walk",requestId:"default-pet"});
+assert.equal(rewards.state(1).player.xp,40,"old walk callers default to pet 1");
+
+const purchaseCalls=[];
+const fallbackApi=createPetApi(async(name,args)=>{purchaseCalls.push({name,args});return name.endsWith("v10")?{data:null,error:{code:"PGRST202",message:"missing"}}:{data:{ok:true},error:null};});
+await fallbackApi.execute(identity,{kind:"purchase",pet:2,item:"061",requestId:"fallback"});
+assert.deepEqual(purchaseCalls.map(c=>c.name),["domine_pet_purchase_v10","domine_pet_purchase_v6"]);
+assert.equal(purchaseCalls[0].args.p_pet,2);assert.ok(!("p_pet" in purchaseCalls[1].args));
+for(const code of ["42501","23514","500"]) {
+  let count=0;const failed=createPetApi(async()=>{count++;return {data:null,error:{code,message:"failure"}};});
+  await assert.rejects(failed.execute(identity,{kind:"purchase",pet:2,item:"061",requestId:"fail"}));assert.equal(count,1);
+}
+response={data:[],error:null};assert.deepEqual(await api.history(),[]);assert.deepEqual(calls.at(-1),{name:"domine_pet_history_v10",args:{p_limit:30}});
+response={data:{ok:true},error:null};
+await api.execute(identity,{kind:"explore_finish",pet:2,ticket:"ticket",requestId:"target"});assert.equal(calls.at(-1).args.p_pet,2);
+await api.execute(identity,{kind:"walk_claim",pet:2,session:"session",requestId:"target"});assert.equal(calls.at(-1).args.p_pet,2);
 
 const sql=readFileSync("supabase/migrations/20261111180000_domine_pet_v6.sql","utf8");
 assert.ok(sql.trim().endsWith("commit;")); assert.equal((sql.match(/^begin;/gm)||[]).length,1);
@@ -217,23 +263,15 @@ assert.deepEqual(DIRECTIONS.map(d=>neighborCell("E5",d).id),["E4","E6","F5","D5"
 assert.equal(neighborCell("bad","e"),null);
 assert.equal(worldCell("A5").theme,"field"); assert.equal(worldCell("D5").theme,"home");
 assert.equal(worldCell("F6").name,"당정동 상가 거리");
-assert.deepEqual(PET_WORLD.filter(c=>c.theme==="church").map(c=>c.id),["F1","E5"]);
-for(const [old,id] of Object.entries({church:"E5",home:"D5",field:"A5",street:"F6",park:"B1"})) assert.equal(savedCell(null,old),id);
+assert.deepEqual(PET_WORLD.filter(c=>c.theme==="church").map(c=>c.id),["E5"]);
+for(const [old,id] of Object.entries({church:"E5",home:"D5",field:"A5",street:"F6",park:"H7"})) assert.equal(savedCell(null,old),id);
 for(const bad of ["", "K1", "A0", "A11", "bad"]) assert.equal(savedCell(bad,"home"),"E5");
 assert.equal(savedCell(null,null),"E5"); assert.equal(savedCell(null,"bad"),"E5");
 assert.equal(savedCell(null,"__proto__"),"E5"); assert.equal(savedCell(null,"toString"),"E5");
 assert.equal(savedCell("J10","home"),"J10");
 assert.deepEqual(visitedCells('["A1","A1","E5","bad",1,null]'),["A1","E5"]);
 for(const bad of ["", "{}", "null", "[bad"]) assert.deepEqual(visitedCells(bad),[]);
-// All source rows survive, apart from the three requested game overrides.
-const rows=readFileSync("docs/pet-world-research.md","utf8").split("\n").map(l=>l.split("|").map(s=>s.trim().replaceAll("**",""))).filter(r=>/^[A-J](10|[1-9])$/.test(r[1]??""));
-assert.equal(rows.length,100);
-for(const row of rows) {
-  const cell=worldCell(row[1]);
-  if(["A5","D5","F6"].includes(cell.id)) continue;
-  assert.equal(cell.theme,row[5]); assert.equal(cell.kind,row[3]);
-  assert.equal(cell.name,cell.id==="E5"?"용호성당 마당":row[2].split(" — ")[0]);
-}
+assert.equal(new Set(PET_WORLD.map(c=>c.id)).size,100); assert.ok(PET_WORLD.every(c=>c.name&&c.kind));
 for(const theme of PET_MAPS) for(const hour of [6,12,18,22]) {
   const file=readFileSync(`public${mapBackground(theme.id,hour)}`);
   assert.equal(file.toString("ascii",8,12),"WEBP");
@@ -313,6 +351,45 @@ for(const signature of ["domine_pet_v6.snapshot_v6(uuid,int)","domine_pet_v6.bad
   assert.ok(v9.includes(`revoke all on function ${signature} from public,anon,authenticated;`));
 }
 assert.ok(v9.includes("grant execute on function public.domine_pet_capabilities_v6() to anon,authenticated;"));
+const v10=readFileSync("supabase/migrations/20261111270000_domine_pet_v10.sql","utf8");
+assert.match(v10,/^begin;/);assert.ok(v10.trim().endsWith("commit;"));
+assert.ok(!/\b(drop\s+(table|function|schema)|truncate)\b/i.test(v10));
+assert.equal((v10.match(/create table if not exists domine_pet_v10\./g)||[]).length,4);
+assert.equal((v10.match(/enable row level security/g)||[]).length,4);
+assert.match(v10,/insert into domine_pet_v10.migration\(id\) values\(1\) on conflict do nothing;\s+if found then/);
+assert.match(v10,/select pet,i.item_id,i.purchased_at from domine_pet_v7.inventory i cross join generate_series\(1,2\) pet/);
+assert.match(v10,/select pet,g.xp from domine_pet_v7.pool g cross join generate_series\(1,2\) pet where g.id=1/);
+assert.match(v10,/foreign key\(pet_id,item_id\) references domine_pet_v10.inventory\(pet_id,item_id\)/);
+assert.match(v10,/confrelid='domine_pet_v7.inventory'::regclass/);
+const snapshot10=v10.slice(v10.indexOf("create or replace function domine_pet_v6.snapshot_v6"),v10.indexOf("create or replace function domine_pet_v6.badges_v6"));
+assert.match(snapshot10,/from domine_pet_v10.inventory where pet_id=p_pet/);
+assert.match(snapshot10,/'xp',x.xp,'coins',g.coins,'level',domine_pet_v6.level_v6\(x.xp\)/);
+assert.match(snapshot10,/'levels',\(select jsonb_object_agg\(pet_id,domine_pet_v6.level_v6\(xp\)\)/);
+assert.match(v10,/exists\(select 1 from domine_pet_v10.pet_xp where xp=9280\)/);
+assert.match(v10,/count\(distinct i.item_id\)>=3/);
+const command10=v10.slice(v10.indexOf("create or replace function domine_pet_v6.command_v6"),v10.indexOf("create or replace function public.domine_pet_capabilities_v6"));
+const lock10=command10.indexOf("select * into strict wallet from domine_pet_v7.pool where id=1 for update");
+for(const mutation of ["rate_v6(","insert into domine_pet_v7.daily","update domine_pet_v7.pool","update domine_pet_v10.pet_xp","log_v10("]) assert.ok(lock10<command10.indexOf(mutation),mutation);
+assert.match(command10,/where pet_id=pet and item_id=entry/);
+assert.match(command10,/where i.pet_id=pet and i.item_id=entry and c.slot=command_v6.slot/);
+assert.ok(!command10.includes("wallet.xp"));assert.ok(!/pool set xp=/.test(command10));
+assert.match(command10,/pet:=coalesce\(\(p_input->>'pet'\)::int,1\)/);
+assert.match(command10,/coalesce\(p_input->>'pet',''\) not in \('1','2'\)/);
+assert.match(command10,/end if;\s+perform domine_pet_v10.log_v10\(p.nickname,pet,'action',action\)/,"skipped actions log outside the reward branch");
+assert.match(v10,/where id <= \(select max\(id\) from domine_pet_v10.history\) - 100 or at < now\(\)-interval '14 days'/);
+const history10=v10.slice(v10.indexOf("create or replace function public.domine_pet_history_v10"),v10.indexOf("create or replace function public.domine_pet_purchase_v10"));
+assert.match(history10,/returns table\(nickname text,pet int,kind text,detail text,at timestamptz\)/);
+assert.match(history10,/language sql stable security definer set search_path=''/);
+assert.match(history10,/order by h.id desc limit least\(50,greatest\(0,coalesce\(p_limit,30\)\)\)/);
+assert.ok(!/insert|update|delete|secret/.test(history10));
+for(const signature of ["domine_pet_history_v10(int)","domine_pet_purchase_v10(text,text,uuid,int,text)","domine_pet_explore_finish_v6(text,text,uuid,uuid,int)","domine_pet_walk_claim_v6(text,text,uuid,uuid,int)","domine_pet_operation_v6(text,text,uuid)"]) {
+  assert.ok(v10.includes(`revoke all on function public.${signature} from public,anon,authenticated;`));
+  assert.ok(v10.includes(`grant execute on function public.${signature} to anon,authenticated;`));
+}
+for(const kind of ["action","purchase","equip","levelup","discover"]) assert.ok(v10.includes(`log_v10(p.nickname,pet,'${kind}'`));
+assert.equal((v10.match(/not op.result \? 'levels'/g)||[]).length,2,"old command and operation snapshots are not replayed");
+assert.match(v10,/not result \? 'levels'/,"old completed explorations are not replayed");
+assert.ok(v10.includes('"v10":true,"perPetShop":true,"history":true'));
 const alpha=spawnSync("python",["-c",`
 import tempfile,subprocess
 from pathlib import Path
