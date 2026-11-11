@@ -41,9 +41,9 @@ s=reduce(s,{type:"request",id:"one"}); s=reduce(s,{type:"uncertain",id:"one"});
 assert.equal(s.command,"uncertain"); assert.equal(reduce(s,{type:"request",id:"two"}),s);
 assert.equal(reduce(s,{type:"settled",id:"two"}),s); s=reduce(s,{type:"settled",id:"one"});
 s=reduce(s,{type:"pause"}); assert.equal(s.epoch,1); assert.equal(s.visual,"paused");
-s=reduce(s,{type:"resume"}); s=reduce(s,{type:"map",map:"home",id:4});
-assert.equal(s.committedMap,"church"); assert.equal(reduce(s,{type:"map-ready",id:3}),s);
-s=reduce(s,{type:"map-ready",id:4}); assert.equal(s.committedMap,"home"); assert.equal(s.visual,"switching-map");
+s=reduce(s,{type:"resume"}); s=reduce(s,{type:"map",map:"D5",id:4});
+assert.equal(s.committedMap,"E5"); assert.equal(reduce(s,{type:"map-ready",id:3}),s);
+s=reduce(s,{type:"map-ready",id:4}); assert.equal(s.committedMap,"D5"); assert.equal(s.visual,"switching-map");
 s=reduce(s,{type:"done",id:4}); assert.equal(s.visual,"idle");
 const actions=["feed","treat","pet","play","walk","brush","bath","train","tap","priest"];
 let plans=0;
@@ -163,6 +163,70 @@ const v7Snapshot=v7.slice(v7.indexOf("create or replace function domine_pet_v6.s
 const v6Snapshot=sql.slice(sql.indexOf("create or replace function domine_pet_v6.snapshot_v6"),sql.indexOf("create or replace function domine_pet_v6.badges_v6"));
 const jsonKeys=(source)=>[...source.matchAll(/'([a-zA-Z_]+)',/g)].map(m=>m[1]);
 assert.deepEqual(jsonKeys(v7Snapshot),jsonKeys(v6Snapshot),"snapshot JSON keys remain v6-compatible");
+const { PET_WORLD, DEFAULT_CELL, DIRECTIONS, neighborCell, worldCell, savedCell, visitedCells } = loadTS("lib/domine/pet-world.ts");
+const { PET_MAPS, mapBackground } = loadTS("lib/domine/pet-maps.ts");
+assert.equal(PET_WORLD.length,100);
+assert.equal(new Set(PET_WORLD.map(c=>c.id)).size,100);
+assert.equal(PET_MAPS.length,24);
+const opposites={n:"s",s:"n",e:"w",w:"e"};
+for(const [i,cell] of PET_WORLD.entries()) {
+  assert.equal(cell.id,`${String.fromCharCode(65+i%10)}${Math.floor(i/10)+1}`);
+  assert.ok(PET_MAPS.some(m=>m.id===cell.theme));
+  for(const dir of DIRECTIONS) {
+    const neighbor=neighborCell(cell.id,dir);
+    if(neighbor) assert.equal(neighborCell(neighbor.id,opposites[dir]).id,cell.id);
+    const edge=dir==="n"?i<10:dir==="s"?i>=90:dir==="w"?i%10===0:i%10===9;
+    assert.equal(neighbor===null,edge);
+  }
+}
+assert.equal(DEFAULT_CELL,"E5");
+assert.deepEqual(DIRECTIONS.map(d=>neighborCell("E5",d).id),["E4","E6","F5","D5"]);
+assert.equal(neighborCell("bad","e"),null);
+assert.equal(worldCell("A5").theme,"field"); assert.equal(worldCell("D5").theme,"home");
+assert.equal(worldCell("F6").name,"당정동 상가 거리");
+assert.deepEqual(PET_WORLD.filter(c=>c.theme==="church").map(c=>c.id),["F1","E5"]);
+for(const [old,id] of Object.entries({church:"E5",home:"D5",field:"A5",street:"F6",park:"B1"})) assert.equal(savedCell(null,old),id);
+for(const bad of ["", "K1", "A0", "A11", "bad"]) assert.equal(savedCell(bad,"home"),"E5");
+assert.equal(savedCell(null,null),"E5"); assert.equal(savedCell(null,"bad"),"E5");
+assert.equal(savedCell(null,"__proto__"),"E5"); assert.equal(savedCell(null,"toString"),"E5");
+assert.equal(savedCell("J10","home"),"J10");
+assert.deepEqual(visitedCells('["A1","A1","E5","bad",1,null]'),["A1","E5"]);
+for(const bad of ["", "{}", "null", "[bad"]) assert.deepEqual(visitedCells(bad),[]);
+// All source rows survive, apart from the three requested game overrides.
+const rows=readFileSync("docs/pet-world-research.md","utf8").split("\n").map(l=>l.split("|").map(s=>s.trim().replaceAll("**",""))).filter(r=>/^[A-J](10|[1-9])$/.test(r[1]??""));
+assert.equal(rows.length,100);
+for(const row of rows) {
+  const cell=worldCell(row[1]);
+  if(["A5","D5","F6"].includes(cell.id)) continue;
+  assert.equal(cell.theme,row[5]); assert.equal(cell.kind,row[3]);
+  assert.equal(cell.name,cell.id==="E5"?"용호성당 마당":row[2].split(" — ")[0]);
+}
+for(const theme of PET_MAPS) for(const hour of [6,12,18,22]) {
+  const file=readFileSync(`public${mapBackground(theme.id,hour)}`);
+  assert.equal(file.toString("ascii",8,12),"WEBP");
+}
+// Reapply the SQL union locally; no database connection or writes.
+const v8=readFileSync("supabase/migrations/20261111230000_domine_pet_v8.sql","utf8");
+assert.match(v8,/^begin;/); assert.ok(v8.trim().endsWith("commit;"));
+assert.ok(!/\b(create|alter|drop|truncate|delete|insert)\b/i.test(v8));
+assert.match(v8,/c\.acquisition = 'explore'/);
+assert.match(v8,/select distinct theme from unnest\(c\.maps \|\| a\.maps\)/);
+const seeds=[...sql.matchAll(/\('([0-9]{3})','([^']*)','[^']*','([^']*)','explore',array\[([^\]]*)\]/g)].map(m=>({id:m[1],rarity:m[3],maps:m[4].match(/[^',]+/g)}));
+const additions=[...v8.matchAll(/\('([0-9]{3})', array\[([^\]]*)\]\)/g)].map(m=>({id:m[1],maps:m[2].match(/[^',]+/g)}));
+assert.ok(additions.length>0);
+for(const a of additions) { assert.ok(seeds.some(s=>s.id===a.id)); for(const map of a.maps) assert.ok(PET_MAPS.some(m=>m.id===map)); }
+const expand=items=>items.map(s=>({...s,maps:[...new Set([...s.maps,...(additions.find(a=>a.id===s.id)?.maps??[])])].sort()}));
+const expanded=expand(seeds); assert.deepEqual(expand(expanded),expanded);
+for(const seed of seeds) assert.ok(seed.maps.every(m=>expanded.find(e=>e.id===seed.id).maps.includes(m)));
+for(const theme of PET_MAPS.slice(5)) {
+  assert.ok(expanded.filter(s=>s.rarity==="일반"&&s.maps.includes(theme.id)).length>=2,theme.id);
+  const explorer=createPetMock(); await explorer.api.register(identity);
+  const ticket=await explorer.api.execute(identity,{kind:"explore_begin",map:theme.id,source:"map",requestId:"begin"});
+  assert.equal(ticket.ticket.map_id,theme.id);
+  explorer.advance(15000);
+  const found=await explorer.api.execute(identity,{kind:"explore_finish",ticket:ticket.ticket.id,requestId:"finish"});
+  assert.ok(expanded.some(s=>s.id===found.reward.newEntries[0]&&s.maps.includes(theme.id)));
+}
 const alpha=spawnSync("python",["-c",`
 import tempfile,subprocess
 from pathlib import Path

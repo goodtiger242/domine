@@ -5,8 +5,9 @@ import { createPetApi, acceptsResult, type PetApi, type PetCommand, type V6Resul
 import { createClient } from "@/lib/supabase/client";
 import { createSecret, normalizeNickname, parseTransfer, readIdentity, saveIdentity, storageAvailable, type PetIdentity } from "@/lib/domine/pet-identity";
 import { gameReducer, initialMachine, visualLocked, type GameEvent } from "@/lib/domine/pet-machine";
-import { neighborMap, petMap, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
-import { BACKGROUNDS, CHURCH_BACKGROUNDS, backgroundAt, type PetId } from "@/lib/domine/pet-photos";
+import { mapBackground, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
+import { DIRECTIONS, neighborCell, savedCell, visitedCells, worldCell } from "@/lib/domine/pet-world";
+import { type PetId } from "@/lib/domine/pet-photos";
 import { prepareImage, vibrate } from "@/lib/domine/pet-assets";
 import { SCENE_DURATION } from "@/lib/domine/pet-scene-plan";
 import type { PetAction, PetState } from "@/lib/domine/pet";
@@ -45,6 +46,9 @@ export function usePetController(injectedApi?: PetApi) {
   const [feedback, setFeedback] = useState<{ id: number; result: V6Result; previousLevel: number } | null>(null);
   const [message, setMessage] = useState("");
   const [cue, setCue] = useState<SceneCue | null>(null);
+  const [visited, setVisited] = useState<string[]>([]);
+  const [arrival, setArrival] = useState<{ id: number; text: string } | null>(null);
+  const [worldReady, setWorldReady] = useState(false);
   const [multiPet, setMultiPet] = useState(true);
   const legacy = useRef(false), alive = useRef(false), generation = useRef(0), readSequence = useRef(0);
   const pending = useRef<PetCommand | null>(null);
@@ -136,27 +140,43 @@ export function usePetController(injectedApi?: PetApi) {
   const startExploration = useCallback((map: PetMap, source: "map" | "walk") => {
     if (!pending.current) void execute({ kind: "explore_begin", map, source, requestId: crypto.randomUUID() });
   }, [execute]);
+  const visit = useCallback((id: string) => {
+    setVisited((previous) => {
+      const next = previous.includes(id) ? previous : [...previous, id];
+      try {
+        localStorage.setItem("domine-pet-cell", id);
+        localStorage.setItem("domine-pet-visited", JSON.stringify(next));
+      } catch { /* Visiting still works without device storage. */ }
+      return next;
+    });
+  }, []);
   const localScene = useCallback(async (next: SceneCue) => {
-    if (visualLocked(machineRef.current)) return;
+    if (!worldReady || visualLocked(machineRef.current)) return;
+    const currentCell = worldCell(machineRef.current.committedMap);
+    if (next.action === "sleep" && currentCell.theme !== "home") return;
+    if (next.action === "priest" && currentCell.theme !== "church") return;
+    if (next.action === "shop" && currentCell.id !== "F6") return;
     vibrate(10);
     const id = ++idCounter.current;
     if (next.action === "map") {
-      const map = neighborMap(machineRef.current.committedMap, next.direction).id;
+      const cell = neighborCell(currentCell.id, next.direction);
+      if (!cell) return;
       const g = generation.current;
-      dispatch({ type: "map", map, id });
+      dispatch({ type: "map", map: cell.id, id });
       const controller = new AbortController(); mapAbort.current?.abort(); mapAbort.current = controller;
       const hour = new Date().getHours();
-      const src = petMap(map).background ?? (map === "church" ? CHURCH_BACKGROUNDS : BACKGROUNDS)[backgroundAt(hour)];
+      const src = mapBackground(cell.theme, hour);
       await prepareImage(src, controller.signal);
       if (!alive.current || generation.current !== g || controller.signal.aborted || machineRef.current.sceneId !== id) return;
       dispatch({ type: "map-ready", id }); setCue(null);
-      try { localStorage.setItem("domine-pet-map", map); } catch { /* Optional preference. */ }
-      startExploration(map, "map");
+      visit(cell.id);
+      setArrival({ id, text: `${cell.name}에 왔어요` });
+      startExploration(cell.theme, "map");
     } else {
       dispatch({ type: "act", id, now: Date.now(), duration: SCENE_DURATION[next.action] });
       setCue({ ...next, id });
     }
-  }, [dispatch, startExploration]);
+  }, [dispatch, startExploration, visit, worldReady]);
   const care = useCallback((action: PetAction | "sleep") => {
     if (visualLocked(machineRef.current)) return;
     void localScene({ action, id: 0 });
@@ -227,8 +247,17 @@ export function usePetController(injectedApi?: PetApi) {
     const nick = safeGet("domine-pet-nick"); nickRef.current = nick; setNickname(nick);
     try { identityRef.current = readIdentity(nick); setIdentity(identityRef.current); } catch { /* No personal storage. */ }
     const selected: PetId = safeGet("domine-pet-selected") === "2" ? 2 : 1; petRef.current = selected; setPetId(selected);
-    const map = petMap(safeGet("domine-pet-map")).id;
-    dispatch({ type: "map", map, id: ++idCounter.current }); dispatch({ type: "map-ready", id: idCounter.current }); dispatch({ type: "done", id: idCounter.current });
+    let saved: string | null = null;
+    try { saved = localStorage.getItem("domine-pet-cell"); } catch { /* Default location. */ }
+    const map = savedCell(saved, safeGet("domine-pet-map"));
+    setVisited(visitedCells(safeGet("domine-pet-visited")));
+    const id = ++idCounter.current;
+    const controller = new AbortController();
+    dispatch({ type: "map", map, id }); dispatch({ type: "map-ready", id }); dispatch({ type: "done", id });
+    void prepareImage(mapBackground(worldCell(map).theme, new Date().getHours()), controller.signal).then(() => {
+      if (!alive.current || controller.signal.aborted) return;
+      visit(map); setWorldReady(true);
+    });
     if (identityRef.current) {
       try {
         const saved = safeGet(pendingKey(identityRef.current));
@@ -238,12 +267,30 @@ export function usePetController(injectedApi?: PetApi) {
     void checkCapabilities();
     return () => {
       alive.current = false;
+      controller.abort();
       // Invalidate requests, not a DOM ref; cleanup must advance the current generation.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       ++generation.current;
       abort.current?.abort(); mapAbort.current?.abort(); if (commandTimer.current) clearTimeout(commandTimer.current);
     };
-  }, [checkCapabilities, dispatch]);
+  }, [checkCapabilities, dispatch, visit]);
+
+  useEffect(() => {
+    if (!worldReady || !active || machine.visual !== "idle") return;
+    const controller = new AbortController();
+    const preload = () => {
+      const hour = new Date().getHours();
+      const backgrounds = new Set(DIRECTIONS.flatMap((dir) => {
+        const cell = neighborCell(machine.committedMap, dir);
+        return cell ? [mapBackground(cell.theme, hour)] : [];
+      }));
+      backgrounds.delete(mapBackground(worldCell(machine.committedMap).theme, hour));
+      backgrounds.forEach((src) => { void prepareImage(src, controller.signal); });
+    };
+    const idle = typeof window.requestIdleCallback === "function";
+    const id = idle ? window.requestIdleCallback(preload) : window.setTimeout(preload, 300);
+    return () => { controller.abort(); if (idle) window.cancelIdleCallback(id); else window.clearTimeout(id); };
+  }, [worldReady, active, machine.visual, machine.committedMap]);
 
   useEffect(() => {
     let intersecting = true;
@@ -271,11 +318,11 @@ export function usePetController(injectedApi?: PetApi) {
   const completedWalk = useRef(0);
   useEffect(() => {
     if (machine.visual !== "idle" || machine.command !== "idle" || cue?.action !== "walk" || completedWalk.current === cue.id) return;
-    completedWalk.current = cue.id; startExploration(machine.committedMap, "walk");
+    completedWalk.current = cue.id; startExploration(worldCell(machine.committedMap).theme, "walk");
   }, [machine.visual, machine.command, machine.committedMap, cue, startExploration]);
   useEffect(() => {
     const ticket = personal?.ticket;
-    if (!active || !ticket || ticket.map_id !== machine.committedMap || machine.command !== "idle") return;
+    if (!active || !ticket || ticket.map_id !== worldCell(machine.committedMap).theme || machine.command !== "idle") return;
     const delay = Math.max(250, Date.parse(ticket.eligible_at) - Date.parse(personal.serverNow) + 200);
     const timer = setTimeout(() => { void execute({ kind: "explore_finish", ticket: ticket.id, requestId: crypto.randomUUID() }); }, delay);
     return () => clearTimeout(timer);
@@ -290,7 +337,7 @@ export function usePetController(injectedApi?: PetApi) {
     void refresh();
   }
   const done = useCallback((id: number, sleep?: boolean) => dispatch({ type: "done", id, sleep }), [dispatch]);
-  return { host, api, machine, active, shared, personal, feedback, message, setMessage, capability, identity, nickname, petId, multiPet, cue,
+  return { host, api, machine, active, shared, personal, feedback, message, setMessage, capability, identity, nickname, petId, multiPet, cue, visited, arrival, worldReady,
     care, localScene, done, connect, selectPet, execute, refresh, checkCapabilities,
     retry: () => { if (pending.current) void execute(pending.current, true); },
     pause: () => { ++generation.current; abort.current?.abort(); mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },

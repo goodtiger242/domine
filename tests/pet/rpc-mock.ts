@@ -45,7 +45,7 @@ export function createPetMock(options: { missing?: boolean; delayMs?: number } =
         ticket={id:"00000000-0000-4000-8000-000000000099",map_id:command.map,eligible_at:new Date(now+15000).toISOString(),expires_at:new Date(now+600000).toISOString()};
       } else if(command.kind==="explore_finish") {
         if(!ticket) code="EXPIRED";
-        else { gain=4;money=2;const entry={church:"001",field:"013",street:"025",park:"037",home:"049"}[ticket.map_id]; if(album.includes(entry))money++;else{album.push(entry);entries.push(entry);}ticket=null; }
+        else { gain=4;money=2;const entry={church:"001",field:"013",street:"025",park:"037",home:"049",playground:"014",stream:"018",churchback:"001",alley:"025",market:"025",station:"027",mountain:"016",lake:"018",school:"027",foodstreet:"026",cafestreet:"026",bakery:"026",apartment:"052",bikepath:"018",overlook:"041",garden:"013",bridge:"018",pilgrimpath:"016",farm:"013"}[ticket.map_id]; if(album.includes(entry))money++;else{album.push(entry);entries.push(entry);}ticket=null; }
       }
       const previous=levelOf(xp); xp=Math.min(9280,xp+gain);
       for(let level=previous+1;level<=levelOf(xp);level++)levelCoins+=10+level*2;

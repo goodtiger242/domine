@@ -1,21 +1,21 @@
-import type { PetMap } from "./pet-maps";
+import { DEFAULT_CELL } from "./pet-world";
 export type GameMachine = {
   visual: "idle" | "acting" | "loading-map" | "switching-map" | "sleeping" | "paused";
   command: "idle" | "pending" | "uncertain";
   epoch: number; sceneId: number; operationId: string | null;
   startedAt: number | null; deadlineAt: number | null;
-  committedMap: PetMap; pendingMap: PetMap | null;
+  committedMap: string; pendingMap: string | null;
 };
 export const initialMachine: GameMachine = {
   visual: "idle", command: "idle", epoch: 0, sceneId: 0, operationId: null,
-  startedAt: null, deadlineAt: null, committedMap: "church", pendingMap: null,
+  startedAt: null, deadlineAt: null, committedMap: DEFAULT_CELL, pendingMap: null,
 };
 export type GameEvent =
   | { type: "act"; id: number; now: number; duration: number }
   | { type: "done"; id: number; sleep?: boolean }
   | { type: "request"; id: string }
   | { type: "settled" | "uncertain"; id: string }
-  | { type: "map"; map: PetMap; id: number }
+  | { type: "map"; map: string; id: number }
   | { type: "map-ready"; id: number }
   | { type: "pause" | "resume" | "reset" };
 export const visualLocked = (s: GameMachine) => !["idle", "sleeping"].includes(s.visual);

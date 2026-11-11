@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useId, useState } from "react";
 import { ACTION_DONE, ACTION_ICON, ACTION_LABEL, availableActionGroups, collarToday, faceOf, LOCAL_ACTIONS, PET_ACTIONS, saysText, stageOf, STAGE_LABEL, timeAgo, type PetCategory } from "@/lib/domine/pet";
 import { actionsForMap } from "@/lib/domine/pet-maps";
+import { worldCell } from "@/lib/domine/pet-world";
 import { PETS, petText } from "@/lib/domine/pet-photos";
 import type { PetApi } from "@/lib/domine/pet-rpc";
 import { visualLocked } from "@/lib/domine/pet-machine";
@@ -14,8 +15,9 @@ import "./pet-game.css";
 const PetShopSheet = dynamic(() => import("./PetShopSheet"));
 const PetAlbumSheet = dynamic(() => import("./PetAlbumSheet"));
 const PetAchievementSheet = dynamic(() => import("./PetAchievementSheet"));
+const PetWorldSheet = dynamic(() => import("./PetWorldSheet"));
 const PetSheet = dynamic(() => import("./PetSheet"));
-type Sheet = "shop" | "album" | "achievements" | "record" | null;
+type Sheet = "map" | "shop" | "album" | "achievements" | "record" | null;
 
 function Mini({ label, icon, value, color }: { label: string; icon: string; value: number; color: string }) {
   return (
@@ -45,13 +47,15 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   const [hour, setHour] = useState(12);
   const tabsId = useId();
   const stage = stageOf(pet?.care_total ?? 0), face = pet ? faceOf(pet, hour >= 21 || hour < 5) : "happy";
-  const groups = availableActionGroups(actionsForMap(PET_ACTIONS, machine.committedMap));
+  const cell = worldCell(machine.committedMap);
+  const groups = availableActionGroups(actionsForMap(PET_ACTIONS, cell.theme));
   const selected = groups.find((g) => g.category === category) ?? groups[0];
-  const locked = visualLocked(machine), disabled = !game.identity || game.capability !== "ready" || machine.command !== "idle";
+  const locked = !game.worldReady || visualLocked(machine), disabled = !game.identity || game.capability !== "ready" || machine.command !== "idle";
   const notice = game.capability === "missing" ? "개인 진행 준비 중 · 기존 돌보기는 계속할 수 있어요."
     : game.capability === "error" ? "개인 기록 연결을 확인하지 못했어요. 기록 메뉴에서 다시 확인해 주세요."
     : !game.identity ? "기록 메뉴에서 별명을 등록하면 개인 진행이 저장돼요." : game.message;
   const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeech({ text, speaker }), []);
+  useEffect(() => { if (game.arrival) say(game.arrival.text); }, [game.arrival, say]);
   useEffect(() => { setHour(new Date().getHours()); }, []);
   useEffect(() => {
     if (!game.active || sheet) return;
@@ -76,11 +80,12 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       {machine.command === "uncertain" && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>
     <div className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
-      <PetScene key={game.petId} petId={game.petId} map={machine.committedMap} onLocal={game.localScene} locked={locked}
+      {game.worldReady ? <PetScene key={game.petId} petId={game.petId} cellId={cell.id} onMap={() => open("map")} onLocal={game.localScene} locked={locked}
         paused={!game.active || !!sheet || machine.visual === "paused"} stage={stage} face={face} hour={hour}
         light={hour >= 21 || hour < 5 ? .8 : hour < 7 || hour >= 17 ? .9 : 1} collar={collarToday().hex}
         cue={game.cue} onSay={say} onDone={game.done} speaker={speech.speaker}
-        bubble={petText(speech.text || "반가워요!", game.petId)} wearable={equipment("wearable")} toy={equipment("toy")} />
+        bubble={speech.text.endsWith("에 왔어요") ? speech.text : petText(speech.text || "반가워요!", game.petId)} wearable={equipment("wearable")} toy={equipment("toy")} />
+        : <p className="p-8 text-center text-sm" role="status">동네를 불러오고 있어요…</p>}
       {pet && <div className="pointer-events-none absolute inset-x-0 bottom-0 flex gap-4 bg-gradient-to-t from-black/75 to-transparent px-3 pb-2 pt-4">
         <Mini label="배부름" icon="🍖" value={pet.fullness} color="#f5c878" /><Mini label="기분" icon="♥" value={pet.mood} color="#ffabbc" /><Mini label="청결" icon="💧" value={pet.clean ?? 80} color="#9ae4f0" />
       </div>}
@@ -101,8 +106,10 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     </div>)}
     <nav className="pet-menu" aria-label="개인 진행"><button type="button" onClick={() => open("shop")}>상점</button><button type="button" onClick={() => open("album")}>도감</button><button type="button" onClick={() => open("achievements")}>업적</button></nav>
     <p className="sr-only" role="status">{game.message || notice}</p>
+    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close}
+      onMove={(direction) => { close(); void game.localScene({ action: "map", direction, id: 0 }); }} />}
     {sheet === "shop" && <PetShopSheet state={personal} petId={game.petId} disabled={disabled} notice={notice} execute={game.execute} onClose={close} />}
-    {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={machine.committedMap} execute={game.execute} onClose={close} />}
+    {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}
     {sheet === "achievements" && <PetAchievementSheet badges={personal?.badges ?? []} notice={notice} onClose={close} />}
     {sheet === "record" && <PetSheet title="내 기록" onClose={close}>
       <p className="pet-sheet-note" role="status">{game.message || notice || `${game.nickname}님의 개인 기록이에요.`}</p>

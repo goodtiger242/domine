@@ -1,14 +1,15 @@
-import type { PetMap } from "./pet-maps";
+import { PET_MAPS, type PetMap } from "./pet-maps";
 export type Point = { x: number; y: number };
 export type SafeZone = { left: number; right: number; top: number; bottom: number };
-export const SAFE_ZONES: Record<PetMap, SafeZone> = {
+export const SAFE_ZONES = {
+  ...Object.fromEntries(PET_MAPS.map(({ id }) => [id, { left: 22, right: 138, top: 77, bottom: 84 } ])),
   church: { left: 46, right: 140, top: 77, bottom: 84 },
   field: { left: 20, right: 140, top: 76, bottom: 84 },
   street: { left: 20, right: 140, top: 77, bottom: 84 },
   park: { left: 22, right: 138, top: 77, bottom: 84 },
   home: { left: 22, right: 98, top: 78, bottom: 84 },
-};
-export const START_POINTS: Record<PetMap, Point> = { church: { x: 85, y: 82 }, field: { x: 80, y: 82 }, street: { x: 80, y: 82 }, park: { x: 80, y: 82 }, home: { x: 66, y: 82 } };
+} as Record<PetMap, SafeZone>;
+export const START_POINTS = { ...Object.fromEntries(PET_MAPS.map(({ id }) => [id, { x: 80, y: 82 }])), church: { x: 85, y: 82 }, field: { x: 80, y: 82 }, street: { x: 80, y: 82 }, park: { x: 80, y: 82 }, home: { x: 66, y: 82 } } as Record<PetMap, Point>;
 export const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 // Photo poses, tail, outfit and carried toy share a conservative union envelope.
 export function actorBounds(width: number) { return { left: -width * .8 - 4, right: width * .8 + 4, top: -width * 1.15 - 5, bottom: 2 }; }

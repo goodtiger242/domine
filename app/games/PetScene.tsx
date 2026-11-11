@@ -6,8 +6,9 @@ import type { PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
 import { ART, BALL, BOWL } from "@/lib/domine/pet-art";
 import { line, PRIEST_LINES } from "@/lib/domine/pet-lines";
-import { BACKGROUNDS, CHURCH_BACKGROUNDS, backgroundAt, PETS, PRIEST, DOGHOUSE, type PetId } from "@/lib/domine/pet-photos";
-import { DEFAULT_MAP, petMap, neighborMap, SHOPS, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
+import { backgroundAt, PETS, PRIEST, DOGHOUSE, type PetId } from "@/lib/domine/pet-photos";
+import { mapBackground, SHOPS, type SceneCue } from "@/lib/domine/pet-maps";
+import { DEFAULT_CELL, DIRECTIONS, neighborCell, worldCell } from "@/lib/domine/pet-world";
 import { DOG_W, PetDog } from "./PetDog";
 
 import { buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
@@ -41,7 +42,8 @@ type Props = {
   /** 새 행동이 시작될 때마다 id 가 바뀐다 */
   cue: SceneCue | null;
   petId?: PetId;
-  map?: PetMap;
+  cellId?: string;
+  onMap?: () => void;
   onLocal?: (cue: SceneCue) => void;
   locked?: boolean;
   speaker?: "dog" | "priest";
@@ -87,14 +89,16 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
     <div ref={layer} className="pointer-events-none absolute inset-0">
       <p ref={bubble} className="pet-speech" role="status" aria-label={label} aria-atomic="true"
         style={{ visibility: "hidden" }}>
-        <span key={text} className="pet-speech-text">{text}</span>
+        <span key={text} className="pet-speech-text" data-arrival={text.endsWith("에 왔어요")}>{text}</span>
         <span aria-hidden="true" className="pet-speech-tail" />
       </p>
     </div>
   );
 }
 
-export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, map = DEFAULT_MAP, onLocal, locked = false, speaker = "dog", paused = false, wearable, toy }: Props) {
+export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onLocal, locked = false, speaker = "dog", paused = false, wearable, toy }: Props) {
+  const cell = worldCell(cellId);
+  const map = cell.theme;
   const shadowId = useId();
   const [animated, setS] = useState<ScenePose>({ ...restingPose(map) });
   const s = cue && !paused ? animated : restingPose(map);
@@ -103,7 +107,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
   const period = backgroundAt(hour);
   const church = map === "church";
   const sceneScale = church ? 0.85 : 1;
-  const background = petMap(map).background ?? (church ? CHURCH_BACKGROUNDS : BACKGROUNDS)[period];
+  const background = mapBackground(map, hour);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -162,6 +166,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
 
   return (
     <div className="pet-scene relative h-full w-full" data-paused={paused}>
+    <div className="pet-scene-picture">
     <svg
       viewBox="0 6 160 90"
       className="block h-full w-full"
@@ -341,20 +346,26 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       ) : null}
       </g>
     </svg>
-    <span className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] text-white">{petMap(map).name}</span>
-    {([-1, 1] as const).map((direction) => <button key={direction} type="button"
-      className={`absolute top-[58%] flex h-11 w-11 items-center justify-center rounded-full text-xl text-white [text-shadow:0_1px_4px_#000] focus-visible:outline-2 disabled:opacity-40 ${direction < 0 ? "left-0" : "right-0"}`}
-      aria-label={`${neighborMap(map, direction).name}(으)로 이동`} disabled={locked}
-      onClick={() => onLocal?.({ action: "map", direction, id: Date.now() })}>{direction < 0 ? "‹" : "›"}</button>)}
     {church && <button type="button" className={`absolute min-h-11 w-[12%] min-w-11 rounded-xl focus-visible:outline-2 ${church ? "left-[4%] top-[25%] h-[50%]" : "left-[15%] top-[30%] h-[50%]"}`}
       aria-label="신부님께 인사하기" disabled={locked} onClick={() => onLocal?.({ action: "priest", id: Date.now() })} />}
-    {map === "street" && SHOPS.map((shop, index) => <button key={shop.name} type="button"
+    {cell.id === "F6" && SHOPS.map((shop, index) => <button key={shop.name} type="button"
       className="absolute flex min-h-11 w-[23%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded text-[clamp(11px,3vw,16px)] font-semibold text-[#30271e] focus-visible:outline-2 disabled:opacity-60"
       style={{ left: `${shop.x}%`, top: `${shop.y}%` }} aria-label={`${shop.name} 앞으로 가기`} disabled={locked}
       onClick={() => onLocal?.({ action: "shop", shop: index, id: Date.now() })}>{shop.name}</button>)}
     {bubble && <SpeechBubble text={bubble} label={speaker === "priest" ? "신부님의 말" : `${PETS[petId].name}의 말`}
       x={speaker === "priest" ? 18 : s.x + s.dir * w * sc * 0.25}
       y={speaker === "priest" ? 31 : s.y - h * sc} duration={s.dur} />}
+    </div>
+    <div key={cell.id} className="pet-location" aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
+    <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기">MAP</button>
+    {DIRECTIONS.map((direction) => {
+      const destination = neighborCell(cell.id, direction);
+      return destination && <button key={direction} type="button" className={`pet-direction pet-direction-${direction}`}
+        aria-label={`${destination.name}(으)로 이동`} disabled={locked}
+        onClick={() => onLocal?.({ action: "map", direction, id: Date.now() })}>
+        <span aria-hidden="true">{{ n: "↑", s: "↓", e: "→", w: "←" }[direction]}</span><small>{destination.name}</small>
+      </button>;
+    })}
     </div>
   );
 });

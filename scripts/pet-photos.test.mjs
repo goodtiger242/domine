@@ -7,7 +7,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import { loadTS } from "./pet-test-loader.mjs";
 import { backgroundAt, BACKGROUNDS, CHURCH_BACKGROUNDS, poseAt, POSES, PETS, PRIEST, DOGHOUSE, petText } from "../lib/domine/pet-photos.ts";
-import { DEFAULT_MAP, PET_MAPS, petMap, neighborMap, actionsForMap, SHOPS } from "../lib/domine/pet-maps.ts";
+const { DEFAULT_MAP, PET_MAPS, petMap, actionsForMap, SHOPS } = loadTS("lib/domine/pet-maps.ts");
+const { PET_WORLD, DIRECTIONS, neighborCell } = loadTS("lib/domine/pet-world.ts");
 import { petRequest } from "../lib/domine/pet-rpc.ts";
 import { bubblePosition } from "../lib/domine/pet-bubble.ts";
 
@@ -95,19 +96,56 @@ const renderScene = (props = {}) => renderToStaticMarkup(createElement(sceneModu
 assert.ok(!renderScene().includes("/pet/art/bowl.webp"));
 assert.ok(!renderScene().includes("foreignObject"));
 assert.ok(renderScene().includes('aria-label="도미의 말"'));
-for (const map of PET_MAPS) {
-  const html = renderScene({ map: map.id, petId: 2, locked: true });
+for (const cell of PET_WORLD) {
+  const map = petMap(cell.theme);
+  const html = renderScene({ cellId: cell.id, petId: 2, locked: true });
   assert.equal(html.includes('aria-label="개집"'), map.id === "home");
-  assert.equal(html.includes('aria-label="맥도날드 앞으로 가기"'), map.id === "street");
+  assert.equal(html.includes('aria-label="맥도날드 앞으로 가기"'), cell.id === "F6");
   assert.ok(html.includes('aria-label="미네의 말"'));
   assert.equal(html.includes('aria-label="신부님께 인사하기" disabled=""'), map.id === "church");
-  for (const direction of [-1, 1]) assert.ok(html.includes(`aria-label="${neighborMap(map.id, direction).name}(으)로 이동" disabled=""`));
+  assert.ok(html.includes(cell.name));
+  for (const direction of DIRECTIONS) {
+    const neighbor = neighborCell(cell.id, direction);
+    assert.equal(html.includes(`pet-direction-${direction}`), !!neighbor);
+    if (neighbor) assert.ok(html.includes(`aria-label="${neighbor.name}(으)로 이동" disabled=""`));
+  }
 }
 assert.ok(renderScene({ speaker: "priest" }).includes('aria-label="신부님의 말"'));
+// Verify the sheet's actual click handlers without opening a browser or database.
+const sheetModule = { exports: {} }, sheetClicks = new Map(), moves = [];
+let selectedCell = "E5";
+const sheetSource = ts.transpileModule(readFileSync("app/games/PetWorldSheet.tsx", "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+}).outputText;
+new Function("require", "exports", sheetSource)((name) => {
+  if (name === "./PetSheet") return { default: ({ children }) => children };
+  if (name.startsWith("@/")) return loadTS(`${name.slice(2)}.ts`);
+  if (name === "react") return { useState: () => [selectedCell, (id) => { selectedCell = id; }] };
+  if (name === "react/jsx-runtime") {
+    const runtime = require(name);
+    const wrap = (fn) => (type, props, key) => {
+      if (type === "button") sheetClicks.set(key, props.onClick);
+      return fn(type, props, key);
+    };
+    return { ...runtime, jsx: wrap(runtime.jsx), jsxs: wrap(runtime.jsxs) };
+  }
+  return require(name);
+}, sheetModule.exports);
+const renderSheet = () => renderToStaticMarkup(createElement(sheetModule.exports.default, {
+  current: "E5", visited: ["E5", "D5"], onMove: (dir) => moves.push(dir), onClose() {},
+}));
+const worldSheet = renderSheet();
+assert.equal((worldSheet.match(/<button /g) ?? []).length,100);
+assert.equal((worldSheet.match(/data-neighbor="true"/g) ?? []).length,4);
+assert.ok(worldSheet.includes('aria-current="location"'));
+assert.ok(worldSheet.includes("D5 도미네 집 마당, 이동 가능, 방문함"));
+sheetClicks.get("A1")(); assert.equal(moves.length,0);
+assert.ok(renderSheet().includes("A1 · 도장중학교 · 중학교"));
+sheetClicks.get("E4")(); assert.deepEqual(moves,["n"]);
 const scales = [];
 for (const y of [77, 88]) {
   sceneState = { y, bowl: 110 };
-  const scene = renderScene({ map: "field" });
+  const scene = renderScene({ cellId: "A5" });
   const bowl = scene.match(/<g transform="translate\(110 ([\d.]+)\) scale\(([\d.]+)\)"[^>]*>(.*?)<\/g>/);
   assert.ok(bowl, "Feeding bowl renders at the dog's depth");
   assert.equal(Number(bowl[1]), y + 1);
@@ -116,13 +154,13 @@ for (const y of [77, 88]) {
   scales.push(Number(bowl[2]));
 }
 assert.ok(scales[1] > scales[0], "Foreground bowl is larger than distant bowl");
-const churchScene = renderScene({ map: "church" });
+const churchScene = renderScene({ cellId: "E5" });
 const churchBowl = churchScene.match(/translate\(110 89\) scale\(([\d.]+)\)/);
 assert.ok(Number(churchBowl[1]) < scales[1], "Church props match the smaller dogs");
 assert.ok(churchScene.includes('transform="translate(-19 0)"'), "Priest stays outside the dog safe zone");
 sceneState = {};
 for (const petId of [1, 2]) {
-  const imageWidth = (map) => Number(renderScene({ map, petId }).match(new RegExp(`href="${PETS[petId].standing.adult}"[^>]*width="([\\d.]+)"`))[1]);
+  const imageWidth = (map) => Number(renderScene({ cellId: map === "church" ? "E5" : "A5", petId }).match(new RegExp(`href="${PETS[petId].standing.adult}"[^>]*width="([\\d.]+)"`))[1]);
   assert.ok(Math.abs(imageWidth("church") / imageWidth("field") - 0.85) < 1e-9);
 }
 
@@ -133,10 +171,11 @@ try {
   const requested = [];
   globalThis.Image = class { set src(value) { requested.push(value); } };
   globalThis.window = { requestIdleCallback: (cb) => { cb(); return 0; }, cancelIdleCallback() {}, clearTimeout() {} };
-  for (const map of PET_MAPS) for (const hour of [6, 12, 18, 22]) {
+  for (const cell of PET_WORLD) for (const hour of [6, 12, 18, 22]) {
     sceneEffects = [];
     requested.length = 0;
-    const rendered = renderScene({ map: map.id, hour });
+    const map = petMap(cell.theme);
+    const rendered = renderScene({ cellId: cell.id, hour });
     const cleanups = sceneEffects.map((effect) => effect());
     const expected = map.background ?? (map.id === "church" ? CHURCH_BACKGROUNDS : BACKGROUNDS)[backgroundAt(hour)];
     assert.ok(rendered.includes(`href="${expected}"`), "Only committed background renders");
@@ -161,19 +200,7 @@ assert.ok(total < 600 * 1024);
 assert.equal(DEFAULT_MAP, "church");
 for (const saved of ["", "invalid"]) assert.equal(petMap(saved).id, DEFAULT_MAP);
 for (const map of PET_MAPS) assert.equal(petMap(map.id).id, map.id, "Remembered maps remain selected");
-assert.deepEqual(PET_MAPS.map((map) => map.id), ["field", "church", "street", "park", "home"]);
-for (const direction of [-1, 1]) {
-  let map = "field";
-  const visited = new Set();
-  for (let i = 0; i < PET_MAPS.length; i++) {
-    visited.add(map);
-    const next = neighborMap(map, direction).id;
-    assert.equal(neighborMap(next, -direction).id, map);
-    map = next;
-  }
-  assert.equal(map, "field");
-  assert.equal(visited.size, 5);
-}
+assert.equal(PET_MAPS.length, 24);
 for (const map of PET_MAPS) {
   const actions = actionsForMap(PET_ACTIONS, map.id);
   assert.equal(actions.includes("sleep"), map.id === "home");
@@ -231,9 +258,11 @@ for (const src of newAssets) {
   assert.ok(size(src) <= (newBackgrounds.includes(src) ? 90 : src === DOGHOUSE ? 40 : 50) * 1000, src);
 }
 const addedBytes = newAssets.reduce((sum, src) => sum + size(src), 0);
-assert.ok(addedBytes <= 600000);
+assert.ok(addedBytes <= 600000 + 19 * 90000);
 for (const bg of newBackgrounds) for (const dog of minePhotos) {
-  assert.ok(size(bg) + size(PRIEST) + size(dog) < 150000, "Initial additional image budget");
+  const priest = Object.values(CHURCH_BACKGROUNDS).includes(bg) ? size(PRIEST) : 0;
+  const doghouse = bg === "/pet/bg/home.webp" ? size(DOGHOUSE) : 0;
+  assert.ok(size(bg) + priest + doghouse + size(dog) < 150000, "Current scene image budget");
 }
 assert.deepEqual(SHOPS.map((shop) => shop.name), ["술이 좋아", "맥도날드", "쁘니네", "화락"]);
 const cutout = spawnSync("python", ["-c", `
