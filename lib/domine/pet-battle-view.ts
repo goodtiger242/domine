@@ -93,7 +93,7 @@ export const STATUS_LABEL: Record<Status, string> = {
   tense: "😬 긴장", winded: "💨 숨참", open: "🫧 빈틈",
 };
 export const STAT_LABEL = { hp: "체력", attack: "공격력", defense: "방어력", speed: "민첩", focus: "집중", calm: "침착" };
-export const MOVE_PAGE_SIZE = 3;
+export const MOVE_PAGE_SIZE = 6;
 export type MoveFilter = "all" | Move["kind"];
 export const costBadge = (cost: number) => `⚡${cost}`;
 export const actionCost = (action: Action, state: BattleState) => moveFor(action)?.finisher || action.kind === "move" && state.player.charging === action.moveId ? 0 : moveFor(action)?.energy ?? 0;

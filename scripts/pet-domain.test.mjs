@@ -18,10 +18,10 @@ assert.equal(levelOf(-1),1); assert.equal(levelOf(99999),30); assert.equal(level
 assert.deepEqual(progressOf(99999),{ level:30,value:9280,current:0,needed:0 });
 assert.deepEqual(rewardDisplay({xp:8,coins:4,levelCoins:14}),{xp:8,coins:18,quiet:false,notice:""});
 assert.deepEqual(rewardDisplay(),{xp:0,coins:0,quiet:true,notice:""});
-for (const [skipped, notice] of [["TOO_FAST","조금 천천히 눌러 주세요"],["DAILY_CAP","오늘 보상 한도를 채웠어요(내일 다시)"]]) {
+for (const [skipped, notice] of [["TOO_FAST","조금 천천히 눌러 주세요"],["DAILY_CAP",""]]) {
   assert.deepEqual(rewardDisplay({xp:0,coins:0,levelCoins:0,skipped}),{xp:0,coins:0,quiet:true,notice});
 }
-assert.equal(rewardDisplay({skipped:"TOO_FAST",retryAfterSeconds:2}).notice,"2초 뒤에 코인이 들어와요");
+assert.equal(rewardDisplay({skipped:"TOO_FAST",retryAfterSeconds:2}).notice,"조금 천천히 눌러 주세요");
 assert.equal(rewardEligible(3000,0,119),true);
 assert.equal(rewardEligible(2999,0,0),false);
 assert.equal(rewardEligible(60000,0,120),false);

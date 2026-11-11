@@ -2,6 +2,22 @@ import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { noticePages, rewardDisplay } from "@/lib/domine/pet-progress";
 import type { V6Result } from "@/lib/domine/pet-rpc";
+export function PetPickupFeedback({ coins, pouch }: { coins: number; pouch: boolean }) {
+  const layer = useRef<HTMLDivElement>(null);
+  const [flight, setFlight] = useState<{ host: HTMLElement; style: CSSProperties } | null>(null);
+  useLayoutEffect(() => {
+    const ground = layer.current, host = ground?.closest<HTMLElement>(".pet-game"), target = host?.querySelector(".pet-coin-total");
+    if (!ground || !host || !target) return;
+    const parent = host.getBoundingClientRect(), start = ground.getBoundingClientRect(), end = target.getBoundingClientRect();
+    const x = start.left + start.width / 2, y = start.top;
+    setFlight({ host, style: { left: x - parent.left, top: y - parent.top,
+      "--coin-x": `${end.left + end.width / 2 - x}px`, "--coin-y": `${end.top + end.height / 2 - y}px` } as CSSProperties });
+  }, []);
+  return <div ref={layer} className="pet-pickup" role="status">
+    <span>🪙 +{coins}</span>
+    {flight && createPortal(<div className="pet-coin-layer" aria-hidden="true"><i className="pet-pickup-flight" data-pouch={pouch} style={flight.style}>{pouch ? "💰" : "🪙"}</i></div>, flight.host)}
+  </div>;
+}
 export function PetNotice({ parts, onOpen }: { parts: string[]; onOpen: () => void }) {
   const button = useRef<HTMLButtonElement>(null), probe = useRef<HTMLSpanElement>(null);
   const [pages, setPages] = useState<string[]>([""]), [index, setIndex] = useState(0);

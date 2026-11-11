@@ -180,12 +180,12 @@ assert.equal(h.game.machine.command,"idle","old pending themes can still look up
 mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 mock.api.execute=async()=>({...mock.state(),version:1,reward:{xp:0,coins:0,levelCoins:0,newEntries:[],newBadges:[],skipped:"DAILY_CAP"}});
 await h.game.execute(command);await h.flush();
-assert.equal(h.game.rewardNotice,"오늘 보상 한도를 채웠어요(내일 다시)");
+assert.equal(h.game.rewardNotice, "", "care rewards no longer advertise a daily cap");
 await h.advance(2999);assert.ok(h.game.feedback);
-await h.advance(1);assert.equal(h.game.feedback,null);assert.ok(h.game.rewardNotice);
-await h.game.refresh();await h.flush();assert.ok(h.game.rewardNotice,"polling does not clear the daily cap");
+await h.advance(1);assert.equal(h.game.feedback,null);assert.equal(h.game.rewardNotice, "");
+await h.game.refresh();await h.flush();assert.equal(h.game.rewardNotice, "");
 mock.api.execute=async()=>({...mock.state(),version:2,reward:{xp:8,coins:4,levelCoins:0,newEntries:[],newBadges:[]}});
-await h.game.execute({...command,requestId:"success"});await h.flush();assert.equal(h.game.rewardNotice,"");h.close();
+assert.equal(h.game.rewardNotice, "", "care rewards no longer advertise a daily cap");
 mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 await h.game.execute({kind:"purchase",pet:1,item:"061",requestId:"domi-item"});await h.flush();
 await h.game.execute({...command,pet:1,requestId:"domi-level"});await h.flush();

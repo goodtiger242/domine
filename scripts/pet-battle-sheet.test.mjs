@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import ts from "typescript";
 import { loadTS } from "./pet-test-loader.mjs";
+import { setImmediate as nextTurn } from "node:timers/promises";
 
 const require = createRequire(import.meta.url);
 const engine = loadTS("lib/domine/battle/engine.ts");
@@ -78,6 +79,42 @@ const encounter = (cell = "F5", level = 10) => {
 };
 function initialFor(e, petId) { return engine.createBattle({ seed: seedFor(`${e.cellId}:${petId}:0`, e.daySeed), player: engine.buildFighter(petId === 1 ? "B001" : "B002", e.playerLevel), opponent: e.fighter, difficulty: e.difficulty }); }
 
+test("server finish renders its reward and level-up; closing the result cannot settle twice", async t => {
+  const { createKingMock } = loadTS("tests/pet/king-mock.ts"), { createKingApi } = loadTS("lib/domine/pet-king-rpc.ts");
+  const { spawnsFor } = loadTS("lib/domine/pet-battle-view.ts");
+  const identity = { nickname: "김경석", secret: "a".repeat(64) }, mock = createKingMock({ xp: { 1: 35 } }); mock.register(identity);
+  const e = PET_WORLD.flatMap(c => spawnsFor(c.id, 1, mock.slot())).find(e => e.level <= 8);
+  const initial = initialFor(e, 1); initial.opponent.hp = 1; initial.opponentAction = { kind: "rest" };
+  const results = [], calls = [];
+  const api = createKingApi((name, args) => { calls.push(args); return mock.rpc(name, args); });
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {}, kingApi: api, identity, firstWin: true, onSettled: r => results.push(r) }, initial, true);
+  await nextTurn(); h.render(); h.settle(); mock.advance(60000);
+  h.click("기술"); h.click("앞발 밀기"); await nextTurn(); h.render(); h.settle();
+  assert.equal(h.phase, "result"); assert.equal(results.length, 1);
+  const result = results[0];
+  const report = calls.find(c => c.p_kind === "finish").p_input;
+  assert.equal(report.rounds, 1); assert.equal(Object.values(report.moveCounts).reduce((a, b) => a + b, 0), 1);
+  assert.equal(result.outcome, "win"); assert.ok(result.levelAfter > result.levelBefore);
+  assert.ok(text(h.tree).includes(`경험치 +${result.xp}`)); assert.ok(text(h.tree).includes(`🪙 +${result.coins}`));
+  assert.ok(text(h.tree).includes("첫 승리!"));
+  assert.equal(nodes(h.tree, n => n.props.className === "pet-level-particle").length, 12);
+  h.click("돌아가기"); await nextTurn(); assert.equal(calls.filter(c => c.p_kind === "finish").length, 1); h.unmount();
+});
+
+for (const offline of [false, true]) test(`quit keeps local play and has no reward (offline=${offline})`, async t => {
+  const { createKingMock } = loadTS("tests/pet/king-mock.ts"), { createKingApi } = loadTS("lib/domine/pet-king-rpc.ts");
+  const { spawnsFor } = loadTS("lib/domine/pet-battle-view.ts");
+  const identity = { nickname: "김경석", secret: "a".repeat(64) }, mock = createKingMock(); mock.register(identity);
+  const e = PET_WORLD.flatMap(c => spawnsFor(c.id, 1, mock.slot()))[0], results = [];
+  const api = createKingApi(offline ? async () => { throw Error("offline"); } : mock.rpc);
+  const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {}, kingApi: api, identity, onSettled: r => results.push(r) });
+  await nextTurn(); h.render(); h.settle(); h.click("그만하기"); await nextTurn(); h.render(); h.settle();
+  assert.match(text(h.tree), /그만뒀어요/); assert.ok(!text(h.tree).includes("경험치 +"));
+  if (offline) { assert.match(text(h.tree), /이 기기에서 계속/); assert.equal(results.length, 0); }
+  else { assert.equal(results[0].outcome, "quit"); assert.equal(results[0].xp, 0); assert.equal(results[0].coins, 0); }
+  assert.equal(mock.inspect().departed.length, 0); h.unmount();
+});
+
 test("조우: 개체 연결과 레벨 경계", () => {
   for (const cell of PET_WORLD) {
     const a = encounterFor(cell.id, 10, 1);
@@ -119,7 +156,7 @@ for (const [petId, cell, level, expected] of [[1, "F5", 30, "player"], [2, "J10"
       const action = expected === "draw" ? { kind: "rest" } : engine.availableActions(state, "player")
         .filter(a => moveFor(a)?.kind === "attack").sort((a,b) => engine.previewDamage(moveFor(b), state.player, state.opponent).min - engine.previewDamage(moveFor(a), state.player, state.opponent).min)[0];
       const next = engine.stepRound(state, action);
-      if (action.kind !== "rest") h.click("기술");
+      h.click("기술");
       const click = h.button(actionLabel(action)).props.onClick;
       click(); click(); h.render(); assert.equal(h.phase, "playback"); assert.equal(h.actions().length, 0);
       assert.deepEqual(h.hp, [state.opponent.hp, state.player.hp], "HP stays until the impact cue finishes");
@@ -188,9 +225,9 @@ test("기술 카드: 이름·요약·숫자 비용·상성, 공격→방어→�
   state.player.moves = MOVES.map(m => m.id).reverse(); state.player.energy = 0;
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
   h.settle();
-  assert.equal(h.button("숨 고르기").props["data-kind"], "support");
-  assert.ok(text(h.button("숨 고르기")).includes(`기력 +${REST_ENERGY}`));
+  assert.equal(h.button("숨 고르기"), undefined, "rest is a skill card, not a main-menu button");
   h.click("기술");
+  assert.equal(h.button("숨 고르기").props["data-kind"], "support");
   const orders = h.actions().map(b => MOVE_KIND[b.props["data-kind"]].order);
   assert.deepEqual(orders, [...orders].sort());
   for (const move of [...MOVES, PUSH]) {
@@ -218,7 +255,7 @@ for (const move of [...MOVES, PUSH, { id: "rest", name: "숨 고르기" }]) test
   state.opponentAction = action;
   const next = engine.stepRound(state, action);
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
-  h.settle(); if (move.id !== "rest") h.click("기술"); h.click(move.name);
+  h.settle(); h.click("기술"); h.click(move.name);
   const fx = () => nodes(h.tree, n => n.props.className === "pet-battle-move-fx")[0];
   const sides = new Set();
   for (let i = 0; i < 1500 && h.phase === "playback"; i++) {
@@ -268,7 +305,7 @@ for (const petId of [1, 2]) test(`방어 성공: 강아지 ${petId} 말풍선은
 
 test("이동 줄이기에도 기술 아이콘과 대사를 읽을 시간이 남는다", t => {
   const h = mount(t, { encounter: encounter(), petId: 1, stage: "adult", onClose() {} }, undefined, true);
-  h.settle(); h.click("숨 고르기");
+  h.settle(); h.click("기술"); h.click("숨 고르기");
   const fx = () => nodes(h.tree, n => n.props["data-trail"] === "energy-dots")[0];
   for (let i = 0; i < 1500 && !fx(); i++) h.nextTimer();
   assert.ok(fx());
@@ -444,7 +481,7 @@ test("동물 상세: 강화·약화 스탯, 상대 미공개 기술 숨김, 재�
   opponentInfo.props.onClick({ stopPropagation() {} }); h.render();
   const known = () => nodes(detail(), n => n.props.className === "pet-battle-known-moves")[0];
   assert.equal(text(known()), "?".repeat(state.opponent.moves.length + (state.opponent.finisher ? 1 : 0))); assert.doesNotMatch(text(detail()), /크리티컬 \d+%/);
-  h.click("상세 닫기"); h.click("숨 고르기"); h.settle();
+  h.click("상세 닫기"); h.click("기술"); h.click("숨 고르기"); h.settle();
   nodes(h.tree, n => n.props.className === "pet-battle-info")[0].props.onClick({ stopPropagation() {} }); h.render();
   assert.ok(text(known()).includes(actionLabel(state.opponentAction)));
   const overlay = detail(); overlay.props.onClick({ target: overlay, currentTarget: overlay }); h.render();
@@ -477,4 +514,16 @@ test("기세 100에서 결정기 활성, 사용하면 컷인과 금색 게이지
   const gauge = nodes(h.tree, n => n.props.className === "pet-battle-momentum" && n.props["aria-label"] === "도미 기세")[0];
   assert.equal(gauge.props["aria-valuenow"], 0);
   h.settle(); h.unmount();
+});
+
+test("배속 토글: 보통→2배속→빠르게 넘기기, 등장 연출이 그만큼 짧아진다", t => {
+  const measure = clicks => {
+    const h = mount(t, { encounter: encounter(), petId: 1, stage: "adult", onClose() {} });
+    for (let i = 0; i < clicks; i++) h.click(["배속 보통", "2배속", "빠르게 넘기기"][i]);
+    let ms = 0; while (h.phase === "intro" || h.phase === "playback") { h.advance(50); ms += 50; if (ms > 20000) break; }
+    return ms;
+  };
+  const normal = measure(0), double = measure(1), skip = measure(2);
+  assert.ok(double <= normal / 1.8, `x2 (${double}) is about twice as fast as x1 (${normal})`);
+  assert.ok(skip <= normal / 3, `skip (${skip}) is much faster than x1 (${normal})`);
 });

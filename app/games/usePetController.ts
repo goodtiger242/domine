@@ -1,6 +1,8 @@
 "use client";
 
 import { cellBackground } from "@/lib/domine/pet-cells";
+import { createKingApi } from "@/lib/domine/pet-king-rpc";
+import type { KingApi } from "@/lib/domine/pet-king-client";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createPetApi, acceptsResult, PetRpcError, supportsExploration, type PetApi, type PetBusy, type PetCapabilities, type PetCommand, type V6Result } from "@/lib/domine/pet-rpc";
 import { createClient } from "@/lib/supabase/client";
@@ -31,8 +33,11 @@ const errorText: Record<string, string> = {
   INVALID_INPUT: "입력 내용을 확인해 주세요.", REQUEST_CONFLICT: "요청이 달라 기록을 확인하지 못했어요.",
   RATE_LIMITED: "우리 강아지는 잠시 후 다시 확인해 주세요. 놀이는 계속할 수 있어요.",
 };
-export function usePetController(injectedApi?: PetApi) {
+export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi) {
   const [supabase] = useState(createClient);
+  const [kingApi] = useState(() => injectedKingApi ?? createKingApi((name, args) => injectedApi
+    ? Promise.resolve({ data: null, error: { code: "PGRST202", message: "King mock not supplied" } })
+    : supabase.rpc(name, args)));
   const [api] = useState(() => injectedApi ?? createPetApi((name, args, signal) => {
     const request = supabase.rpc(name, args);
     return signal ? request.abortSignal(signal) : request;
@@ -187,7 +192,7 @@ export function usePetController(injectedApi?: PetApi) {
           setCue({ action: command.action, id, endsAt: Date.now() + duration });
         }
       }
-      if (!result.ok && !["BUSY", "ALREADY_OWNED", "TOO_EARLY", "EXPIRED"].includes(result.code)) setMessage(errorText[result.code] ?? "우리 강아지 상태를 확인하지 못했어요.");
+      if (!result.ok && !["BUSY", "ALREADY_OWNED", "TOO_EARLY", "EXPIRED", "RATE_LIMITED"].includes(result.code)) setMessage(errorText[result.code] ?? "우리 강아지 상태를 확인하지 못했어요.");
       else setMessage("");
       if (result.ok && command.kind === "purchase") vibrate(15);
     } catch (error) {
@@ -484,7 +489,7 @@ export function usePetController(injectedApi?: PetApi) {
     void refresh();
   }
   const done = useCallback((id: number, sleep?: boolean) => dispatch({ type: "done", id, sleep }), [dispatch]);
-  return { host, api, machine, active, shared, personal, feedback, message, rewardNotice, setMessage, capability, features, registered, identity, nickname, petId, multiPet, cue, visited, arrival, travel, worldReady,
+  return { host, api, kingApi, machine, active, shared, personal, feedback, message, rewardNotice, setMessage, capability, features, registered, identity, nickname, petId, multiPet, cue, visited, arrival, travel, worldReady,
     busy: busy && busy.until > Date.now() ? busy : undefined,
     requestingAction: machine.command === "pending" && pending.current?.kind === "action" && pending.current.pet === petId ? pending.current.action : null,
     canRetry: machine.command === "uncertain" && autoAttempts >= 3,

@@ -8,6 +8,7 @@ import { loadTS } from "./pet-test-loader.mjs";
 
 const require = createRequire(import.meta.url);
 function mount(file, props, imports = {}) {
+  if (file === "PetGame") imports["./usePetKing"] ??= { usePetKing: () => ({ state: null, departed: [], watching: "", pickup: null, settled() {} }) };
   const slots = [], effects = []; let cursor = 0, tree;
   function effect(fn, deps) { const i = cursor++; if (!slots[i] || deps.some((d, n) => d !== slots[i].deps[n])) { const previous = slots[i]; slots[i] = { deps }; effects.push(() => { previous?.cleanup?.(); slots[i].cleanup = fn(); }); } }
   const hooks = {
@@ -37,7 +38,7 @@ const { PET_LEGAL_NAMES } = loadTS("lib/domine/pet-identity.ts");
 const game = {
   machine: { command: "idle", visual: "idle", committedMap: "E5" }, shared: null, personal: null,
   nickname: "김경석", registered: true, capability: "ready", features: { v9: true }, petId: 1, multiPet: true,
-  message: "", api: {}, pause() {}, resume() {}, clearIdentity() { this.nickname = ""; },
+  message: "", setMessage(text) { this.message = text; }, api: {}, pause() {}, resume() {}, clearIdentity() { this.nickname = ""; },
   async connect(name) { this.nickname = name; },
 };
 // Render the real game handlers with scene/network dependencies replaced by inert components.
@@ -167,12 +168,13 @@ sheet.unmount(); assert.equal(style.position, ""); assert.equal(style.overflow, 
 console.log("Pet sheet shell: 80px drag, scroll-top guard, cancel, backdrop, back navigation and scroll restoration passed.");
 
 let battlePause = false;
-const battleGame = { ...game, worldReady: true, petId: 2, personal: { levels: { 2: 40 } },
+const battleGame = { ...game, registered: true, worldReady: true, petId: 2, personal: { levels: { 2: 40 } },
   machine: { command: "idle", visual: "idle", committedMap: "E5" },
   pause(localOnly) { battlePause = localOnly; }, resume() { battlePause = false; },
 };
 const battleView = mount("PetGame", {}, {
   "./usePetController": { usePetController: () => battleGame }, "next/dynamic": { default: () => "section" },
+  "./usePetKing": { usePetKing: () => ({ state: { pets: [{ pet: 2, xp: 11000, level: 40 }], encyclopedia: [] }, departed: [], watching: "", pickup: null, settled() {} }) },
   "./PetScene": { PetScene: () => null }, "./PetProgress": {}, "./PetFeedback": {}, "./pet-game.css": {},
 });
 const scene = () => nodes(battleView.tree, n => "onBattle" in n.props)[0];
@@ -189,7 +191,7 @@ for (const cell of ["E5", "D5"]) {
 }
 const slot = encounterSlot(), found = PET_WORLD.find(cell => spawnsFor(cell.id, 40, slot).length === 1);
 battleGame.machine.committedMap = found.id; battleGame.machine.command = "pending"; battleView.render();
-assert.equal(scene().props.battleDisabled, true); scene().props.onBattle(); battleView.render(); assert.equal(battlePause, false);
+assert.equal(scene().props.battleDisabled, false, "a pending care command never blocks fighting");
 battleGame.machine.command = "idle"; battleView.render(); scene().props.onBattle(); battleView.render();
 const confirmation = () => nodes(battleView.tree, n => "onStart" in n.props)[0];
 assert.equal(battlePause, false, "confirmation does not start a fight");
@@ -236,7 +238,7 @@ try {
   timedScene().props.onMap(); timed.render(); timed.flushEffects(); timed.render();
   const worldSheet = () => nodes(timed.tree, n => "showAnimals" in n.props)[0];
   assert.equal(worldSheet().props.slot, 100);
-  clock += 1800000; [...intervals.values()].find(timer => timer.ms === 60000).fn(); timed.render(); timed.flushEffects(); timed.render();
+  clock += 1800000; [...intervals.values()].find(timer => timer.ms === 30000).fn(); timed.render(); timed.flushEffects(); timed.render();
   assert.equal(worldSheet().props.slot, 101); assert.equal(timedScene().props.encounters.length, 0);
   worldSheet().props.onClose(); timed.render(); timed.flushEffects(); timed.render();
   clock = 100 * 1800000;

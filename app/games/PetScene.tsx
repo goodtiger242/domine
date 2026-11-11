@@ -1,6 +1,6 @@
 "use client";
 
-import { cellBackground, cellShops } from "@/lib/domine/pet-cells";
+import { cellBackground } from "@/lib/domine/pet-cells";
 import { memo, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { bubblePosition } from "@/lib/domine/pet-bubble";
 import type { PetFace, PetStage } from "@/lib/domine/pet";
@@ -41,6 +41,7 @@ function Ball({ scale = 1, toy }: { scale?: number; toy?: string | null }) {
 
 type Props = {
   busyText?: string;
+  watchingText?: string;
   travel?: MapTravel | null;
   arrivalId?: number;
   stage: PetStage;
@@ -115,7 +116,7 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, encounters = [], selectedEncounter, onEncounter, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
+export const PetScene = memo(function PetScene({ busyText, watchingText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, encounters = [], selectedEncounter, onEncounter, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
   const cell = worldCell(cellId);
   const [moving, setMoving] = useState(false);
   const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
@@ -478,12 +479,12 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
         <span className="pet-scene-foe-art">{failed[foe.art] ? <span role="img" aria-label={foe.name}>🐾</span> : <NextImage src={foe.art} alt="" width={160} height={160} sizes="16vw" unoptimized onError={() => setFailed(previous => ({ ...previous, [foe.art]: true }))} />}</span>
         <span className="pet-scene-foe-label"><strong title={foe.name}>{foe.given}</strong><small data-danger={foe.levelDifference >= 5}><i data-group={foe.individual.group} aria-label={GROUP_LABEL[foe.individual.group]} />Lv.{foe.level}</small></span>
       </button>)}
-      {busyText && <div className="pet-busy" role="status">{busyText}</div>}
+      {watchingText && !travel && <div className="pet-watching" role="status" title={watchingText}>{watchingText}</div>}
+      {busyText && !watchingText && <div className="pet-busy" role="status">{busyText}</div>}
       <div key={arrivalId ?? 0} className={`pet-location${arrivalId && !travel ? " pet-location-arrived" : ""}`} aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
-      {cellShops(cell.id).length > 0 && <ul className="pet-shop-plates" aria-label="이 칸의 가게">{cellShops(cell.id).slice(0, occupied ? 1 : undefined).map((name) => <li key={name}>{name}</li>)}</ul>}
-      <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기"><span>MAP</span></button>
-      {onBattle && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled || moving || !!ask} onClick={onBattle} aria-label={`겨루기, ${encounters.length}마리`}>⚔️<span className="pet-battle-encounter-label"> 겨루기</span> <b>{encounters.length}</b></button>}
-      <button type="button" className="pet-move-toggle" aria-pressed={moving} disabled={locked} onClick={() => { setMoving(!moving); setAsking(null); }}><span>{moving ? "닫기" : "이동"}</span></button>
+      <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기"><span aria-hidden="true">🗺️</span></button>
+      {onBattle && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled || moving || !!ask} onClick={onBattle} aria-label={`겨루기, ${encounters.length}마리`}><span aria-hidden="true">⚔️</span></button>}
+      <button type="button" className="pet-move-toggle" aria-pressed={moving} disabled={locked} onClick={() => { setMoving(!moving); setAsking(null); }} aria-label={moving ? "이동 닫기" : "이동"}><span aria-hidden="true">{moving ? "✕" : "🧭"}</span></button>
       {moving && DIRECTIONS.map((direction) => {
         const destination = neighborCell(cell.id, direction);
         return destination && <button key={direction} type="button" className={`pet-direction pet-direction-${direction}`}

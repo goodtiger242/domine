@@ -26,7 +26,7 @@ export function rewardEligible(now: number, lastAny: number | null, daily: numbe
 export type Reward = { xp: number; coins: number; levelCoins: number; newEntries: string[]; newBadges: string[]; skipped?: "TOO_FAST" | "DAILY_CAP"; retryAfterSeconds?: number };
 export function rewardDisplay(reward?: Reward) {
   const coins = (reward?.coins ?? 0) + (reward?.levelCoins ?? 0);
-  const notice = reward?.skipped === "TOO_FAST" ? (reward.retryAfterSeconds !== undefined ? `${Math.ceil(reward.retryAfterSeconds)}초 뒤에 코인이 들어와요` : "조금 천천히 눌러 주세요") : reward?.skipped === "DAILY_CAP" ? "오늘 보상 한도를 채웠어요(내일 다시)" : "";
+  const notice = reward?.skipped === "TOO_FAST" ? "조금 천천히 눌러 주세요" : "";
   return { coins, xp: reward?.xp ?? 0, quiet: coins === 0 && !reward?.xp, notice };
 }
 

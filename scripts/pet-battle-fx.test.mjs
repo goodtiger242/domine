@@ -78,10 +78,10 @@ test("390×844 고정 패널: 1열×3행, 요약·배지 폭, 이름은 말줄�
   assert.doesNotMatch(css, /pet-battle-cost-dots/);
 });
 
-test("3칸 페이지와 분류, 0·2·8 비용 배지", () => {
+test("6칸(2열×3줄) 페이지와 분류, 0·2·8 비용 배지", () => {
   const actions = MOVES.map(move => ({ kind: "move", moveId: move.id }));
-  assert.equal(movePages(actions.slice(0, 3), "all").length, 1);
-  assert.equal(movePages(actions.slice(0, 4), "all").length, 2);
+  assert.equal(movePages(actions.slice(0, 6), "all").length, 1);
+  assert.equal(movePages(actions.slice(0, 7), "all").length, 2);
   assert.equal(movePages(actions, "all").length, Math.ceil(actions.length / MOVE_PAGE_SIZE));
   for (const kind of ["attack", "defense", "support"]) {
     const ids = movePages(actions, kind).flat().map(a => a.moveId);

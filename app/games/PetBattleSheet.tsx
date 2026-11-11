@@ -15,6 +15,9 @@ import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import type { PetStage } from "@/lib/domine/pet";
 import { cellBackground } from "@/lib/domine/pet-cells";
 import { shortBreedName } from "@/lib/domine/breed-short";
+import { battleFinish, createKingBattle, kingRewardLine, KING_LOCAL_NOTICE, type KingApi } from "@/lib/domine/pet-king-client";
+import type { PetIdentity } from "@/lib/domine/pet-identity";
+import type { KingSettlement } from "@/lib/domine/pet-king-rpc";
 
 const TRAIT_LABEL: Record<Trait, string> = {
   restDamage: "쉰 뒤 첫 공격 강화", earlySpeed: "초반 민첩 증가", firstTrack: "첫 추적 공격 강화",
@@ -47,16 +50,17 @@ function playbackFor(state: BattleState, next: BattleState, cues: BattleCue[]): 
   return { next, cues, index: 0, shown: state, revealed: 0, line: cues[0].text ?? "" };
 }
 
-export default function PetBattleSheet({ encounter, petId, condition, stage, hour, onClose, onWin }: {
+export default function PetBattleSheet({ encounter, petId, condition, stage, hour, onClose, onWin, kingApi, identity, firstWin, onSettled }: {
   encounter: Encounter; petId: PetId; condition?: Condition; stage: PetStage; hour: number; onClose: () => void; onWin?: () => void;
+  kingApi?: KingApi; identity?: PetIdentity | null; firstWin?: boolean; onSettled?: (result: KingSettlement) => void;
 }) {
   const attempt = useRef(0);
   const names = { player: PETS[petId].name, opponent: encounter.name };
   const lastRival = useRef("");
   const lastPlayer = useRef(""), lastDefenseResult = useRef("");
-  const start = (roundSeed: number) => createBattle({
+  const start = (roundSeed: number, playerLevel = encounter.playerLevel) => createBattle({
     seed: seedFor(`${encounter.cellId}:${petId}:${roundSeed}`, encounter.daySeed),
-    player: buildFighter(petId === 1 ? "B001" : "B002", encounter.playerLevel, [], { condition }),
+    player: buildFighter(petId === 1 ? "B001" : "B002", playerLevel, [], { condition }),
     opponent: encounter.fighter, difficulty: encounter.difficulty,
   });
   const introduction = (state: BattleState) => playbackFor(state, state, [
@@ -64,10 +68,45 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     { rivalText: encounterLine(encounter, "enter", encounter.individual.seed), duration: 1600 },
   ]);
   const [battle, setBattle] = useState(() => start(0));
+  const [serverLine, setServerLine] = useState("");
+  const [settlement, setSettlement] = useState<KingSettlement | null>(null);
+  const session = useRef<ReturnType<typeof createKingBattle> | null>(null);
+  const accounting = useRef({ rounds: 0, moves: {} as Record<string, number> });
+  const finalizing = useRef(false);
+  const latestBattle = useRef(battle);
+  function beginServer(state: BattleState) {
+    const next = createKingBattle(kingApi, identity, petId, encounter, state.player.items ?? []);
+    session.current = next;
+    void next.start().then(reply => {
+      if (session.current === next && !finalizing.current && (!reply?.supported || !reply.ok)) setServerLine(KING_LOCAL_NOTICE);
+    });
+  }
+  useEffect(() => {
+    if (!session.current) beginServer(battle);
+    // One ticket per mounted attempt, including React's effect replay.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function finishServer(state: BattleState) {
+    if (finalizing.current || !session.current) return;
+    finalizing.current = true;
+    const current = session.current;
+    setServerLine("보상 확인 중…");
+    void current.finish(battleFinish(state, accounting.current.rounds, accounting.current.moves)).then(result => {
+      if (result.settlement) onSettled?.(result.settlement);
+      if (session.current !== current) return;
+      setSettlement(result.settlement ?? null);
+      setServerLine(result.settlement ? kingRewardLine(result.settlement, firstWin) : result.notice);
+    });
+  }
+  function leave() { finishServer(latestBattle.current); onClose(); }
   const [playback, setPlayback] = useState<Playback | null>(() => introduction(battle));
   const [menu, setMenu] = useState<"main" | "moves">("main");
   const [preview, setPreview] = useState("");
-  const [reduced, setReduced] = useState(false);
+  const [reducedPref, setReduced] = useState(false);
+  const [speedMode, setSpeedMode] = useState<0 | 1 | 2>(0);
+  const reduced = reducedPref || speedMode === 2;
+  const factor = [1, 2, 5][speedMode];
+  const fast = (ms: number) => Math.round(ms / factor);
   const [filter, setFilter] = useState<MoveFilter>("all"), [page, setPage] = useState(0);
   const [previewCost, setPreviewCost] = useState(0);
   const [detailSide, setDetailSide] = useState<Side | null>(null);
@@ -82,8 +121,8 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   const heading = useId(), previewId = useId();
   const playing = useRef(true), held = useRef(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeRef = useRef(onClose);
-  useLayoutEffect(() => { closeRef.current = onClose; }, [onClose]);
+  const closeRef = useRef(leave);
+  useLayoutEffect(() => { closeRef.current = leave; }, [leave]);
   const cancelHold = () => { if (holdTimer.current !== null) clearTimeout(holdTimer.current); holdTimer.current = null; };
   useEffect(() => cancelHold, []);
   useEffect(() => {
@@ -173,7 +212,8 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   }
   useEffect(() => {
     if (!playback || paused) return;
-    const delay = typing ? 18 : cue?.text ? 900 : cue?.moveName || cue?.result || cue?.rivalText || cue?.playerText ? cue.duration ?? 1200 : reduced && cue?.motion && !cue.moveFx ? cue.fx || cue.critical ? 300 : 0 : cue?.duration ?? 0;
+    const base = typing ? 18 : cue?.text ? 900 : cue?.moveName || cue?.result || cue?.rivalText || cue?.playerText ? cue.duration ?? 1200 : reduced && cue?.motion && !cue.moveFx ? cue.fx || cue.critical ? 300 : 0 : cue?.duration ?? 0;
+    const delay = typing ? base : fast(base);
     const timer = setTimeout(() => {
       if (typing) setPlayback({ ...playback, revealed: playback.revealed + 1 });
       else advance();
@@ -181,7 +221,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     return () => clearTimeout(timer);
     // Playback owns the immutable cue and text for this timer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playback, reduced, paused]);
+  }, [playback, reduced, paused, speedMode]);
   useEffect(() => {
     if (!reduced && cue?.motion === "effective") navigator.vibrate?.(30);
   }, [cue, reduced]);
@@ -197,6 +237,15 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   function choose(action: Action) {
     if (paused || playing.current || !availableActions(battle, "player").some(a => sameAction(a, action))) return;
     const next = stepRound(battle, action);
+    if (action.kind !== "quit") accounting.current.rounds++;
+    for (const event of next.events) {
+      if (event.type === "action" && event.side === "player") {
+        const move = moveFor(event.action);
+        if (move) accounting.current.moves[move.id] = (accounting.current.moves[move.id] ?? 0) + 1;
+      }
+    }
+    latestBattle.current = next.state;
+    if (next.state.outcome) finishServer(next.state);
     if (next.state.outcome === "player") onWin?.();
     playing.current = true; cancelHold(); setPreview(""); setPreviewCost(0); setMenu("main");
     const cues = battleCues(next.events, names, { state: battle, lastResult: lastDefenseResult.current });
@@ -215,7 +264,9 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
   }
   function restart() {
     lastPlayer.current = ""; lastDefenseResult.current = "";
-    const next = start(++attempt.current); setSeen({ player: [], opponent: [] }); setFilter("all"); setPage(0);
+    const next = start(++attempt.current, settlement?.levelAfter ?? encounter.playerLevel); setSeen({ player: [], opponent: [] }); setFilter("all"); setPage(0);
+    accounting.current = { rounds: 0, moves: {} }; finalizing.current = false;
+    latestBattle.current = next; setSettlement(null); setServerLine(""); beginServer(next);
     playing.current = true; cancelHold(); setPreview(""); setPreviewCost(0); setMenu("main"); setBattle(next); setPlayback(introduction(next));
   }
   const actions: Action[] = [...new Set([...battle.player.moves, ...(battle.player.finisher ? [battle.player.finisher] : [])])].map(moveId => ({ kind: "move", moveId }));
@@ -255,7 +306,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     const animation = moveFx && (cue?.side === side ? `pet-move-${moveFx.motion}` : cue?.target === side ? `pet-react-${cue.missed ? "dodge" : moveFx.reaction}` : undefined);
     return <div className="pet-battle-fighter" data-side={side}>
       <div className="pet-battle-platform" />
-      <div className="pet-battle-entry"><div key={animation ? `${shown.round}-${playback?.index}` : "idle"} className="pet-battle-portrait" data-motion={motion} style={animation ? { animation: `${animation} ${moveFx!.duration}ms ease-in-out both` } : undefined}>
+      <div className="pet-battle-entry"><div key={animation ? `${shown.round}-${playback?.index}` : "idle"} className="pet-battle-portrait" data-motion={motion} style={animation ? { animation: `${animation} ${fast(moveFx!.duration)}ms ease-in-out both` } : undefined}>
         {side === "player" ? <Image src={PETS[petId].standing[stage]} alt={names.player} width={320} height={320} sizes="42vw" loading="eager" /> : <BreedPicture key={encounter.id} breedId={shown.opponent.breedId} name={names.opponent} art={encounter.art} />}
         <span className="pet-battle-flash" aria-hidden="true" />
         {motion === "win" && <span className="pet-battle-sparkles" aria-hidden="true">✦ · ✧<br />✧　✦</span>}
@@ -264,9 +315,9 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
         <span className="pet-battle-flash" />
         <Image src={`/pet/battle/fx-${cue.fx}.webp`} alt="" width={160} height={160} unoptimized loading="eager" onError={e => { e.currentTarget.style.visibility = "hidden"; }} />
       </span>}
-      {moveFx && (cue?.target ?? cue?.side) === side && <span key={`${shown.round}-${playback?.index}-art`} className="pet-battle-art" data-side={cue?.side} data-missed={cue?.missed} style={{ "--art-duration": `${moveFx.duration}ms` } as CSSProperties} aria-hidden="true">
+      {moveFx && (cue?.target ?? cue?.side) === side && <span key={`${shown.round}-${playback?.index}-art`} className="pet-battle-art" data-side={cue?.side} data-missed={cue?.missed} style={{ "--art-duration": `${fast(moveFx.duration)}ms` } as CSSProperties} aria-hidden="true">
         {!cue?.missed && moveFx.image && <Image src={moveFx.image} alt="" width={160} height={160} unoptimized onError={e => { e.currentTarget.style.visibility = "hidden"; }} />}
-        {(cue?.missed ? [fxSheets("smoke", shown.round)] : moveFx.sheets ?? []).map((sheet, i) => <FxSprite key={`${sheet.id}-${i}`} sheet={sheet} reduced={reduced} delay={reduced ? 0 : Math.round(moveFx.duration * .2)} tint={moveFx.tint} duration={moveFx.duration * .7} />)}
+        {(cue?.missed ? [fxSheets("smoke", shown.round)] : moveFx.sheets ?? []).map((sheet, i) => <FxSprite key={`${sheet.id}-${i}`} sheet={sheet} reduced={reduced} delay={reduced ? 0 : fast(Math.round(moveFx.duration * .2))} tint={moveFx.tint} duration={fast(moveFx.duration * .7)} />)}
       </span>}
       {cue?.side === side && (cue.fx || cue.critical) && <span key={`${shown.round}-${playback?.index}-sprite`} className="pet-battle-art" data-critical={cue.critical} aria-hidden="true">
         <FxSprite sheet={fxSheets(cue.critical ? "particle" : cue.fx === "heal" ? "heal" : cue.fx === "buff" ? "buff" : cue.fx === "shield" ? "shield" : cue.fx === "hit" || cue.fx === "hit-good" ? "impact" : "debuff", cue.critical ? 3 : cue.fx === "buff" ? 4 : shown.round)} reduced={reduced} duration={cue.duration} />
@@ -305,12 +356,12 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
     </>;
   }
 
-  return <dialog ref={dialog} className="pet-battle-screen" style={{ "--arena-bg": `url(${cellBackground(encounter.cellId, hour)})` } as CSSProperties} aria-labelledby={heading} tabIndex={-1} onCancel={e => { e.preventDefault(); if (paused) { closeDetail(); } else if (menu === "moves" && !playback) { setMenu("main"); setPreview(""); } else onClose(); }}>
+  return <dialog ref={dialog} className="pet-battle-screen" style={{ "--arena-bg": `url(${cellBackground(encounter.cellId, hour)})` } as CSSProperties} aria-labelledby={heading} tabIndex={-1} onCancel={e => { e.preventDefault(); if (paused) { closeDetail(); } else if (menu === "moves" && !playback) { setMenu("main"); setPreview(""); } else leave(); }}>
     <div className="pet-battle-scene" data-phase={phase} data-paused={paused} data-impact={cue?.motion === "effective" || !!cue?.critical} data-heavy={cue?.moveFx === "T63" && !cue.missed} key={attempt.current} onClick={intro && !paused ? advance : undefined}>
       <div ref={arena} className="pet-battle-arena">
-        <header className="pet-battle-topline"><h2 id={heading} className="pet-battle-sr">동네 겨루기</h2>{!finished && <span key={shown.round} className="pet-battle-round" data-urgency={shown.round >= MAX_ROUNDS ? "last" : shown.round >= MAX_ROUNDS - 1 ? "near" : shown.round >= MAX_ROUNDS - 2 ? "late" : undefined}>라운드 {shown.round}/{MAX_ROUNDS}</span>}</header>
+        <header className="pet-battle-topline"><h2 id={heading} className="pet-battle-sr">동네 겨루기</h2>{!finished && <button type="button" className="pet-battle-speed" aria-label={["배속 보통", "2배속", "빠르게 넘기기"][speedMode]} aria-pressed={speedMode > 0} onClick={() => setSpeedMode(((speedMode + 1) % 3) as 0 | 1 | 2)}>{["▶", "▶▶", "⏭"][speedMode]}</button>}{!finished && <span key={shown.round} className="pet-battle-round" data-urgency={shown.round >= MAX_ROUNDS ? "last" : shown.round >= MAX_ROUNDS - 1 ? "near" : shown.round >= MAX_ROUNDS - 2 ? "late" : undefined}>라운드 {shown.round}/{MAX_ROUNDS}</span>}</header>
         {!finished && hud("opponent")}{fighter("opponent")}{fighter("player")}{!finished && hud("player")}
-        {moveFx && <div key={`${shown.round}-${playback?.index}-move`} className="pet-battle-move-fx" data-side={cue?.side} data-trail={moveFx.trail} data-local={moveFx.reaction === "none"} data-missed={cue?.missed} style={{ "--fx-duration": `${moveFx.duration}ms` } as CSSProperties} aria-hidden="true">
+        {moveFx && <div key={`${shown.round}-${playback?.index}-move`} className="pet-battle-move-fx" data-side={cue?.side} data-trail={moveFx.trail} data-local={moveFx.reaction === "none"} data-missed={cue?.missed} style={{ "--fx-duration": `${fast(moveFx.duration)}ms` } as CSSProperties} aria-hidden="true">
           {moveFx.elements.map((element, i) => <span key={i} className="pet-battle-fx-part" style={{ "--part": i, animationName: `pet-trail-${moveFx.trail}` } as CSSProperties}>
             <span className="pet-battle-fx-glyph" data-shape={element}>
               {element.startsWith("fx-") ? <Image src={`/pet/battle/${element}.webp`} alt="" width={80} height={80} unoptimized loading="eager" onError={e => { e.currentTarget.style.visibility = "hidden"; }} /> : ["ring", "wave", "streak"].includes(element) ? null : element}
@@ -320,9 +371,10 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
         {cue?.result && <p key={`${shown.round}-${playback?.index}-result`} className="pet-battle-center-result" role="status">{cue.result}</p>}
         {cue?.cutin && <div className="pet-battle-cutin" data-side={cue.side} aria-hidden="true"><Image src={cue.side === "opponent" ? encounter.art : PETS[petId].standing[stage]} alt="" width={160} height={160} unoptimized /><strong>기세</strong><span>✦ ✧ ✦</span></div>}
         {finished && <div className="pet-battle-banner" data-victory={outcome === "player"} role="status"><h3>{result}</h3></div>}
+        {finished && settlement && settlement.levelAfter > settlement.levelBefore && <div className="pet-feedback" aria-hidden="true">{Array.from({ length: 12 }, (_, i) => <i key={i} className="pet-level-particle" style={{ left: `${8 + i * 7}%`, animationDelay: `${i * 35}ms` }}>✦</i>)}</div>}
       </div>
       <div className="pet-battle-console">
-        {finished ? <div className="pet-battle-result"><p>{outcome === "player" ? "정말 멋진 움직임이었어요!" : outcome === "opponent" ? "끝까지 함께해 줘서 고마워요." : "다음에도 즐겁게 겨뤄요!"}</p><div className="pet-battle-result-actions">{outcome === "opponent" && <button ref={command} type="button" onClick={restart}>다시</button>}<button ref={outcome !== "opponent" ? command : undefined} type="button" onClick={onClose}>돌아가기</button></div></div>
+        {finished ? <div className="pet-battle-result"><p>{outcome === "player" ? "정말 멋진 움직임이었어요!" : outcome === "opponent" ? "끝까지 함께해 줘서 고마워요." : "다음에도 즐겁게 겨뤄요!"}</p>{serverLine && <p className="pet-battle-reward" role="status" title={serverLine}>{serverLine}</p>}<div className="pet-battle-result-actions">{outcome === "opponent" && <button ref={command} type="button" disabled={!!kingApi && serverLine === "보상 확인 중…"} onClick={restart}>다시</button>}<button ref={outcome !== "opponent" ? command : undefined} type="button" onClick={leave}>돌아가기</button></div></div>
           : <>
             {playback && <div className={text ? "pet-battle-dialogue" : "pet-battle-sr"}>
             {playback && <button ref={message} type="button" className={intro ? "pet-battle-sr" : "pet-battle-message"} aria-label={intro ? "등장 연출 건너뛰기" : typing ? "대사 모두 보기" : playback ? "다음 대사" : "대결 안내"} onClick={e => { e.stopPropagation(); if (intro) advance(); else if (typing) setPlayback({ ...playback!, revealed: characters.length }); else if (cue?.text) advance(); }}>
@@ -335,7 +387,6 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
                 {menu === "main" ? <>
                   <button ref={command} type="button" className="pet-battle-primary" onClick={() => { setMenu("moves"); setPreview(""); setPage(0); }}><span aria-hidden="true">✦</span> 기술</button>
                   <button type="button" onClick={bag}><span aria-hidden="true">▣</span> 가방</button>
-                  <button type="button" data-kind="support" disabled={!allowed.some(a => a.kind === "rest")} onClick={() => choose({ kind: "rest" })}><span aria-hidden="true">✨</span> 숨 고르기<small>기력 +{REST_ENERGY}</small></button>
                   <button type="button" onClick={() => choose({ kind: "quit" })}><span aria-hidden="true">↗</span> 그만하기</button>
                 </> : <>
                   <div className="pet-battle-filters" role="group" aria-label="기술 분류">
@@ -361,7 +412,7 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
                             onContextMenu={e => e.preventDefault()} onKeyDown={e => { if (e.key === " " && !e.repeat) { held.current = false; holdTimer.current = setTimeout(() => { held.current = true; showDetail(); }, 500); } }} onKeyUp={cancelHold}
                             onClick={() => { cancelHold(); if (held.current) { held.current = false; return; } if (enabled) choose(action); }}>
                             <span className="pet-battle-kind" aria-hidden="true">{kind.icon}</span>
-                            <span className="pet-battle-move-copy"><span className="pet-battle-move-title"><strong title={label}>{label}</strong>{move?.kind === "attack" && hint !== "normal" && <span className="pet-battle-matchup" data-hint={hint}>{hint === "good" ? "↑ 효과 좋음" : "↓ 효과 약함"}</span>}</span><small>{damage ? <>피해 {damage.base}{damage.delta !== 0 && <span className="pet-battle-delta" data-good={damage.delta > 0}> {damage.delta > 0 ? "↑+" : "↓−"}{Math.abs(damage.delta)}</span>}</> : move ? compactEffect(move, battle) : `기력 +${REST_ENERGY}`}</small></span>
+                            <span className="pet-battle-move-copy"><span className="pet-battle-move-title"><strong title={label}>{label}</strong></span><small>{damage ? <>피해 {damage.base}{damage.delta !== 0 && <span className="pet-battle-delta" data-good={damage.delta > 0}> {damage.delta > 0 ? "↑+" : "↓−"}{Math.abs(damage.delta)}</span>}</> : move ? compactEffect(move, battle) : `기력 +${REST_ENERGY}`}</small></span>
                             <span className="pet-battle-cost" data-finisher={!!move?.finisher}>{move?.finisher ? "기세" : costBadge(cost)}{insufficient && <small>{move?.finisher ? "부족" : "기력 부족"}</small>}</span>
                           </button>
                         </div>;

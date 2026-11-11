@@ -32,7 +32,7 @@ const mineShop=renderToStaticMarkup(createElement(Shop,{...shopProps,petId:2,sta
 assert.ok(domiShop.includes(">보유</span>"));assert.ok(mineShop.includes("🪙 40"));assert.ok(!mineShop.includes("✓ 미네 보유"));
 assert.ok(mineShop.includes("우리 코인(공용)"));
 for(const [name,xp,level] of [["도미",40,2],["미네",32,1]]) {
-  const progress=renderToStaticMarkup(createElement(Progress,{name,xp,coins:60}));assert.ok(progress.includes(`${name} Lv.${level}`));assert.ok(progress.includes("우리 코인(공용) 60"));
+  const progress=renderToStaticMarkup(createElement(Progress,{name,xp,level,coins:60}));assert.ok(progress.includes(`${name} Lv.${level}`));assert.ok(progress.includes("우리 코인(공용) 60"));
 }
 
 // Run the sheet's actual effects and refresh handler without installing a DOM/test library.
