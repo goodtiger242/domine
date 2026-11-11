@@ -25,6 +25,7 @@ def main() -> int:
     ap.add_argument("--bg", default="FF00FF")
     ap.add_argument("--width", type=int, default=256)
     ap.add_argument("--quality", type=int, default=82)
+    ap.add_argument("--despill", action="store_true", help="마젠타가 섞인 털 가장자리의 색 번짐 제거")
     a = ap.parse_args()
 
     names = [n.strip() for n in a.names.split(",")]
@@ -60,9 +61,17 @@ def main() -> int:
         region = cv2.dilate(m, np.ones((5, 5), np.uint8))
         alpha = np.clip((dist - 40) / 90, 0, 1) * region
         alpha = np.maximum(alpha, m.astype(np.float32))
+        if a.despill:
+            spill = np.maximum(0, np.minimum(rgb[..., 0], rgb[..., 2]) - rgb[..., 1])
+            alpha = np.minimum(alpha, 1 - spill / 255)
         # 배경색 섞임 되돌리기: c = a*fg + (1-a)*bg  ->  fg = (c - (1-a)*bg) / a
         a3 = np.clip(alpha, 1e-3, 1)[..., None]
         fg = np.clip((rgb - (1 - a3) * bg) / a3, 0, 255)
+        if a.despill:
+            # 투명 픽셀의 마젠타도 지워 WebP 색차 압축이 가장자리로 번지지 않게 한다.
+            excess = np.maximum(0, np.minimum(fg[..., 0], fg[..., 2]) - fg[..., 1])
+            fg[..., 0] -= excess
+            fg[..., 2] -= excess
         ys, xs = np.where(alpha > 0.05)
         pad = 4
         y0, y1 = max(0, ys.min() - pad), min(H, ys.max() + pad)

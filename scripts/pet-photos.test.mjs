@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
+import { spawnSync } from "node:child_process";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
-import { backgroundAt, BACKGROUNDS, poseAt, POSES } from "../lib/domine/pet-photos.ts";
+import { backgroundAt, BACKGROUNDS, poseAt, POSES, PETS, PRIEST, DOGHOUSE, petText } from "../lib/domine/pet-photos.ts";
+import { PET_MAPS, petMap, neighborMap, actionsForMap, SHOPS } from "../lib/domine/pet-maps.ts";
+import { petRequest } from "../lib/domine/pet-rpc.ts";
 import { bubblePosition } from "../lib/domine/pet-bubble.ts";
 
 for (const width of [318, 348, 370]) {
@@ -54,7 +57,7 @@ const dogSource = ts.transpileModule(readFileSync(new URL("../app/games/PetDog.t
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 new Function("require", "exports", dogSource)(
-  (name) => name === "@/lib/domine/pet-photos" ? { POSES, poseAt } : require(name), dogModule.exports,
+  (name) => name === "@/lib/domine/pet-photos" ? { PETS, poseAt } : require(name), dogModule.exports,
 );
 for (const stage of ["baby", "young", "adult"]) {
   for (const [motion, face, pose] of [["pet-sit", "happy", "sit"], ["pet-lie", "happy", "lie"], [null, "sleepy", "sleep"]]) {
@@ -82,12 +85,22 @@ new Function("require", "exports", sceneSource)((name) => {
   };
   return require(name);
 }, sceneModule.exports);
-const renderScene = () => renderToStaticMarkup(createElement(sceneModule.exports.PetScene, {
+const renderScene = (props = {}) => renderToStaticMarkup(createElement(sceneModule.exports.PetScene, {
   stage: "adult", face: "happy", light: 0.8, hour: 22, collar: "purple", cue: null, onSay() {}, bubble: "반가워요!",
+  ...props,
 }));
 assert.ok(!renderScene().includes("/pet/art/bowl.webp"));
 assert.ok(!renderScene().includes("foreignObject"));
 assert.ok(renderScene().includes('aria-label="도미의 말"'));
+for (const map of PET_MAPS) {
+  const html = renderScene({ map: map.id, petId: 2, locked: true });
+  assert.equal(html.includes('aria-label="개집"'), map.id === "home");
+  assert.equal(html.includes('aria-label="맥도날드 앞으로 가기"'), map.id === "street");
+  assert.ok(html.includes('aria-label="미네의 말"'));
+  assert.ok(html.includes('aria-label="신부님께 인사하기" disabled=""'));
+  for (const direction of [-1, 1]) assert.ok(html.includes(`aria-label="${neighborMap(map.id, direction).name}(으)로 이동" disabled=""`));
+}
+assert.ok(renderScene({ speaker: "priest" }).includes('aria-label="신부님의 말"'));
 const scales = [];
 for (const y of [77, 88]) {
   sceneState = { y, bowl: 110 };
@@ -109,4 +122,103 @@ for (const src of [...Object.values(BACKGROUNDS), ...Object.values(POSES).map((p
   total += bytes;
 }
 assert.ok(total < 600 * 1024);
+
+assert.equal(petMap("invalid").id, "field");
+assert.deepEqual(PET_MAPS.map((map) => map.id), ["field", "church", "street", "park", "home"]);
+for (const direction of [-1, 1]) {
+  let map = "field";
+  const visited = new Set();
+  for (let i = 0; i < PET_MAPS.length; i++) {
+    visited.add(map);
+    const next = neighborMap(map, direction).id;
+    assert.equal(neighborMap(next, -direction).id, map);
+    map = next;
+  }
+  assert.equal(map, "field");
+  assert.equal(visited.size, 5);
+}
+for (const map of PET_MAPS) {
+  const actions = actionsForMap(PET_ACTIONS, map.id);
+  assert.equal(actions.includes("sleep"), map.id === "home");
+  assert.deepEqual(actions.filter((a) => a !== "sleep"), PET_ACTIONS);
+  if (map.id === "home") assert.ok(availableActionGroups(actions).find((g) => g.category === "돌봄").actions.includes("sleep"));
+}
+assert.deepEqual(actionsForMap([], "home"), ["sleep"]);
+assert.deepEqual(actionsForMap([], "invalid"), []);
+assert.equal(petText("도미는 도미랍니다", 2), "미네는 미네랍니다");
+assert.equal(poseAt("pet-sleep", "happy"), "sleep");
+for (const [motion, pose] of [[null, null], ["pet-sit", "sit"], ["pet-lie", "lie"], ["pet-sleep", "sleep"]]) {
+  const config = PETS[2];
+  const src = pose ? config.poses[pose].src : config.standing.adult;
+  const html = renderToStaticMarkup(createElement(dogModule.exports.PetDog, {
+    petId: 2, stage: "adult", face: "happy", motion, light: 1, collar: "red", photos: { [src]: true },
+  }));
+  assert.ok(html.includes(`href="${src}"`));
+  assert.ok(!html.includes("/pet/adult.webp") && !html.includes('stroke="red"'));
+}
+
+const calls = [];
+let responses = [];
+const rpc = async (name, args) => { calls.push({ name, args }); return responses.shift(); };
+const missing = { data: null, error: { code: "PGRST202", message: "missing" } };
+const success = { data: { name: "test" }, error: null };
+responses = [success];
+assert.equal((await petRequest(rpc, 2, "친구")).petId, 2);
+assert.deepEqual(calls.pop(), { name: "domine_pet_state_for", args: { p_pet: 2, p_nickname: "친구" } });
+responses = [missing, success];
+const fallback = await petRequest(rpc, 2, "친구");
+assert.equal(fallback.petId, 1);
+assert.equal(fallback.legacy, true);
+assert.equal(calls.pop().name, "domine_pet_state");
+calls.length = 0;
+responses = [missing];
+assert.ok((await petRequest(rpc, 2, "친구", "walk")).error);
+assert.equal(calls.length, 1, "Missing Mine care must never write to Domi");
+assert.equal(calls[0].name, "domine_pet_care_for");
+calls.length = 0;
+responses = [missing, success];
+assert.equal((await petRequest(rpc, 1, "친구", "walk")).legacy, true);
+assert.equal(calls[1].name, "domine_pet_care");
+calls.length = 0;
+responses = [{ data: null, error: { code: "42501", message: "permission" } }];
+assert.equal((await petRequest(rpc, 2, "친구")).legacy, false);
+assert.equal(calls.length, 1, "Other failures must not trigger fallback");
+
+const newBackgrounds = PET_MAPS.flatMap((map) => map.background ? [map.background] : []);
+const minePhotos = [PETS[2].standing.adult, ...Object.values(PETS[2].poses).map((p) => p.src)];
+const newAssets = [...newBackgrounds, PRIEST, DOGHOUSE, ...minePhotos];
+const size = (src) => statSync(new URL(`../public${src}`, import.meta.url)).size;
+for (const src of newAssets) {
+  assert.equal(readFileSync(new URL(`../public${src}`, import.meta.url)).toString("ascii", 8, 12), "WEBP");
+  assert.ok(size(src) <= (newBackgrounds.includes(src) ? 90 : src === DOGHOUSE ? 40 : 50) * 1000, src);
+}
+const addedBytes = newAssets.reduce((sum, src) => sum + size(src), 0);
+assert.ok(addedBytes <= 600000);
+for (const bg of newBackgrounds) for (const dog of minePhotos) {
+  assert.ok(size(bg) + size(PRIEST) + size(dog) < 150000, "Initial additional image budget");
+}
+assert.deepEqual(SHOPS.map((shop) => shop.name), ["술이 좋아", "맥도날드", "쁘니네", "화락"]);
+const cutout = spawnSync("python", ["-c", `
+import tempfile, subprocess
+from pathlib import Path
+import numpy as np
+from PIL import Image, ImageDraw
+with tempfile.TemporaryDirectory(prefix='pet-cut-test-') as d:
+    root = Path(d)
+    im = Image.new('RGB', (128,128), '#ff00ff')
+    draw = ImageDraw.Draw(im)
+    draw.rectangle((30,30,98,98), fill=(255,128,255))
+    draw.rectangle((34,34,94,94), fill='white')
+    im.save(root/'test.png')
+    subprocess.run(['python','scripts/cut_sheet.py',str(root/'test.png'),d,'cut','--cols','1','--rows','1','--despill'], check=True, capture_output=True)
+    subprocess.run(['python','scripts/optimize_images.py',str(root/'cut.webp'),str(root/'out'),'--kind','character'], check=True, capture_output=True)
+    rgba=np.asarray(Image.open(root/'out/cut.webp').convert('RGBA')).astype(float)
+    assert rgba[...,3].min()==0 and rgba[...,3].max()==255
+    assert ((rgba[...,3]>40)&(rgba[...,3]<220)).any(), 'Soft fur edges preserved'
+    visible=rgba[...,3]>40
+    spill=np.minimum(rgba[...,0],rgba[...,2])-rgba[...,1]
+    assert spill[visible].max()<35, 'No magenta fringe after cut and optimization'
+`], { encoding: "utf8" });
+assert.equal(cutout.status, 0, cutout.stderr);
+console.log(`Maps, local actions, Mine poses, RPC fallback and new assets passed (${addedBytes} bytes).`);
 console.log(`Pet photos: time boundaries, poses, feeding depth/shadows and asset budget passed (${total} bytes).`);

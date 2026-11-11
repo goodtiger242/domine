@@ -5,8 +5,9 @@ import { bubblePosition } from "@/lib/domine/pet-bubble";
 import type { PetAction, PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
 import { ART, BALL, BOWL, preloadArt } from "@/lib/domine/pet-art";
-import { line } from "@/lib/domine/pet-lines";
-import { BACKGROUNDS, backgroundAt, POSES } from "@/lib/domine/pet-photos";
+import { line, PRIEST_LINES } from "@/lib/domine/pet-lines";
+import { BACKGROUNDS, backgroundAt, PETS, PRIEST, DOGHOUSE, type PetId } from "@/lib/domine/pet-photos";
+import { PET_MAPS, petMap, neighborMap, SHOPS, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
 import { DOG_W, PetDog, RATIO } from "./PetDog";
 
 /**
@@ -34,7 +35,7 @@ type S = {
   scroll: boolean;
   carry: Carry | null;
 };
-type Patch = Partial<S> & { say?: string };
+type Patch = Partial<S> & { say?: string; map?: PetMap; asleep?: boolean };
 type Plan = { steps: [number, Patch][]; end: number };
 
 const HOME: S = {
@@ -49,8 +50,8 @@ const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const depth = (y: number) => 0.84 + ((y - 76) / 13) * 0.2;
 
-function makePlan(action: PetAction | "tap", w: number): Plan {
-  const h = w * RATIO;
+function makePlan(action: PetAction | "tap", w: number, ratio = RATIO): Plan {
+  const h = w * ratio;
 
   if (action === "tap") {
     return {
@@ -392,14 +393,20 @@ type Props = {
   hour: number;
   collar: string;
   /** 새 행동이 시작될 때마다 id 가 바뀐다 */
-  cue: { action: PetAction; id: number } | null;
-  onSay: (text: string) => void;
+  cue: SceneCue | null;
+  petId?: PetId;
+  map?: PetMap;
+  onMap?: (map: PetMap) => void;
+  onLocal?: (cue: SceneCue) => void;
+  locked?: boolean;
+  speaker?: "dog" | "priest";
+  onSay: (text: string, speaker?: "dog" | "priest") => void;
   /** 연출이 끝났을 때 */
   onDone?: () => void;
   bubble?: string;
 };
 
-function SpeechBubble({ text, x, y, duration }: { text: string; x: number; y: number; duration: number }) {
+function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number; y: number; duration: number; label: string }) {
   const layer = useRef<HTMLDivElement>(null);
   const bubble = useRef<HTMLParagraphElement>(null);
   const previousSize = useRef("");
@@ -430,7 +437,7 @@ function SpeechBubble({ text, x, y, duration }: { text: string; x: number; y: nu
   }, [text, x, y, duration]);
   return (
     <div ref={layer} className="pointer-events-none absolute inset-0">
-      <p ref={bubble} className="pet-speech" role="status" aria-label="도미의 말" aria-atomic="true"
+      <p ref={bubble} className="pet-speech" role="status" aria-label={label} aria-atomic="true"
         style={{ visibility: "hidden" }}>
         <span key={text} className="pet-speech-text">{text}</span>
         <span aria-hidden="true" className="pet-speech-tail" />
@@ -439,14 +446,16 @@ function SpeechBubble({ text, x, y, duration }: { text: string; x: number; y: nu
   );
 }
 
-export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble }: Props) {
+export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, map = "field", onMap, onLocal, locked = false, speaker = "dog" }: Props) {
   const shadowId = useId();
   const [s, setS] = useState<S>(HOME);
   const timers = useRef<number[]>([]);
-  const latest = useRef({ stage, onSay, onDone });
-  latest.current = { stage, onSay, onDone };
+  const latest = useRef({ stage, onSay, onDone, onMap, map, petId });
+  latest.current = { stage, onSay, onDone, onMap, map, petId };
   const running = useRef(false);
   const period = backgroundAt(hour);
+  const background = petMap(map).background ?? BACKGROUNDS[period];
+  const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
   const [shown, setShown] = useState<string | null>(null);
 
@@ -467,22 +476,19 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       img.onerror = () => { if (current && !cancelled) setShown(null); };
       img.src = src;
     };
-    load(BACKGROUNDS[period], true);
-    const idle = () => {
-      Object.values(BACKGROUNDS).filter((src) => src !== BACKGROUNDS[period]).forEach((src) => load(src));
-      Object.values(POSES).forEach(({ src }) => load(src));
-    };
-    const supportsIdle = typeof window.requestIdleCallback === "function";
-    const id = supportsIdle
-      ? window.requestIdleCallback(idle, { timeout: 4000 })
-      : window.setTimeout(idle, 2500);
+    load(background, true);
     return () => {
       cancelled = true;
       images.forEach((img) => { img.onload = null; img.onerror = null; });
-      if (supportsIdle) window.cancelIdleCallback(id);
-      else window.clearTimeout(id);
     };
-  }, [period]);
+  }, [background]);
+
+  useEffect(() => preloadArt([
+    ...Object.values(BACKGROUNDS),
+    ...PET_MAPS.flatMap((m) => m.background ? [m.background] : []),
+    ...Object.values(PETS).flatMap((pet) => [...Object.values(pet.standing), ...Object.values(pet.poses).map((p) => p.src)]),
+    DOGHOUSE,
+  ], (src) => setPhotos((prev) => ({ ...prev, [src]: true }))), []);
 
   function run(plan: Plan) {
     timers.current.forEach(window.clearTimeout);
@@ -491,8 +497,10 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
     plan.steps.forEach(([t, patch]) => {
       timers.current.push(
         window.setTimeout(() => {
-          const { say, ...rest } = patch;
-          if (say) latest.current.onSay(say);
+          const { say, map: nextMap, asleep, ...rest } = patch;
+          if (say) latest.current.onSay(say, cue?.action === "priest" ? "priest" : "dog");
+          if (nextMap) latest.current.onMap?.(nextMap);
+          if (asleep) { running.current = false; latest.current.onDone?.(); }
           setS((prev) => ({ ...prev, ...rest }));
         }, t * SLOW)
       );
@@ -507,19 +515,50 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
   }
 
   useEffect(() => {
-    if (cue) run(makePlan(cue.action, DOG_W[latest.current.stage]));
-    // cue.id 가 바뀔 때만 새 연출을 시작한다
+    if (!cue) return;
+    const travel = (from: PetMap, direction: Dir, offset = 0): [number, Patch][] => [
+      [offset, { x: direction > 0 ? 205 : -45, y: 84, dir: direction, dur: 900, motion: "pet-trot" }],
+      [offset + 650, { map: neighborMap(from, direction).id, x: direction > 0 ? -45 : 205, dur: 0 }],
+      [offset + 1450, { x: 80, dur: 1000 }],
+      [offset + 2150, { motion: null }],
+    ];
+    if (cue.action === "map") {
+      run({ steps: travel(latest.current.map, cue.direction), end: 2300 });
+    } else if (cue.action === "sleep") {
+      if (latest.current.map !== "home") { latest.current.onDone?.(); return; }
+      run({ steps: [[0, { ...HOME, x: 115, y: 86, dir: 1, dur: 1000, motion: "pet-trot" }],
+        [750, { motion: "pet-sleep", asleep: true, say: "잠시 눈을 붙일게요…" }]], end: 5500 });
+    } else if (cue.action === "shop") {
+      const shop = SHOPS[cue.shop];
+      if (latest.current.map !== "street" || !shop) { latest.current.onDone?.(); return; }
+      const x = clamp(shop.x * 1.6, 27, 133);
+      run({ steps: [[0, { ...HOME, x, y: 80, dir: x >= s.x ? 1 : -1, dur: 1000, motion: "pet-trot" }],
+        [750, { motion: null, say: line(shop.line) }]], end: 2600 });
+    } else if (cue.action === "priest") {
+      run({ steps: [[0, { say: pick([...PRIEST_LINES]) }]], end: 2000 });
+    } else {
+      const config = PETS[latest.current.petId];
+      const plan = makePlan(cue.action, DOG_W[latest.current.stage] * config.scale, config.ratio);
+      if (cue.action === "walk" && Math.random() < 0.8) {
+        const direction = pick<Dir>([-1, 1]);
+        const from = latest.current.map;
+        plan.steps.push(...travel(from, direction, plan.end),
+          ...travel(neighborMap(from, direction).id, direction, plan.end + 2300));
+        plan.end += 4600;
+      }
+      run(plan);
+    }
+    // 새 행동은 이전 연출과 잠 깨는 타이머를 함께 취소한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.id]);
 
   useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
-  useEffect(() => preloadArt(), []);
 
   const c = skyAt(hour);
   const body = bodyAt(hour);
   const sc = depth(s.y);
-  const w = DOG_W[stage];
-  const h = w * RATIO;
+  const w = DOG_W[stage] * PETS[petId].scale;
+  const h = w * PETS[petId].ratio;
   const move = (x: number, y: number, dur: number, extra = "") => ({
     transform: `translate(${x}px, ${y}px)${extra}`,
     transition: `transform ${dur}ms ease-in-out`,
@@ -530,8 +569,8 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
     <svg
       viewBox="0 6 160 90"
       className="block h-full w-full"
-      role="img"
-      aria-label={`${stage === "baby" ? "아기" : stage === "young" ? "어린" : "다 큰"} 강아지 도미`}
+      role="group"
+      aria-label={`${stage === "baby" ? "아기" : stage === "young" ? "어린" : "다 큰"} 강아지 ${PETS[petId].name}`}
     >
       <defs>
         <radialGradient id={shadowId}>
@@ -571,11 +610,28 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       <rect y="66" width="160" height="30" fill={c.ground} />
 
       <g pointerEvents="none" className={s.scroll ? "pet-photo-pan" : undefined}>
-        {Object.values(BACKGROUNDS).filter((src) => photos[src]).map((src) => (
-          <image key={src} href={src} x="-10" y="6" width="180" height="90"
-            preserveAspectRatio="xMidYMid slice" className="pet-photo-fade"
+        {[...Object.values(BACKGROUNDS), ...PET_MAPS.flatMap((m) => m.background ? [m.background] : [])].filter((src) => photos[src]).map((src) => (
+          <image key={src} href={src} x="0" y="6" width="160" height="90"
+            preserveAspectRatio="none" className="pet-photo-fade"
             style={{ opacity: shown === src ? 1 : 0 }} />
         ))}
+      </g>
+
+      {map !== "field" && <rect pointerEvents="none" y="6" width="160" height="90"
+        fill={period === "night" ? "#101d49" : period === "dusk" ? "#e98b44" : "#e7b7af"}
+        opacity={period === "night" ? 0.55 : period === "dusk" ? 0.23 : period === "dawn" ? 0.17 : 0} />}
+
+      <g pointerEvents="none" style={{ filter: `brightness(${light})` }}>
+        <ellipse cx="34" cy="78" rx="8" ry="2" fill={`url(#${shadowId})`} />
+        {failed[PRIEST] ? <text x="34" y="70" fontSize="6" textAnchor="middle">신부님</text> :
+          <image href={PRIEST} x="26" y="29" width="16" height="49" preserveAspectRatio="xMidYMax meet"
+            onError={() => setFailed((prev) => ({ ...prev, [PRIEST]: true }))} />}
+        {map === "home" && <g role="img" aria-label="개집">
+          <ellipse cx="122" cy="82" rx="27" ry="4" fill={`url(#${shadowId})`} />
+          {photos[DOGHOUSE] && !failed[DOGHOUSE] ? <image href={DOGHOUSE} x="95" y="34" width="55" height="48"
+            onError={() => setFailed((prev) => ({ ...prev, [DOGHOUSE]: true }))} /> :
+            <g fill="#a4784e"><path d="M99 52 L122 35 L145 52 V81 H99Z" /><path d="M114 81 V66 A8 8 0 0 1 16 0 V81" fill="#382b25" /></g>}
+        </g>}
       </g>
 
       {s.bowl !== null ? (
@@ -597,6 +653,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
           </g>
         ) : null}
         <PetDog
+          petId={petId}
           stage={stage}
           face={face}
           motion={s.motion}
@@ -605,13 +662,14 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
           photos={photos}
           onTap={() => {
             // 한 연출이 끝나기 전에는 다른 연출을 시작하지 않는다
-            if (!running.current) run(makePlan("tap", w));
+            if (!locked && !running.current) onLocal?.({ action: "tap", id: Date.now() });
           }}
         />
       </g>
 
       {/* 효과 (도미를 따라다니되 뒤집히지 않게) */}
       <g style={move(s.x, s.y, s.dur, ` scale(${sc})`)} pointerEvents="none">
+        {s.motion === "pet-sleep" && <text y={-h * 0.6} x="8" fontSize="9">💤</text>}
         {s.fx.includes("hearts")
           ? [0, 1, 2].map((i) => (
               <path
@@ -685,7 +743,20 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       ) : null}
       </g>
     </svg>
-    {bubble && <SpeechBubble text={bubble} x={s.x + s.dir * w * sc * 0.25} y={s.y - h * sc} duration={s.dur} />}
+    <span className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] text-white">{petMap(map).name}</span>
+    {([-1, 1] as const).map((direction) => <button key={direction} type="button"
+      className={`absolute top-[58%] flex h-11 w-11 items-center justify-center rounded-full text-xl text-white [text-shadow:0_1px_4px_#000] focus-visible:outline-2 disabled:opacity-40 ${direction < 0 ? "left-0" : "right-0"}`}
+      aria-label={`${neighborMap(map, direction).name}(으)로 이동`} disabled={locked}
+      onClick={() => onLocal?.({ action: "map", direction, id: Date.now() })}>{direction < 0 ? "‹" : "›"}</button>)}
+    <button type="button" className="absolute left-[15%] top-[30%] h-[50%] min-h-11 w-[12%] min-w-11 rounded-xl focus-visible:outline-2"
+      aria-label="신부님께 인사하기" disabled={locked} onClick={() => onLocal?.({ action: "priest", id: Date.now() })} />
+    {map === "street" && SHOPS.map((shop, index) => <button key={shop.name} type="button"
+      className="absolute flex min-h-11 w-[23%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded text-[clamp(11px,3vw,16px)] font-semibold text-[#30271e] focus-visible:outline-2 disabled:opacity-60"
+      style={{ left: `${shop.x}%`, top: `${shop.y}%` }} aria-label={`${shop.name} 앞으로 가기`} disabled={locked}
+      onClick={() => onLocal?.({ action: "shop", shop: index, id: Date.now() })}>{shop.name}</button>)}
+    {bubble && <SpeechBubble text={bubble} label={speaker === "priest" ? "신부님의 말" : `${PETS[petId].name}의 말`}
+      x={speaker === "priest" ? 47 : s.x + s.dir * w * sc * 0.25}
+      y={speaker === "priest" ? 39 : s.y - h * sc} duration={s.dur} />}
     </div>
   );
 });

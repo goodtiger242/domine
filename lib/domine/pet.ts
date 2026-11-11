@@ -14,10 +14,12 @@ export const PET_ACTIONS = Object.keys(PET_ACTION_TABLE) as PetAction[];
 export const PET_CATEGORIES = ["먹이", "돌봄", "놀이"] as const;
 export type PetCategory = typeof PET_CATEGORIES[number];
 
-export function availableActionGroups(avail: PetAction[]) {
+export const LOCAL_ACTIONS = { sleep: { category: "돌봄", label: "재우기", icon: "💤" } } as const;
+const DISPLAY_ACTIONS = { ...PET_ACTION_TABLE, ...LOCAL_ACTIONS };
+export function availableActionGroups(avail: (PetAction | "sleep")[]) {
   return PET_CATEGORIES.map((category) => ({
     category,
-    actions: PET_ACTIONS.filter((action) => PET_ACTION_TABLE[action].category === category && avail.includes(action)),
+    actions: (Object.keys(DISPLAY_ACTIONS) as (keyof typeof DISPLAY_ACTIONS)[]).filter((action) => DISPLAY_ACTIONS[action].category === category && avail.includes(action)),
   })).filter(({ actions }) => actions.length > 0);
 }
 
@@ -105,8 +107,8 @@ export function saysText(face: string): string {
 }
 
 /** 이 기기에서 연속으로 돌본 날 수 (localStorage) */
-export function bumpStreak(): number {
-  const key = "domine-pet-streak";
+export function bumpStreak(petId: 1 | 2 = 1): number {
+  const key = petId === 1 ? "domine-pet-streak" : "domine-pet-streak-2";
   const today = localISO(new Date());
   const y = new Date();
   y.setDate(y.getDate() - 1);

@@ -19,7 +19,34 @@ export const POSES = {
 };
 
 export function poseAt(motion: string | null, face: string): keyof typeof POSES | null {
+  if (motion === "pet-sleep") return "sleep";
   if (motion === "pet-sit") return "sit";
   if (motion === "pet-lie") return "lie";
   return !motion && face === "sleepy" ? "sleep" : null;
+}
+
+export const PETS = {
+  1: {
+    name: "도미", standing: { baby: "/pet/puppy.webp", young: "/pet/puppy.webp", adult: "/pet/adult.webp" },
+    ratio: 622 / 900, scale: 1, poses: POSES,
+    collar: "M641 143 Q692 168 736 214",
+  },
+  2: {
+    name: "미네", standing: { baby: "/pet/mine/stand.webp", young: "/pet/mine/stand.webp", adult: "/pet/mine/stand.webp" },
+    ratio: 484 / 640, scale: 0.72,
+    poses: {
+      sit: { src: "/pet/mine/sit.webp", ratio: 640 / 627, width: 0.73 },
+      lie: { src: "/pet/mine/lie.webp", ratio: 342 / 640, width: 1 },
+      sleep: { src: "/pet/mine/sleep.webp", ratio: 271 / 640, width: 0.85 },
+    },
+    // shortcut: 미네는 털에 목줄이 가려짐, 목줄 포함 사진을 만들 때 전례색 위치를 지정한다.
+    collar: null,
+  },
+} as const;
+export type PetId = keyof typeof PETS;
+export const PRIEST = "/pet/priest.webp";
+export const DOGHOUSE = "/pet/doghouse.webp";
+
+export function petText(text: string, petId: PetId) {
+  return text.replaceAll("도미", PETS[petId].name);
 }
