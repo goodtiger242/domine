@@ -316,6 +316,17 @@ h.game.care("feed");await h.flush();assert.equal(h.game.machine.visual,"idle");
 await h.advance(300);assert.equal(h.game.machine.visual,"acting");assert.equal(h.game.cue.endsAt,2400,"network delay cannot extend the scene beyond the reservation");
 await h.advance(2100);assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy,undefined);h.close();
 
+// A local battle holds the existing pause lock and never starts a server request.
+mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+const callsBeforeBattle=mock.calls.length, petBeforeBattle=h.game.petId;
+h.game.pause(true);await h.flush();
+h.game.care("feed");h.game.localScene({action:"map",to:"F5",id:1});h.game.selectPet(2);
+await h.game.refresh();await h.game.execute({...command,requestId:"battle-must-not-send"});await h.advance(60000);
+assert.equal(h.game.machine.visual,"paused");assert.equal(h.game.petId,petBeforeBattle);
+assert.equal(mock.calls.length,callsBeforeBattle);
+h.game.resume();await h.flush();assert.equal(h.game.machine.visual,"idle");assert.equal(mock.calls.length,callsBeforeBattle);
+await h.game.refresh();assert.equal(mock.calls.length,callsBeforeBattle+1);h.close();
+
 // A timeout is also recovered automatically even if the transport ignores abort.
 mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
 const commitBeforeTimeout=mock.api.execute;

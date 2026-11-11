@@ -159,3 +159,24 @@ sheet.tree.props.onCancel({ preventDefault() {} }); assert.equal(closed, 2);
 sheet.render({ onBack: () => false }); sheet.flushEffects(); sheet.tree.props.onCancel({ preventDefault() {} }); assert.equal(closed, 3);
 sheet.unmount(); assert.equal(style.position, ""); assert.equal(style.overflow, "auto"); assert.equal(restoredScroll, 120); assert.equal(backs, 1); assert.equal(events.size, 0); assert.equal(viewportEvents.size, 0);
 console.log("Pet sheet shell: 80px drag, scroll-top guard, cancel, backdrop, back navigation and scroll restoration passed.");
+
+let battlePause = false;
+const battleGame = { ...game, worldReady: true, petId: 2, personal: { levels: { 2: 40 } },
+  machine: { command: "idle", visual: "idle", committedMap: "E5" },
+  pause(localOnly) { battlePause = localOnly; }, resume() { battlePause = false; },
+};
+const battleView = mount("PetGame", {}, {
+  "./usePetController": { usePetController: () => battleGame }, "next/dynamic": { default: () => "section" },
+  "./PetScene": { PetScene: () => null }, "./PetProgress": {}, "./PetFeedback": {}, "./pet-game.css": {},
+});
+const scene = () => nodes(battleView.tree, n => "onBattle" in n.props)[0];
+for (const cell of ["E5", "D5"]) { battleGame.machine.committedMap = cell; battleView.render(); assert.equal(scene().props.onBattle, undefined); }
+battleGame.machine.committedMap = "F5"; battleGame.machine.command = "pending"; battleView.render();
+assert.equal(scene().props.battleDisabled, true); scene().props.onBattle(); battleView.render(); assert.equal(battlePause, false);
+battleGame.machine.command = "idle"; battleView.render(); scene().props.onBattle(); battleView.render();
+assert.equal(battlePause, true); assert.equal(scene().props.locked, true);
+assert.ok(nodes(battleView.tree, n => n.props.className === "pet-action").every(n => n.props.disabled));
+const battleSheet = nodes(battleView.tree, n => n.props.encounter)[0];
+assert.equal(battleSheet.props.petId, 2); assert.equal(battleSheet.props.encounter.playerLevel, 30);
+battleSheet.props.onClose(); battleView.render(); assert.equal(battlePause, false); assert.equal(scene().props.locked, false);
+console.log("Battle entry: safe cells, pending guard, selected pet/level, care and movement locks passed.");

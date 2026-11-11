@@ -42,6 +42,45 @@
 .pet-sheet-panel { position: absolute; inset: 0; background: var(--lit-bg, #f7f5ef); }
 .pet-sheet-footer { flex-shrink: 0; max-height: 35dvh; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--lit-border); background: var(--lit-bg, #f7f5ef); }
 .pet-sheet-footer > button { width: 100%; }
+.pet-sheet[data-full-height=true] { height: 100vh; height: var(--pet-viewport-height, 100dvh); max-height: 100vh; max-height: 100dvh; padding-top: env(safe-area-inset-top); border-radius: 0; }
+.pet-sheet[data-full-height=true] .pet-sheet-handle { display: none; }
+.pet-sheet[data-full-height=true] .pet-sheet-body, .pet-sheet[data-full-height=true] .pet-sheet-content { flex: 1; }
+.pet-sheet[data-full-height=true] .pet-sheet-content { display: flex; padding: 12px 16px; }
+.pet-sheet[data-full-height=true] .pet-sheet-footer { max-height: none; }
+.pet-battle-encounter { position: absolute; top: 42px; right: 4px; min-height: 44px; padding: 6px 10px; border-radius: 12px; background: #fff7df; color: #493d26; border: 1px solid #b7a478; font-size: 12px; font-weight: 700; }
+.pet-battle-arena { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; width: 100%; min-height: min-content; }
+.pet-battle-fighter { display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--lit-bg-elevated, #fffdf8); border: 1px solid var(--lit-border, #ded9cd); border-radius: 16px; }
+.pet-battle-portrait { position: relative; flex: 0 0 72px; height: 80px; display: grid; place-items: center; }
+.pet-battle-portrait img { width: 72px; height: 80px; object-fit: contain; }
+.pet-battle-emoji { font-size: 48px; }
+.pet-battle-stats { flex: 1; min-width: 0; }
+.pet-battle-stats h3 { font-size: 15px; font-weight: 700; line-height: 1.4; }
+.pet-battle-stats small { font-size: 11px; line-height: 1.4; }
+.pet-battle-stats p { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 6px; font-size: 11px; }
+.pet-battle-hp { height: 7px; margin: 6px 0 4px; overflow: hidden; background: #deded2; border-radius: 6px; }
+.pet-battle-hp span { display: block; height: 100%; background: #597b4b; transform-origin: left; transition: transform 350ms ease-out; }
+.pet-battle-statuses { display: flex; flex-wrap: wrap; gap: 2px 6px; min-height: 16px; font-size: 10px; }
+.pet-battle-center { text-align: center; font-size: 13px; line-height: 1.6; }
+.pet-battle-forecast { color: var(--lit-ink-muted, #696358); }
+.pet-battle-message { min-height: 44px; padding: 8px 0; font-weight: 700; }
+.pet-battle-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.pet-sheet .pet-battle-actions button { min-height: 52px; padding: 6px 8px; border: 1px solid var(--lit-border, #ded9cd); background: var(--lit-bg-elevated, #fffdf8); text-align: left; touch-action: manipulation; user-select: none; -webkit-touch-callout: none; }
+.pet-battle-actions strong, .pet-battle-actions small { display: block; word-break: keep-all; overflow-wrap: anywhere; }
+.pet-battle-actions strong { font-size: 13px; }
+.pet-battle-actions small { font-size: 10px; margin-top: 2px; }
+.pet-battle-preview { min-height: 34px; margin-bottom: 6px; font-size: 11px; line-height: 1.5; }
+.pet-battle-result h3 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+.pet-battle-result small { display: block; margin-top: 10px; color: var(--lit-ink-muted, #696358); }
+.pet-battle-result-actions { display: flex; gap: 8px; }
+.pet-battle-result-actions button { flex: 1; }
+.pet-battle-number { position: absolute; top: 0; right: 0; color: #963b27; font-size: 26px; text-shadow: 0 1px 3px white; animation: pet-battle-float 600ms ease-out both; }
+.pet-battle-portrait[data-motion=attack] { animation: pet-battle-lunge 500ms ease-out; }
+.pet-battle-fighter[data-side=player] { --battle-step: -12px; }
+.pet-battle-fighter[data-side=opponent] { --battle-step: 12px; }
+.pet-battle-portrait[data-motion=hit] { animation: pet-battle-shake 500ms ease-out; }
+@keyframes pet-battle-lunge { 40% { transform: translateY(var(--battle-step)); } }
+@keyframes pet-battle-shake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+@keyframes pet-battle-float { from { transform: translateY(10px); opacity: 0; } 25% { opacity: 1; } to { transform: translateY(-14px); opacity: 1; } }
 .pet-footer-actions { display: flex; gap: 8px; margin-top: 8px; }
 .pet-footer-actions button { flex: 1; }
 .pet-sheet .pet-primary { background: #365942; color: #fff; font-weight: 700; }

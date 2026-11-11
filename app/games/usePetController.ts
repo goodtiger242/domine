@@ -80,6 +80,7 @@ export function usePetController(injectedApi?: PetApi) {
   const idCounter = useRef(0);
   const [active, setActive] = useState(true);
   const activeRef = useRef(true);
+  const offline = useRef(false);
   const host = useRef<HTMLDivElement>(null);
   const pendingKey = (i: PetIdentity) => `domine-pet-pending:${i.nickname.toLowerCase()}`;
   const current = useCallback((g: number, i: PetIdentity | null, selected: PetId) => alive.current && generation.current === g && identityRef.current === i && petRef.current === selected, []);
@@ -115,6 +116,7 @@ export function usePetController(injectedApi?: PetApi) {
     }
   }, []);
   const refresh = useCallback(async () => {
+    if (offline.current) return;
     const g = generation.current, selected = petRef.current, i = identityRef.current, seq = ++readSequence.current;
     const started = Date.now();
     try {
@@ -136,6 +138,7 @@ export function usePetController(injectedApi?: PetApi) {
   }, [api, apply, current]);
 
   const execute = useCallback(async (command: PetCommand, retry = false, presented = false) => {
+    if (offline.current) return;
     const i = identityRef.current;
     if (!i || !registeredRef.current || capabilityRef.current !== "ready") return;
     if (pending.current && !retry) return;
@@ -426,7 +429,7 @@ export function usePetController(injectedApi?: PetApi) {
       if (visible === activeRef.current) return;
       activeRef.current = visible; setActive(visible);
       if (!visible) { ++generation.current; mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); }
-      else { dispatch({ type: "resume" }); void refresh(); }
+      else if (!offline.current) { dispatch({ type: "resume" }); void refresh(); }
     };
     const observer = new IntersectionObserver(([entry]) => { intersecting = entry.isIntersecting; update(); });
     if (host.current) observer.observe(host.current);
@@ -448,13 +451,14 @@ export function usePetController(injectedApi?: PetApi) {
   }, [machine.visual, machine.command, machine.committedMap, cue, startExploration]);
   useEffect(() => {
     const ticket = personal?.ticket;
-    if (!active || !ticket || ticket.map_id !== worldCell(machine.committedMap).theme || machine.command !== "idle") return;
+    if (offline.current || !active || !ticket || ticket.map_id !== worldCell(machine.committedMap).theme || machine.command !== "idle") return;
     const delay = Math.max(250, Date.parse(ticket.eligible_at) - Date.parse(personal.serverNow) + 200);
     const timer = setTimeout(() => { void execute({ kind: "explore_finish", pet: petRef.current, ticket: ticket.id, requestId: crypto.randomUUID() }); }, delay);
     return () => clearTimeout(timer);
-  }, [personal?.ticket, personal?.serverNow, machine.committedMap, machine.command, active, execute]);
+  }, [personal?.ticket, personal?.serverNow, machine.committedMap, machine.command, machine.visual, active, execute]);
 
   function selectPet(id: PetId) {
+    if (offline.current) return;
     if ((machineRef.current.visual !== "paused" && visualLocked(machineRef.current)) || id === petRef.current) return;
     ++generation.current; ++readSequence.current;
     petRef.current = id; setPetId(id); setCue(null); setShared(petStates.current[id]?.shared?.pet ?? null); setMessage("");
@@ -488,7 +492,7 @@ export function usePetController(injectedApi?: PetApi) {
     canRetry: machine.command === "uncertain" && autoAttempts >= 3,
     care, localScene, done, connect, clearIdentity, selectPet, execute, refresh, checkCapabilities,
     retry: () => { if (pending.current) void execute(pending.current, true); },
-    pause: () => { ++generation.current; mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },
-    resume: () => { if (activeRef.current) { dispatch({ type: "resume" }); void refresh(); } },
+    pause: (localOnly = false) => { offline.current = localOnly; ++generation.current; mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); },
+    resume: () => { const wasOffline = offline.current; offline.current = false; if (activeRef.current) { dispatch({ type: "resume" }); if (!wasOffline) void refresh(); } },
   };
 }

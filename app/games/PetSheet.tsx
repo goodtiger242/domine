@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useLayoutEffect, useId, useRef, type ReactNode } from "react";
 
-export default function PetSheet({ title, onClose, onBack, children, toolbar, panel, footer }: {
+export default function PetSheet({ title, onClose, onBack, children, toolbar, panel, footer, fullHeight = false }: {
   title: string; onClose: () => void; onBack?: () => boolean; children: ReactNode;
-  toolbar?: ReactNode; panel?: ReactNode; footer?: ReactNode;
+  toolbar?: ReactNode; panel?: ReactNode; footer?: ReactNode; fullHeight?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null), heading = useId();
   const content = useRef<HTMLDivElement>(null), panelRef = useRef<HTMLDivElement>(null);
@@ -45,7 +45,7 @@ export default function PetSheet({ title, onClose, onBack, children, toolbar, pa
       dialog?.close(); Object.assign(body.style, saved); window.scrollTo({ top: scrollY, behavior: "instant" }); opener?.focus({ preventScroll: true });
     };
   }, [heading]);
-  return <dialog ref={ref} className="pet-sheet" aria-labelledby={heading} tabIndex={-1}
+  return <dialog ref={ref} className="pet-sheet" data-full-height={fullHeight} aria-labelledby={heading} tabIndex={-1}
     onPointerDown={(event) => { backdrop.current = event.target === event.currentTarget; }}
     onClick={(event) => { if (backdrop.current && event.target === event.currentTarget) onClose(); backdrop.current = false; }}
     onCancel={(event) => { event.preventDefault(); if (!onBack?.()) onClose(); }}>

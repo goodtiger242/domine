@@ -51,6 +51,8 @@ type Props = {
   petId?: PetId;
   cellId?: string;
   onMap?: () => void;
+  onBattle?: () => void;
+  battleDisabled?: boolean;
   onLocal?: (cue: SceneCue) => void;
   locked?: boolean;
   tapDisabled?: boolean;
@@ -107,7 +109,7 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
+export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
   const cell = worldCell(cellId);
   const [moving, setMoving] = useState(false);
   const [asking, setAsking] = useState<{ from: string; direction: (typeof DIRECTIONS)[number] } | null>(null);
@@ -462,6 +464,7 @@ export const PetScene = memo(function PetScene({ busyText, travel, arrivalId, st
       <div key={arrivalId ?? 0} className={`pet-location${arrivalId && !travel ? " pet-location-arrived" : ""}`} aria-live="polite"><strong>{cell.name}</strong><small>{cell.id}</small></div>
       {cellShops(cell.id).length > 0 && <ul className="pet-shop-plates" aria-label="이 칸의 가게">{cellShops(cell.id).map((name) => <li key={name}>{name}</li>)}</ul>}
       <button type="button" className="pet-map-button" disabled={locked} onClick={onMap} aria-label="동네 지도 열기"><span>MAP</span></button>
+      {onBattle && !moving && !ask && <button type="button" className="pet-battle-encounter" disabled={locked || battleDisabled} onClick={onBattle}>⚔️ 겨루기</button>}
       <button type="button" className="pet-move-toggle" aria-pressed={moving} disabled={locked} onClick={() => { setMoving(!moving); setAsking(null); }}><span>{moving ? "닫기" : "이동"}</span></button>
       {moving && DIRECTIONS.map((direction) => {
         const destination = neighborCell(cell.id, direction);

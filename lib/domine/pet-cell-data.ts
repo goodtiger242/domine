@@ -35,7 +35,7 @@ export const CELL_DATA: Record<string, { landmark: string; shops: string[]; imag
   "image": true
  },
  "G1": {
-  "landmark": "군포역전시장·당동도서관",
+  "landmark": "당동도서관 앞 거리",
   "shops": [
    "예감쪽갈비 군포점",
    "서유커피"
@@ -43,7 +43,7 @@ export const CELL_DATA: Record<string, { landmark: string; shops: string[]; imag
   "image": true
  },
  "H1": {
-  "landmark": "군포역(1호선)",
+  "landmark": "군포역·군포역전시장",
   "shops": [
    "여우화로",
    "포비엣콴"
@@ -216,7 +216,7 @@ export const CELL_DATA: Record<string, { landmark: string; shops: string[]; imag
   "image": true
  },
  "F4": {
-  "landmark": "성유유치원·군포초등학교 북측",
+  "landmark": "군포초등학교",
   "shops": [
    "동대문엽기떡볶이 군포당동점",
    "디저트어클락"
@@ -276,7 +276,7 @@ export const CELL_DATA: Record<string, { landmark: string; shops: string[]; imag
   "image": false
  },
  "F5": {
-  "landmark": "군포초등학교",
+  "landmark": "군포초교사거리 먹자골목",
   "shops": [
    "양은이네 군포당동점",
    "전주감자탕해장국 당동점"
@@ -448,12 +448,12 @@ export const CELL_DATA: Record<string, { landmark: string; shops: string[]; imag
   "image": true
  },
  "B8": {
-  "landmark": "삼성마을 1단지 서쪽 숲 가장자리",
+  "landmark": "삼성마을1단지아파트",
   "shops": [],
   "image": true
  },
  "C8": {
-  "landmark": "삼성마을1단지아파트·산마을공원",
+  "landmark": "용호사거리 골목",
   "shops": [
    "송정바지락칼국수",
    "텐퍼센트커피 군포용호마을점"
@@ -507,24 +507,24 @@ export const CELL_DATA: Record<string, { landmark: string; shops: string[]; imag
   "image": true
  },
  "B9": {
-  "landmark": "삼성로",
+  "landmark": "트레이더스 홀세일클럽 군포점",
   "shops": [
    "스타벅스 군포트레이더스점"
   ],
   "image": true
  },
  "C9": {
-  "landmark": "트레이더스 홀세일클럽 군포점",
+  "landmark": "군포국민체육센터 밤나무동산",
   "shops": [],
   "image": true
  },
  "D9": {
-  "landmark": "안양컨트리클럽 진입로·안양컨트리클럽삼거리",
+  "landmark": "안양컨트리클럽 진입로",
   "shops": [],
   "image": true
  },
  "E9": {
-  "landmark": "안양컨트리클럽 연습장",
+  "landmark": "안양컨트리클럽 클럽하우스",
   "shops": [],
   "image": true
  },
