@@ -11,6 +11,7 @@ export function groupHistory(entries: readonly PetHistoryEntry[], limit = 10) {
   const groups: HistoryRow[] = [];
   const open = new Map<string, HistoryRow>();
   for (const row of [...entries].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))) {
+    if (row.kind === "equip") continue; // 착용·해제는 이력에 남기지 않는다.
     const time = Date.parse(row.at);
     if (row.kind !== "action") { groups.push({ ...row, count: 1, oldest: time }); continue; }
     const key = `${row.nickname}|${row.pet}`, previous = open.get(key);

@@ -18,8 +18,8 @@ const entries = [
   {nickname:"민수",pet:2,kind:"discover",detail:"001",at},
 ];
 const html = renderToStaticMarkup(createElement(PetHistoryList,{entries}));
-assert.match(html,/<ul[^>]+aria-label="최근 활동"/);assert.equal((html.match(/<li>/g)||[]).length,5);
-for(const text of ["2분 전","민수 · 도미에게 밥","미네","도미 착용 해제","도미 Lv.5 달성","새 도감"]) assert.ok(html.includes(text),text);
+assert.match(html,/<ul[^>]+aria-label="최근 활동"/);assert.equal((html.match(/<li>/g)||[]).length,4);
+for(const text of ["2분 전","민수 · 도미에게 밥","미네","도미 Lv.5 달성","새 도감"]) assert.ok(html.includes(text),text);
 assert.ok(!html.includes("secret"));
 assert.match(historyText({...entries[0],detail:"unknown"}),/돌봄/);
 assert.match(historyText({...entries[2],detail:"061"}),/착용/);
@@ -58,7 +58,8 @@ const grouped = groupHistory([row(0), row(20, {nickname:"지수"}), row(30, {det
 assert.equal(grouped.length, 2); assert.equal(grouped[0].count, 3); assert.equal(grouped[0].at, row(60).at);
 assert.match(historyText(grouped[0]), /도미 돌봄 3번 \(밥2 간식\)/);
 assert.equal(groupHistory([row(0), row(61)]).length, 2);
-assert.equal(groupHistory([row(0), row(1, {pet:2}), row(2, {kind:"equip"}), row(3, {detail:"treat"})]).length, 3);
+assert.equal(groupHistory([row(0), row(1, {pet:2}), row(2, {kind:"equip"}), row(3, {detail:"treat"})]).length, 2);
+assert.ok(!renderToStaticMarkup(createElement(PetHistoryList,{entries})).includes("착용"));
 const limited = groupHistory(Array.from({length:20}, (_, i) => row(i * 61)));
 assert.equal(limited.length, 10); assert.equal(limited[0].at, row(19 * 61).at);
 const repeated = renderToStaticMarkup(createElement(PetHistoryList, {entries:[...entries, entries[0]]}));
