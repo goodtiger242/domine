@@ -2,12 +2,13 @@ import type { PetAction } from "./pet";
 
 export const PET_MAPS = [
   { id: "field", name: "들판", background: null },
-  { id: "church", name: "성당 앞마당", background: "/pet/bg/church.webp" },
+  { id: "church", name: "용호성당 마당", background: null },
   { id: "street", name: "당정동", background: "/pet/bg/street.webp" },
   { id: "park", name: "공원 숲길", background: "/pet/bg/park.webp" },
   { id: "home", name: "도미네 집 마당", background: "/pet/bg/home.webp" },
 ] as const;
 export type PetMap = typeof PET_MAPS[number]["id"];
+export const DEFAULT_MAP: PetMap = "church";
 export type SceneAction = PetAction | "sleep";
 export type SceneCue = { id: number } & (
   { action: SceneAction | "tap" | "priest" } |
@@ -16,7 +17,7 @@ export type SceneCue = { id: number } & (
 );
 
 export function petMap(value: string) {
-  return PET_MAPS.find((map) => map.id === value) ?? PET_MAPS[0];
+  return PET_MAPS.find((map) => map.id === value) ?? PET_MAPS[1];
 }
 
 export function neighborMap(current: string, direction: 1 | -1) {

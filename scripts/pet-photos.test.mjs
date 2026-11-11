@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
-import { backgroundAt, BACKGROUNDS, poseAt, POSES, PETS, PRIEST, DOGHOUSE, petText } from "../lib/domine/pet-photos.ts";
-import { PET_MAPS, petMap, neighborMap, actionsForMap, SHOPS } from "../lib/domine/pet-maps.ts";
+import { backgroundAt, BACKGROUNDS, CHURCH_BACKGROUNDS, poseAt, POSES, PETS, PRIEST, DOGHOUSE, petText } from "../lib/domine/pet-photos.ts";
+import { DEFAULT_MAP, PET_MAPS, petMap, neighborMap, actionsForMap, SHOPS } from "../lib/domine/pet-maps.ts";
 import { petRequest } from "../lib/domine/pet-rpc.ts";
 import { bubblePosition } from "../lib/domine/pet-bubble.ts";
 
@@ -73,6 +73,7 @@ for (const stage of ["baby", "young", "adult"]) {
 // Render the scene without effects or network calls, at two feeding depths.
 const sceneModule = { exports: {} };
 let sceneState = {};
+let sceneEffects = [];
 const sceneSource = ts.transpileModule(readFileSync(new URL("../app/games/PetScene.tsx", import.meta.url), "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
@@ -82,6 +83,7 @@ new Function("require", "exports", sceneSource)((name) => {
   if (name === "react") return {
     ...require("react"),
     useState: (initial) => require("react").useState(initial?.fx ? { ...initial, ...sceneState } : initial),
+    useEffect: (effect) => { sceneEffects.push(effect); },
   };
   return require(name);
 }, sceneModule.exports);
@@ -104,7 +106,7 @@ assert.ok(renderScene({ speaker: "priest" }).includes('aria-label="신부님의 
 const scales = [];
 for (const y of [77, 88]) {
   sceneState = { y, bowl: 110 };
-  const scene = renderScene();
+  const scene = renderScene({ map: "field" });
   const bowl = scene.match(/<g transform="translate\(110 ([\d.]+)\) scale\(([\d.]+)\)"[^>]*>(.*?)<\/g>/);
   assert.ok(bowl, "Feeding bowl renders at the dog's depth");
   assert.equal(Number(bowl[1]), y + 1);
@@ -113,6 +115,36 @@ for (const y of [77, 88]) {
   scales.push(Number(bowl[2]));
 }
 assert.ok(scales[1] > scales[0], "Foreground bowl is larger than distant bowl");
+const churchScene = renderScene({ map: "church" });
+const churchBowl = churchScene.match(/translate\(110 89\) scale\(([\d.]+)\)/);
+assert.ok(Number(churchBowl[1]) < scales[1], "Church props match the smaller dogs");
+assert.ok(churchScene.includes('transform="translate(12 21) scale(0.68)"'), "Priest feet stay on courtyard paving");
+sceneState = {};
+for (const petId of [1, 2]) {
+  const imageWidth = (map) => Number(renderScene({ map, petId }).match(new RegExp(`href="${PETS[petId].standing.adult}"[^>]*width="([\\d.]+)"`))[1]);
+  assert.ok(Math.abs(imageWidth("church") / imageWidth("field") - 0.58) < 1e-9);
+}
+
+// Exercise mount loaders with a fake browser: no network or DB calls.
+const oldWindow = globalThis.window;
+const oldImage = globalThis.Image;
+try {
+  const requested = [];
+  globalThis.Image = class { set src(value) { requested.push(value); } };
+  globalThis.window = { requestIdleCallback: (cb) => { cb(); return 0; }, cancelIdleCallback() {}, clearTimeout() {} };
+  for (const map of PET_MAPS) for (const hour of [6, 12, 18, 22]) {
+    sceneEffects = [];
+    requested.length = 0;
+    renderScene({ map: map.id, hour });
+    const cleanups = sceneEffects.map((effect) => effect());
+    const expected = map.background ?? (map.id === "church" ? CHURCH_BACKGROUNDS : BACKGROUNDS)[backgroundAt(hour)];
+    assert.deepEqual(requested.filter((src) => src.startsWith("/pet/bg/")), [expected], "Only the current map/time photo loads, even during idle preload");
+    cleanups.forEach((cleanup) => cleanup?.());
+  }
+} finally {
+  globalThis.window = oldWindow;
+  globalThis.Image = oldImage;
+}
 let total = 0;
 for (const src of [...Object.values(BACKGROUNDS), ...Object.values(POSES).map((p) => p.src)]) {
   const file = new URL(`../public${src}`, import.meta.url);
@@ -123,7 +155,9 @@ for (const src of [...Object.values(BACKGROUNDS), ...Object.values(POSES).map((p
 }
 assert.ok(total < 600 * 1024);
 
-assert.equal(petMap("invalid").id, "field");
+assert.equal(DEFAULT_MAP, "church");
+for (const saved of ["", "invalid"]) assert.equal(petMap(saved).id, DEFAULT_MAP);
+for (const map of PET_MAPS) assert.equal(petMap(map.id).id, map.id, "Remembered maps remain selected");
 assert.deepEqual(PET_MAPS.map((map) => map.id), ["field", "church", "street", "park", "home"]);
 for (const direction of [-1, 1]) {
   let map = "field";
@@ -184,7 +218,8 @@ responses = [{ data: null, error: { code: "42501", message: "permission" } }];
 assert.equal((await petRequest(rpc, 2, "친구")).legacy, false);
 assert.equal(calls.length, 1, "Other failures must not trigger fallback");
 
-const newBackgrounds = PET_MAPS.flatMap((map) => map.background ? [map.background] : []);
+const newBackgrounds = [...Object.values(CHURCH_BACKGROUNDS), ...PET_MAPS.flatMap((map) => map.background ? [map.background] : [])];
+assert.ok(!existsSync(new URL("../public/pet/bg/church.webp", import.meta.url)), "Old church photo removed");
 const minePhotos = [PETS[2].standing.adult, ...Object.values(PETS[2].poses).map((p) => p.src)];
 const newAssets = [...newBackgrounds, PRIEST, DOGHOUSE, ...minePhotos];
 const size = (src) => statSync(new URL(`../public${src}`, import.meta.url)).size;
@@ -203,6 +238,8 @@ import tempfile, subprocess
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
+for path in Path('public/pet/bg').glob('church-*.webp'):
+    assert Image.open(path).size == (1200, 600), 'Church photos keep the 2:1 composition'
 with tempfile.TemporaryDirectory(prefix='pet-cut-test-') as d:
     root = Path(d)
     im = Image.new('RGB', (128,128), '#ff00ff')

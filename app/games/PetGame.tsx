@@ -26,7 +26,7 @@ import {
 import { rejectLine } from "@/lib/domine/pet-lines";
 import { currentHour } from "@/lib/domine/sky";
 import { PETS, petText, type PetId } from "@/lib/domine/pet-photos";
-import { actionsForMap, petMap, type PetMap, type SceneAction, type SceneCue } from "@/lib/domine/pet-maps";
+import { DEFAULT_MAP, actionsForMap, petMap, type PetMap, type SceneAction, type SceneCue } from "@/lib/domine/pet-maps";
 import { petRequest } from "@/lib/domine/pet-rpc";
 import { PetScene } from "./PetScene";
 
@@ -72,7 +72,7 @@ export function PetGame() {
   const [multiPet, setMultiPet] = useState(false);
   const requestId = useRef(0);
   const busyRef = useRef(false);
-  const [map, setMap] = useState<PetMap>("field");
+  const [map, setMap] = useState<PetMap>(DEFAULT_MAP);
   const changeMap = useCallback((next: PetMap) => {
     setMap(next);
     try { localStorage.setItem(MAP_KEY, next); } catch { /* 기기 저장 실패는 무시 */ }

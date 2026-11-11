@@ -6,8 +6,8 @@ import type { PetAction, PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
 import { ART, BALL, BOWL, preloadArt } from "@/lib/domine/pet-art";
 import { line, PRIEST_LINES } from "@/lib/domine/pet-lines";
-import { BACKGROUNDS, backgroundAt, PETS, PRIEST, DOGHOUSE, type PetId } from "@/lib/domine/pet-photos";
-import { PET_MAPS, petMap, neighborMap, SHOPS, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
+import { BACKGROUNDS, CHURCH_BACKGROUNDS, backgroundAt, PETS, PRIEST, DOGHOUSE, type PetId } from "@/lib/domine/pet-photos";
+import { DEFAULT_MAP, PET_MAPS, petMap, neighborMap, SHOPS, type PetMap, type SceneCue } from "@/lib/domine/pet-maps";
 import { DOG_W, PetDog, RATIO } from "./PetDog";
 
 /**
@@ -382,8 +382,8 @@ function Prop({ e, size, className }: { e: string; size: number; className?: str
   );
 }
 
-function Ball() {
-  return <image href={BALL} x={-3.2} y={-3.2} width={6.4} height={6.4} />;
+function Ball({ scale = 1 }: { scale?: number }) {
+  return <image href={BALL} x={-3.2 * scale} y={-3.2 * scale} width={6.4 * scale} height={6.4 * scale} />;
 }
 
 type Props = {
@@ -446,7 +446,7 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, map = "field", onMap, onLocal, locked = false, speaker = "dog" }: Props) {
+export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, map = DEFAULT_MAP, onMap, onLocal, locked = false, speaker = "dog" }: Props) {
   const shadowId = useId();
   const [s, setS] = useState<S>(HOME);
   const timers = useRef<number[]>([]);
@@ -454,7 +454,9 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
   latest.current = { stage, onSay, onDone, onMap, map, petId };
   const running = useRef(false);
   const period = backgroundAt(hour);
-  const background = petMap(map).background ?? BACKGROUNDS[period];
+  const church = map === "church";
+  const sceneScale = church ? 0.58 : 1;
+  const background = petMap(map).background ?? (church ? CHURCH_BACKGROUNDS : BACKGROUNDS)[period];
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [photos, setPhotos] = useState<Record<string, boolean>>({});
   const [shown, setShown] = useState<string | null>(null);
@@ -484,8 +486,6 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
   }, [background]);
 
   useEffect(() => preloadArt([
-    ...Object.values(BACKGROUNDS),
-    ...PET_MAPS.flatMap((m) => m.background ? [m.background] : []),
     ...Object.values(PETS).flatMap((pet) => [...Object.values(pet.standing), ...Object.values(pet.poses).map((p) => p.src)]),
     DOGHOUSE,
   ], (src) => setPhotos((prev) => ({ ...prev, [src]: true }))), []);
@@ -538,7 +538,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       run({ steps: [[0, { say: pick([...PRIEST_LINES]) }]], end: 2000 });
     } else {
       const config = PETS[latest.current.petId];
-      const plan = makePlan(cue.action, DOG_W[latest.current.stage] * config.scale, config.ratio);
+      const plan = makePlan(cue.action, DOG_W[latest.current.stage] * config.scale * sceneScale, config.ratio);
       if (cue.action === "walk" && Math.random() < 0.8) {
         const direction = pick<Dir>([-1, 1]);
         const from = latest.current.map;
@@ -557,7 +557,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
   const c = skyAt(hour);
   const body = bodyAt(hour);
   const sc = depth(s.y);
-  const w = DOG_W[stage] * PETS[petId].scale;
+  const w = DOG_W[stage] * PETS[petId].scale * sceneScale;
   const h = w * PETS[petId].ratio;
   const move = (x: number, y: number, dur: number, extra = "") => ({
     transform: `translate(${x}px, ${y}px)${extra}`,
@@ -610,22 +610,24 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       <rect y="66" width="160" height="30" fill={c.ground} />
 
       <g pointerEvents="none" className={s.scroll ? "pet-photo-pan" : undefined}>
-        {[...Object.values(BACKGROUNDS), ...PET_MAPS.flatMap((m) => m.background ? [m.background] : [])].filter((src) => photos[src]).map((src) => (
+        {[...Object.values(BACKGROUNDS), ...Object.values(CHURCH_BACKGROUNDS), ...PET_MAPS.flatMap((m) => m.background ? [m.background] : [])].filter((src) => photos[src]).map((src) => (
           <image key={src} href={src} x="0" y="6" width="160" height="90"
             preserveAspectRatio="none" className="pet-photo-fade"
             style={{ opacity: shown === src ? 1 : 0 }} />
         ))}
       </g>
 
-      {map !== "field" && <rect pointerEvents="none" y="6" width="160" height="90"
+      {map !== "field" && !church && <rect pointerEvents="none" y="6" width="160" height="90"
         fill={period === "night" ? "#101d49" : period === "dusk" ? "#e98b44" : "#e7b7af"}
         opacity={period === "night" ? 0.55 : period === "dusk" ? 0.23 : period === "dawn" ? 0.17 : 0} />}
 
       <g pointerEvents="none" style={{ filter: `brightness(${light})` }}>
+        <g transform={church ? "translate(12 21) scale(0.68)" : undefined}>
         <ellipse cx="34" cy="78" rx="8" ry="2" fill={`url(#${shadowId})`} />
         {failed[PRIEST] ? <text x="34" y="70" fontSize="6" textAnchor="middle">신부님</text> :
           <image href={PRIEST} x="26" y="29" width="16" height="49" preserveAspectRatio="xMidYMax meet"
             onError={() => setFailed((prev) => ({ ...prev, [PRIEST]: true }))} />}
+        </g>
         {map === "home" && <g role="img" aria-label="개집">
           <ellipse cx="122" cy="82" rx="27" ry="4" fill={`url(#${shadowId})`} />
           {photos[DOGHOUSE] && !failed[DOGHOUSE] ? <image href={DOGHOUSE} x="95" y="34" width="55" height="48"
@@ -635,7 +637,7 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       </g>
 
       {s.bowl !== null ? (
-        <g transform={`translate(${s.bowl} ${s.y + 1}) scale(${sc})`} className="fade-in" style={{ filter: `brightness(${light})` }}>
+        <g transform={`translate(${s.bowl} ${s.y + 1}) scale(${sc * sceneScale})`} className="fade-in" style={{ filter: `brightness(${light})` }}>
           <ellipse cy="1" rx="13" ry="2.5" fill={`url(#${shadowId})`} />
           <image href={BOWL} x={-12} y={-13} width={24} height={14} />
         </g>
@@ -643,17 +645,18 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
 
       {/* 도미 (가로 위치·방향·깊이는 transition 으로 부드럽게) */}
       <g style={move(s.x, s.y, s.dur, ` scale(${s.dir * sc}, ${sc})`)}>
-        <ellipse cx="0" cy="1.8" rx={w * 0.5} ry="5" fill={`url(#${shadowId})`} />
-        <ellipse cx="0" cy="1" rx={w * 0.3} ry="1.5" fill={`url(#${shadowId})`} />
+        <ellipse cx="0" cy={1.8 * sceneScale} rx={w * 0.5} ry={5 * sceneScale} fill={`url(#${shadowId})`} />
+        <ellipse cx="0" cy={sceneScale} rx={w * 0.3} ry={1.5 * sceneScale} fill={`url(#${shadowId})`} />
         {s.carry ? (
           <g
             transform={`translate(${{ mouth: w * 0.47, back: 0, tail: -w * 0.47, head: w * 0.34 }[s.carry]} ${{ mouth: -h * 0.76, back: -h * 0.8, tail: -h * 0.33, head: -h * 1.0 }[s.carry]})`}
           >
-            <Ball />
+            <Ball scale={sceneScale} />
           </g>
         ) : null}
         <PetDog
           petId={petId}
+          scale={sceneScale}
           stage={stage}
           face={face}
           motion={s.motion}
@@ -726,18 +729,18 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       <g style={{ filter: `brightness(${light}) drop-shadow(0 0.5px 0.5px #17231d40)` }}>
       {s.ball ? (
         <g style={move(s.ball.x, s.ball.y, s.ball.dur)}>
-          <Ball />
+          <Ball scale={sceneScale} />
         </g>
       ) : null}
       {s.item ? (
         <g style={move(s.item.x, s.item.y, s.item.dur)}>
-          <Prop e={s.item.e} size={s.item.size} />
+          <Prop e={s.item.e} size={s.item.size * sceneScale} />
         </g>
       ) : null}
       {s.hand ? (
         <g style={move(s.hand.x, s.hand.y, s.hand.dur)} pointerEvents="none">
           <g className={s.hand.stroke ? "pet-stroke" : undefined}>
-            <Prop e={s.hand.e} size={15} />
+            <Prop e={s.hand.e} size={15 * sceneScale} />
           </g>
         </g>
       ) : null}
@@ -748,15 +751,15 @@ export const PetScene = memo(function PetScene({ stage, face, light, hour, colla
       className={`absolute top-[58%] flex h-11 w-11 items-center justify-center rounded-full text-xl text-white [text-shadow:0_1px_4px_#000] focus-visible:outline-2 disabled:opacity-40 ${direction < 0 ? "left-0" : "right-0"}`}
       aria-label={`${neighborMap(map, direction).name}(으)로 이동`} disabled={locked}
       onClick={() => onLocal?.({ action: "map", direction, id: Date.now() })}>{direction < 0 ? "‹" : "›"}</button>)}
-    <button type="button" className="absolute left-[15%] top-[30%] h-[50%] min-h-11 w-[12%] min-w-11 rounded-xl focus-visible:outline-2"
+    <button type="button" className={`absolute min-h-11 w-[12%] min-w-11 rounded-xl focus-visible:outline-2 ${church ? "left-[16%] top-[38%] h-[38%]" : "left-[15%] top-[30%] h-[50%]"}`}
       aria-label="신부님께 인사하기" disabled={locked} onClick={() => onLocal?.({ action: "priest", id: Date.now() })} />
     {map === "street" && SHOPS.map((shop, index) => <button key={shop.name} type="button"
       className="absolute flex min-h-11 w-[23%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded text-[clamp(11px,3vw,16px)] font-semibold text-[#30271e] focus-visible:outline-2 disabled:opacity-60"
       style={{ left: `${shop.x}%`, top: `${shop.y}%` }} aria-label={`${shop.name} 앞으로 가기`} disabled={locked}
       onClick={() => onLocal?.({ action: "shop", shop: index, id: Date.now() })}>{shop.name}</button>)}
     {bubble && <SpeechBubble text={bubble} label={speaker === "priest" ? "신부님의 말" : `${PETS[petId].name}의 말`}
-      x={speaker === "priest" ? 47 : s.x + s.dir * w * sc * 0.25}
-      y={speaker === "priest" ? 39 : s.y - h * sc} duration={s.dur} />}
+      x={speaker === "priest" ? (church ? 43 : 47) : s.x + s.dir * w * sc * 0.25}
+      y={speaker === "priest" ? (church ? 45 : 39) : s.y - h * sc} duration={s.dur} />}
     </div>
   );
 });

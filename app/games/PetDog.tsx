@@ -12,6 +12,7 @@ export const RATIO = 622 / 900;
 
 type Props = {
   petId?: PetId;
+  scale?: number;
   stage: PetStage;
   face: PetFace;
   /** 연출 중인 동작 클래스 (없으면 상태에 맞는 기본 자세) */
@@ -24,13 +25,13 @@ type Props = {
   onTap?: () => void;
 };
 
-export function PetDog({ petId = 1, stage, face, motion, light, collar, photos, onTap }: Props) {
+export function PetDog({ petId = 1, scale = 1, stage, face, motion, light, collar, photos, onTap }: Props) {
   const config = PETS[petId];
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const pose = poseAt(motion, face);
   const photo = pose && photos[config.poses[pose].src] && !failed[config.poses[pose].src] ? config.poses[pose] : null;
   const src = photo?.src ?? config.standing[stage];
-  const width = DOG_W[stage] * config.scale * (photo?.width ?? 1);
+  const width = DOG_W[stage] * config.scale * scale * (photo?.width ?? 1);
   const height = width * (photo?.ratio ?? config.ratio);
   const sad = face === "hungry" || face === "sad";
   const dirty = face === "dirty" && motion !== "pet-shake";
@@ -48,7 +49,7 @@ export function PetDog({ petId = 1, stage, face, motion, light, collar, photos, 
       {failed[src] ? <text y={-height / 3} textAnchor="middle" fontSize={width * 0.6}>🐕</text> : <image
         href={src}
         x={-width / 2}
-        y={-height + 1.5}
+        y={-height + 1.5 * scale}
         width={width}
         height={height}
         style={{ filter }}
@@ -56,7 +57,7 @@ export function PetDog({ petId = 1, stage, face, motion, light, collar, photos, 
       />}
       {/* 사진의 목줄 위치(900px 기준 좌표)에 전례색 목줄을 덧그린다 */}
       {!photo && !failed[src] && config.collar && <g
-        transform={`translate(${-width / 2} ${-height + 1.5}) scale(${width / 900})`}
+        transform={`translate(${-width / 2} ${-height + 1.5 * scale}) scale(${width / 900})`}
         style={{ filter }}
       >
         <path d={config.collar} stroke={collar} strokeWidth="15" strokeLinecap="round" fill="none" />

@@ -5,6 +5,13 @@ export const BACKGROUNDS = {
   night: "/pet/bg/night.webp",
 };
 
+export const CHURCH_BACKGROUNDS = {
+  dawn: "/pet/bg/church-dawn.webp",
+  day: "/pet/bg/church-day.webp",
+  dusk: "/pet/bg/church-dusk.webp",
+  night: "/pet/bg/church-night.webp",
+};
+
 export function backgroundAt(hour: number): keyof typeof BACKGROUNDS {
   return hour >= 5 && hour < 7 ? "dawn"
     : hour >= 7 && hour < 17 ? "day"
