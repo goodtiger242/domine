@@ -527,7 +527,7 @@
 .pet-battle-round[data-urgency=late] { color: #ffe293; }
 .pet-battle-round[data-urgency=near] { color: #ffba7b; }
 .pet-battle-round[data-urgency=last] { color: #ff8d88; }
-.pet-battle-hud h3 > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pet-battle-hud h3 > span { min-width: 0; flex: 1; overflow: hidden; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.15; }
 .pet-battle-info { flex: 0 0 44px; height: 44px; background: transparent; border: 0; color: #fff; font-size: 16px; }
 .pet-battle-health-row { display: flex; align-items: center; gap: 5px; font-size: 12px; line-height: 16px; }
 .pet-battle-health-row > span { white-space: nowrap; }

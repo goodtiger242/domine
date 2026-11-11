@@ -13,6 +13,7 @@ import type { FxSheet } from "@/lib/domine/pet-fx-sheets";
 import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import type { PetStage } from "@/lib/domine/pet";
 import { cellBackground } from "@/lib/domine/pet-cells";
+import { shortBreedName } from "@/lib/domine/breed-short";
 
 const TRAIT_LABEL: Record<Trait, string> = {
   restDamage: "쉰 뒤 첫 공격 강화", earlySpeed: "초반 민첩 증가", firstTrack: "첫 추적 공격 강화",
@@ -49,7 +50,7 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose,
   encounter: Encounter; petId: PetId; stage: PetStage; hour: number; onClose: () => void; onWin?: () => void;
 }) {
   const attempt = useRef(0);
-  const names = { player: PETS[petId].name, opponent: BREED_BY_ID[encounter.fighter.breedId].name };
+  const names = { player: PETS[petId].name, opponent: shortBreedName(encounter.fighter.breedId, BREED_BY_ID[encounter.fighter.breedId].name) };
   const start = (roundSeed: number) => createBattle({
     seed: seedFor(`${encounter.cellId}:${petId}:${roundSeed}`, encounter.daySeed),
     player: buildFighter(petId === 1 ? "B001" : "B002", encounter.playerLevel),
