@@ -56,8 +56,8 @@
 .pet-coin-flight { position: absolute; top: 65%; color: #d8a233; font-style: normal; animation: pet-coin-flight 450ms both; }
 .pet-level-particle { position: absolute; top: 20%; color: #d9a73c; animation: pet-particle 900ms both; }
 .pet-scene[data-paused=true] *, .pet-scene[data-paused=true] { animation-play-state: paused !important; transition: none !important; }
-.pet-stage { height: 400px; aspect-ratio: auto; }
-.pet-scene-picture { position: absolute; top: 120px; left: 50%; width: min(100%, 362px); aspect-ratio: 16 / 9; transform: translateX(-50%); }
+.pet-stage { width: 100%; max-width: 680px; margin-inline: auto; aspect-ratio: 16 / 9; }
+.pet-scene-picture { position: absolute; inset: 0; }
 .pet-scene-ui { pointer-events: none; z-index: 1; }
 .pet-scene-ui > * { pointer-events: auto; }
 .pet-location { position: absolute; top: 4px; left: 4px; max-width: calc(100% - 64px); padding: 3px 9px; border-radius: 12px; background: #15221ccc; color: white; pointer-events: none !important; }

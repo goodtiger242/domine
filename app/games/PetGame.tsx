@@ -86,7 +86,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
         cue={game.cue} onSay={say} onDone={game.done} speaker={speech.speaker}
         bubble={speech.text.endsWith("에 왔어요") ? speech.text : petText(speech.text || "반가워요!", game.petId)} wearable={equipment("wearable")} toy={equipment("toy")} />
         : <p className="p-8 text-center text-sm" role="status">동네를 불러오고 있어요…</p>}
-      {pet && <div className="pointer-events-none absolute inset-x-0 bottom-0 flex gap-4 bg-gradient-to-t from-black/75 to-transparent px-3 pb-2 pt-4">
+      {pet && <div className="pointer-events-none absolute inset-x-0 bottom-0 flex gap-4 bg-gradient-to-t from-black/55 to-transparent px-3 pb-1 pt-3">
         <Mini label="배부름" icon="🍖" value={pet.fullness} color="#f5c878" /><Mini label="기분" icon="♥" value={pet.mood} color="#ffabbc" /><Mini label="청결" icon="💧" value={pet.clean ?? 80} color="#9ae4f0" />
       </div>}
       {game.feedback && <PetFeedback key={game.feedback.id} result={game.feedback.result} previousLevel={game.feedback.previousLevel} />}
