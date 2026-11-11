@@ -753,6 +753,83 @@ body {
   transition: opacity 1.2s ease-in-out;
 }
 
+.pet-category {
+  min-height: 40px;
+  color: var(--lit-ink-muted);
+  border-bottom: 2px solid transparent;
+}
+.pet-category[aria-selected="true"] {
+  color: var(--lit-ink);
+  border-bottom-color: currentColor;
+}
+.pet-actions {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding: 2px;
+}
+.pet-actions[hidden] { display: none; }
+.pet-actions::-webkit-scrollbar { display: none; }
+.pet-action {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 64px;
+  height: 44px;
+  padding: 0 5px;
+  border: 1px solid var(--lit-border);
+  border-radius: 10px;
+  background: var(--lit-bg-elevated);
+  color: var(--lit-ink);
+  scroll-snap-align: start;
+}
+.pet-action:disabled { opacity: 0.5; }
+.pet-action[data-active="true"] { opacity: 1; border-color: var(--lit-ink-muted); }
+.pet-action:enabled:hover { border-color: var(--lit-ink-muted); }
+.pet-action:focus-visible, .pet-category:focus-visible, .pet-actions:focus-visible {
+  outline: 2px solid var(--lit-ring);
+  outline-offset: -2px;
+}
+.pet-speech {
+  position: absolute;
+  width: max-content;
+  max-width: min(240px, calc(100% - 12px));
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: #fffdf8;
+  color: #302a24;
+  box-shadow: 0 1px 6px #17231d30;
+  font-size: 12px;
+  line-height: 16px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  transition-property: left, top;
+  transition-timing-function: ease-in-out;
+}
+.pet-speech-text { display: block; animation: pet-speech-in 160ms ease-out; }
+.pet-speech-tail {
+  position: absolute;
+  top: 100%;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-top: 8px solid #fffdf8;
+  border-bottom: 0;
+  transform: translateX(-50%);
+  transition-property: left;
+  transition-timing-function: ease-in-out;
+}
+@keyframes pet-speech-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes pet-photo-pan {
   from { transform: translateX(8px); }
   to { transform: translateX(-8px); }

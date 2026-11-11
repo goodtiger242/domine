@@ -1,7 +1,25 @@
-export type PetAction = "feed" | "treat" | "pet" | "play" | "walk" | "brush" | "bath" | "train";
+/** UI에 행동을 추가할 때는 이 표에 한 줄만 추가한다. 서버 지원 여부는 cooldown으로 확인한다. */
+export const PET_ACTION_TABLE = {
+  feed: { category: "먹이", label: "밥주기", icon: "🍖", done: "밥을 줬어요", ms: 2400 },
+  treat: { category: "먹이", label: "간식", icon: "🦴", done: "간식을 줬어요", ms: 2200 },
+  pet: { category: "돌봄", label: "쓰다듬기", icon: "🤚", done: "쓰다듬어 줬어요", ms: 2400 },
+  play: { category: "놀이", label: "공놀이", icon: "🎾", done: "공놀이를 했어요", ms: 3200 },
+  walk: { category: "놀이", label: "산책", icon: "🦮", done: "산책을 시켰어요", ms: 4000 },
+  brush: { category: "돌봄", label: "빗질", icon: "🪮", done: "빗질을 해 줬어요", ms: 2600 },
+  bath: { category: "돌봄", label: "목욕", icon: "🛁", done: "목욕을 시켰어요", ms: 3200 },
+  train: { category: "놀이", label: "훈련", icon: "🎓", done: "훈련을 시켰어요", ms: 3000 },
+} as const;
+export type PetAction = keyof typeof PET_ACTION_TABLE;
+export const PET_ACTIONS = Object.keys(PET_ACTION_TABLE) as PetAction[];
+export const PET_CATEGORIES = ["먹이", "돌봄", "놀이"] as const;
+export type PetCategory = typeof PET_CATEGORIES[number];
 
-/** 화면에 나오는 순서 */
-export const PET_ACTIONS: PetAction[] = ["feed", "treat", "pet", "play", "walk", "brush", "bath", "train"];
+export function availableActionGroups(avail: PetAction[]) {
+  return PET_CATEGORIES.map((category) => ({
+    category,
+    actions: PET_ACTIONS.filter((action) => PET_ACTION_TABLE[action].category === category && avail.includes(action)),
+  })).filter(({ actions }) => actions.length > 0);
+}
 
 export type PetState = {
   name: string;
@@ -29,50 +47,12 @@ export const STAGE_LABEL: Record<PetStage, string> = {
   adult: "다 큰 강아지",
 };
 
-export const ACTION_LABEL: Record<PetAction, string> = {
-  feed: "밥주기",
-  treat: "간식",
-  pet: "쓰다듬기",
-  play: "공놀이",
-  walk: "산책",
-  brush: "빗질",
-  bath: "목욕",
-  train: "훈련",
-};
-
-export const ACTION_DONE: Record<PetAction, string> = {
-  feed: "밥을 줬어요",
-  treat: "간식을 줬어요",
-  pet: "쓰다듬어 줬어요",
-  play: "공놀이를 했어요",
-  walk: "산책을 시켰어요",
-  brush: "빗질을 해 줬어요",
-  bath: "목욕을 시켰어요",
-  train: "훈련을 시켰어요",
-};
-
-export const ACTION_ICON: Record<PetAction, string> = {
-  feed: "🍖",
-  treat: "🦴",
-  pet: "🤚",
-  play: "🎾",
-  walk: "🦮",
-  brush: "🪮",
-  bath: "🛁",
-  train: "🎓",
-};
+export const ACTION_LABEL = Object.fromEntries(PET_ACTIONS.map((a) => [a, PET_ACTION_TABLE[a].label])) as Record<PetAction, string>;
+export const ACTION_DONE = Object.fromEntries(PET_ACTIONS.map((a) => [a, PET_ACTION_TABLE[a].done])) as Record<PetAction, string>;
+export const ACTION_ICON = Object.fromEntries(PET_ACTIONS.map((a) => [a, PET_ACTION_TABLE[a].icon])) as Record<PetAction, string>;
 
 /** 행동이 끝난 뒤 효과가 보이는 시간(ms) */
-export const ACTION_PLAY_MS: Record<PetAction, number> = {
-  feed: 2400,
-  treat: 2200,
-  pet: 2400,
-  play: 3200,
-  walk: 4000,
-  brush: 2600,
-  bath: 3200,
-  train: 3000,
-};
+export const ACTION_PLAY_MS = Object.fromEntries(PET_ACTIONS.map((a) => [a, PET_ACTION_TABLE[a].ms])) as Record<PetAction, number>;
 
 /** 남은 쉬는 시간 표시: 2시간 13분 / 14분 / 40초 */
 export function formatWait(sec: number): string {

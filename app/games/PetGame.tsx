@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   ACTION_DONE,
   ACTION_ICON,
   ACTION_LABEL,
+  availableActionGroups,
   blip,
   bumpStreak,
   collarToday,
@@ -18,6 +19,7 @@ import {
   stageOf,
   timeAgo,
   type PetAction,
+  type PetCategory,
   type PetState,
 } from "@/lib/domine/pet";
 import { rejectLine } from "@/lib/domine/pet-lines";
@@ -36,15 +38,12 @@ function safeGet(key: string): string {
   }
 }
 
-function Mini({ label, value, color }: { label: string; value: number; color: string }) {
+function Mini({ label, icon, value, color }: { label: string; icon: string; value: number; color: string }) {
   return (
-    <span className="min-w-0 flex-1">
-      <span className="mb-2 flex items-baseline justify-between gap-1 text-[12px] text-[var(--lit-ink-muted)]">
-        <span>{label}</span>
-        <span className="tabular-nums text-[var(--lit-ink)]">{value}<span className="sr-only"> / 100</span></span>
-      </span>
+    <span className="flex min-w-0 flex-1 items-center gap-1.5" title={`${label} ${value} / 100`}>
+      <span aria-hidden="true" className="text-[12px] leading-none" style={{ color }}>{icon}</span>
       <span
-        className="block h-1 overflow-hidden rounded-full bg-[var(--lit-border)]"
+        className="block h-1 flex-1 overflow-hidden rounded-full bg-white/40"
         role="progressbar"
         aria-label={label}
         aria-valuemin={0}
@@ -58,7 +57,9 @@ function Mini({ label, value, color }: { label: string; value: number; color: st
 }
 
 export function PetGame() {
-  const supabase = useRef(createClient());
+  const [supabase] = useState(createClient);
+  const tabsId = useId();
+  const [category, setCategory] = useState<PetCategory>("먹이");
   const [nick, setNick] = useState("");
   const [nickInput, setNickInput] = useState("");
   const [pet, setPet] = useState<PetState | null>(null);
@@ -116,7 +117,7 @@ export function PetGame() {
   );
 
   const load = useCallback(async (nickname: string) => {
-    const { data, error } = await supabase.current.rpc("domine_pet_state", { p_nickname: nickname });
+    const { data, error } = await supabase.rpc("domine_pet_state", { p_nickname: nickname });
     if (error) {
       const missing = error.code === "PGRST202" || /could not find the function/i.test(error.message);
       setStatus(missing ? "missing" : "error");
@@ -129,7 +130,7 @@ export function PetGame() {
     setPet(state);
     setWait(state.cooldown);
     setStatus("ready");
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     const saved = safeGet(NICK_KEY);
@@ -144,7 +145,9 @@ export function PetGame() {
     const tick = window.setInterval(
       () =>
         setWait(
-          (w) => Object.fromEntries(PET_ACTIONS.map((a) => [a, Math.max(0, w[a] - 1)])) as Record<PetAction, number>
+          (w) => PET_ACTIONS.some((a) => w[a] > 0)
+            ? Object.fromEntries(PET_ACTIONS.map((a) => [a, Math.max(0, w[a] - 1)])) as Record<PetAction, number>
+            : w
         ),
       1000
     );
@@ -192,10 +195,11 @@ export function PetGame() {
     if (busy || !nick || sceneBusyRef.current) return;
     setBusy(true);
     setMessage("");
-    const { data, error } = await supabase.current.rpc("domine_pet_care", { p_nickname: nick, p_action: action });
+    const { data, error } = await supabase.rpc("domine_pet_care", { p_nickname: nick, p_action: action });
     setBusy(false);
     if (error) {
       setMessage("잠시 후 다시 해 주세요.");
+      say("잠시 후 다시 해 주세요.");
       return;
     }
     const r = data as { ok: boolean; message?: string; wait?: number };
@@ -222,9 +226,11 @@ export function PetGame() {
   }
 
   const collar = collarToday();
+  const groups = availableActionGroups(avail);
+  const selected = groups.find((group) => group.category === category) ?? groups[0];
 
   const head = (
-    <div className="mb-3 flex min-h-11 items-center justify-between gap-3">
+    <div className="flex min-h-11 items-center justify-between gap-3">
       <h2 className="t-heading text-[var(--lit-ink)]">우리 강아지 도미</h2>
       {nick ? (
         <button
@@ -270,12 +276,8 @@ export function PetGame() {
   return (
     <div>
       {head}
-      <div className="space-y-3">
+      <div className="space-y-1">
       <div className="overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] shadow-[var(--lit-paper-shadow-soft)]" aria-busy={status === "loading"}>
-        <div className="flex items-center justify-between gap-3 px-4 py-3 text-[12px] text-[var(--lit-ink-muted)]">
-          <span>{pet ? STAGE_LABEL[stage] : "함께 키우는 강아지"}</span>
-          <span className="tabular-nums">함께한 돌봄 <span className="font-semibold text-[var(--lit-ink)]">{pet ? pet.care_total.toLocaleString("ko-KR") : "—"}</span></span>
-        </div>
         <div className="relative aspect-[16/9] overflow-hidden bg-[var(--lit-bg)]">
         {pet && <PetScene
           stage={stage}
@@ -286,26 +288,45 @@ export function PetGame() {
           cue={cue}
           onSay={say}
           onDone={endScene}
+          bubble={bubble || "잠깐만 기다려 주시오…"}
         />}
           {!pet && <p role="status" className="absolute inset-0 flex items-center justify-center text-[13px] text-[var(--lit-ink-muted)]">도미가 오는 중이에요…</p>}
-        </div>
-        <div className="px-4 pb-4">
-          <p className="flex min-h-16 items-center gap-3 py-3 text-[13px] leading-relaxed text-[var(--lit-ink)]" role="status" aria-atomic="true">
-            <span aria-hidden="true" className="shrink-0 text-[11px] font-semibold text-[var(--lit-ink-muted)]">도미</span>
-            <span className="break-keep">{bubble || "잠깐만 기다려 주시오…"}</span>
-          </p>
-          {pet && <div className="flex gap-5 border-t border-[var(--lit-border)] pt-3">
-            <Mini label="배부름" value={pet.fullness} color="#b78b4e" />
-            <Mini label="기분" value={pet.mood} color="#b97582" />
-            {avail.length > 3 ? <Mini label="청결" value={pet.clean} color="#64949c" /> : null}
+          {pet && <div className="pointer-events-none absolute inset-x-0 bottom-0 flex gap-4 bg-gradient-to-t from-black/75 to-transparent px-3 pb-2 pt-4">
+            <Mini label="배부름" icon="🍖" value={pet.fullness} color="#f5c878" />
+            <Mini label="기분" icon="♥" value={pet.mood} color="#ffabbc" />
+            <Mini label="청결" icon="💧" value={pet.clean} color="#9ae4f0" />
           </div>}
         </div>
       </div>
 
       {nick ? (
         <>
-          <div className="grid grid-cols-4 gap-2" role="group" aria-label="도미 돌보기" aria-busy={busy || sceneBusy}>
-            {avail.map((a) => {
+          <div aria-busy={busy || sceneBusy}>
+            <div role="tablist" aria-label="돌보기 카테고리" className="flex h-10 gap-1">
+              {groups.map((group, index) => (
+                <button key={group.category} type="button" role="tab"
+                  id={`${tabsId}-tab-${group.category}`} aria-controls={`${tabsId}-panel-${group.category}`}
+                  aria-selected={selected?.category === group.category} tabIndex={selected?.category === group.category ? 0 : -1}
+                  className="pet-category px-4 text-[12px] font-semibold"
+                  onClick={() => setCategory(group.category)}
+                  onKeyDown={(event) => {
+                    const next = event.key === "ArrowRight" ? (index + 1) % groups.length
+                      : event.key === "ArrowLeft" ? (index + groups.length - 1) % groups.length
+                      : event.key === "Home" ? 0 : event.key === "End" ? groups.length - 1 : -1;
+                    if (next < 0) return;
+                    event.preventDefault();
+                    setCategory(groups[next].category);
+                    document.getElementById(`${tabsId}-tab-${groups[next].category}`)?.focus();
+                  }}>
+                  {group.category}
+                </button>
+              ))}
+            </div>
+            {groups.map((group) => (
+            <div key={group.category} role="tabpanel" id={`${tabsId}-panel-${group.category}`}
+              aria-labelledby={`${tabsId}-tab-${group.category}`} hidden={group.category !== selected?.category}
+              tabIndex={0} className="pet-actions">
+            {group.actions.map((a) => {
               const w = wait[a];
               return (
                 <button
@@ -314,22 +335,24 @@ export function PetGame() {
                   onClick={() => care(a)}
                   disabled={busy || sceneBusy || w > 0 || status !== "ready"}
                   data-active={sceneBusy && cue?.action === a}
-                  className="flex min-h-[4.25rem] flex-col items-center justify-center rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-1 py-2 text-[var(--lit-ink)] transition duration-150 enabled:active:scale-[0.96] enabled:hover:border-[var(--lit-border-strong)] disabled:opacity-45 data-[active=true]:border-[var(--lit-ink-muted)] data-[active=true]:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lit-ring)] motion-reduce:transition-none"
+                  className="pet-action"
                 >
-                  <span className="flex flex-col items-center gap-2 leading-none">
-                    <span aria-hidden className="text-[20px]">
+                  <span className="flex items-center gap-1 leading-none">
+                    <span aria-hidden className="text-[12px]">
                       {ACTION_ICON[a]}
                     </span>
-                    <span className="text-[12px] font-semibold">{ACTION_LABEL[a]}</span>
+                    <span className="text-[11px] font-semibold">{ACTION_LABEL[a]}</span>
                   </span>
                   {w > 0 ? (
-                    <span className="mt-0.5 text-[10px] tabular-nums leading-none text-[var(--lit-ink-muted)]">{formatWait(w)}</span>
+                    <span className="text-[10px] tabular-nums leading-none text-[var(--lit-ink-muted)]">{formatWait(w)}</span>
                   ) : null}
                 </button>
               );
             })}
+            </div>
+            ))}
           </div>
-          <p role="status" className="min-h-5 break-keep px-1 text-[12px] leading-relaxed text-[var(--lit-ink-muted)]">{message || "마음 가는 대로 도미를 돌봐 주세요."}</p>
+          <p role="status" className="sr-only">{message}</p>
         </>
       ) : (
         <form
@@ -364,11 +387,12 @@ export function PetGame() {
         </form>
       )}
 
-      {pet && (pet.today_top.length > 0 || pet.recent.length > 0) ? (
-        <details className="rounded-xl border border-[var(--lit-border)] bg-[var(--lit-bg-elevated)] px-3 py-2">
-          <summary className="t-label min-h-11 cursor-pointer select-none content-center rounded text-[var(--lit-ink-muted)] focus-visible:outline-2 focus-visible:outline-offset-2">
+      {pet ? (
+        <details className="px-1">
+          <summary className="t-label min-h-10 cursor-pointer select-none content-center rounded text-[var(--lit-ink-muted)] focus-visible:outline-2 focus-visible:outline-offset-2">
             오늘의 기록 보기
           </summary>
+          <p className="t-caption text-[var(--lit-ink-muted)]">{STAGE_LABEL[stage]} · 함께한 돌봄 {pet.care_total.toLocaleString("ko-KR")}{streak > 0 ? ` · ${streak}일 연속` : ""}</p>
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
             <section aria-label="오늘 돌봐 준 친구들">
               <h2 className="t-caption font-semibold text-[var(--lit-ink)]">오늘 돌봐 준 친구들</h2>

@@ -5,6 +5,26 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import { backgroundAt, BACKGROUNDS, poseAt, POSES } from "../lib/domine/pet-photos.ts";
+import { bubblePosition } from "../lib/domine/pet-bubble.ts";
+
+for (const width of [318, 348, 370]) {
+  const height = width * 9 / 16;
+  for (const x of [0, 80, 160]) {
+    for (const y of [20, 55, 89]) {
+      for (const [bubbleWidth, bubbleHeight] of [[52, 28], [200, 44], [240, 60]]) {
+        const p = bubblePosition(x, y, width, height, bubbleWidth, bubbleHeight);
+        const left = p.left / 100 * width;
+        const top = p.top / 100 * height;
+        assert.ok(left >= 6 - 1e-9 && left + bubbleWidth <= width - 6 + 1e-9, "Bubble stays inside horizontal edges");
+        assert.ok(top >= 6 - 1e-9 && top + bubbleHeight + 8 <= height, "Bubble and tail stay inside vertical edges");
+        assert.ok(p.tail > 0 && p.tail < 100, "Tail stays on bubble");
+        if (x === 0) assert.ok(p.tail < 50, "Left-edge tail points left");
+        if (x === 80) assert.equal(p.tail, 50, "Centered tail points to dog");
+        if (x === 160) assert.ok(p.tail > 50, "Right-edge tail points right");
+      }
+    }
+  }
+}
 
 for (const [hour, expected] of [
   [0, "night"], [4.99, "night"], [5, "dawn"], [6.99, "dawn"],
@@ -16,6 +36,19 @@ assert.equal(poseAt(null, "sleepy"), "sleep");
 assert.equal(poseAt("pet-trot", "sleepy"), null);
 assert.equal(poseAt(null, "happy"), null);
 const require = createRequire(import.meta.url);
+const petModule = { exports: {} };
+new Function("require", "exports", ts.transpileModule(readFileSync(new URL("../lib/domine/pet.ts", import.meta.url), "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS },
+}).outputText)(() => ({}), petModule.exports);
+const { availableActionGroups, PET_ACTIONS } = petModule.exports;
+assert.deepEqual(availableActionGroups([]), []);
+assert.deepEqual(availableActionGroups(["walk"]), [{ category: "놀이", actions: ["walk"] }]);
+assert.deepEqual(availableActionGroups(["feed", "pet", "walk"]), [
+  { category: "먹이", actions: ["feed"] }, { category: "돌봄", actions: ["pet"] }, { category: "놀이", actions: ["walk"] },
+]);
+assert.deepEqual(availableActionGroups(PET_ACTIONS).map((g) => g.actions), [
+  ["feed", "treat"], ["pet", "brush", "bath"], ["play", "walk", "train"],
+]);
 const dogModule = { exports: {} };
 const dogSource = ts.transpileModule(readFileSync(new URL("../app/games/PetDog.tsx", import.meta.url), "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
@@ -50,9 +83,11 @@ new Function("require", "exports", sceneSource)((name) => {
   return require(name);
 }, sceneModule.exports);
 const renderScene = () => renderToStaticMarkup(createElement(sceneModule.exports.PetScene, {
-  stage: "adult", face: "happy", light: 0.8, hour: 22, collar: "purple", cue: null, onSay() {},
+  stage: "adult", face: "happy", light: 0.8, hour: 22, collar: "purple", cue: null, onSay() {}, bubble: "반가워요!",
 }));
 assert.ok(!renderScene().includes("/pet/art/bowl.webp"));
+assert.ok(!renderScene().includes("foreignObject"));
+assert.ok(renderScene().includes('aria-label="도미의 말"'));
 const scales = [];
 for (const y of [77, 88]) {
   sceneState = { y, bowl: 110 };

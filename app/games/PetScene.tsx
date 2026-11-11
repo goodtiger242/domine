@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { bubblePosition } from "@/lib/domine/pet-bubble";
 import type { PetAction, PetFace, PetStage } from "@/lib/domine/pet";
 import { bodyAt, FAR_PATH, HILL_PATH, skyAt, STARS } from "@/lib/domine/sky";
 import { ART, BALL, BOWL, preloadArt } from "@/lib/domine/pet-art";
@@ -395,9 +396,50 @@ type Props = {
   onSay: (text: string) => void;
   /** 연출이 끝났을 때 */
   onDone?: () => void;
+  bubble?: string;
 };
 
-export function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone }: Props) {
+function SpeechBubble({ text, x, y, duration }: { text: string; x: number; y: number; duration: number }) {
+  const layer = useRef<HTMLDivElement>(null);
+  const bubble = useRef<HTMLParagraphElement>(null);
+  const previousSize = useRef("");
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!layer.current || !bubble.current) return;
+      const width = layer.current.clientWidth;
+      const height = layer.current.clientHeight;
+      if (!width || !height) return;
+      const bubbleWidth = bubble.current.offsetWidth;
+      const bubbleHeight = bubble.current.offsetHeight;
+      const position = bubblePosition(x, y, width, height, bubbleWidth, bubbleHeight);
+      const size = `${text}:${width}:${height}:${bubbleWidth}:${bubbleHeight}`;
+      // 글 길이·화면 크기가 바뀔 때는 즉시 보정하고, 도미가 이동할 때만 따라 움직인다.
+      const transitionDuration = previousSize.current === size ? `${duration}ms` : "0ms";
+      previousSize.current = size;
+      Object.assign(bubble.current.style, {
+        left: `${position.left}%`, top: `${position.top}%`, visibility: "visible", transitionDuration,
+      });
+      const tail = bubble.current.lastElementChild as HTMLElement;
+      Object.assign(tail.style, { left: `${position.tail}%`, transitionDuration });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (layer.current) observer.observe(layer.current);
+    if (bubble.current) observer.observe(bubble.current);
+    return () => observer.disconnect();
+  }, [text, x, y, duration]);
+  return (
+    <div ref={layer} className="pointer-events-none absolute inset-0">
+      <p ref={bubble} className="pet-speech" role="status" aria-label="도미의 말" aria-atomic="true"
+        style={{ visibility: "hidden" }}>
+        <span key={text} className="pet-speech-text">{text}</span>
+        <span aria-hidden="true" className="pet-speech-tail" />
+      </p>
+    </div>
+  );
+}
+
+export const PetScene = memo(function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone, bubble }: Props) {
   const shadowId = useId();
   const [s, setS] = useState<S>(HOME);
   const timers = useRef<number[]>([]);
@@ -484,9 +526,10 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone 
   });
 
   return (
+    <div className="pet-scene relative h-full w-full">
     <svg
       viewBox="0 6 160 90"
-      className="pet-scene block w-full"
+      className="block h-full w-full"
       role="img"
       aria-label={`${stage === "baby" ? "아기" : stage === "young" ? "어린" : "다 큰"} 강아지 도미`}
     >
@@ -642,5 +685,7 @@ export function PetScene({ stage, face, light, hour, collar, cue, onSay, onDone 
       ) : null}
       </g>
     </svg>
+    {bubble && <SpeechBubble text={bubble} x={s.x + s.dir * w * sc * 0.25} y={s.y - h * sc} duration={s.dur} />}
+    </div>
   );
-}
+});

@@ -59,7 +59,7 @@ export function LandingPage({
 
           <section
             id="home-pet"
-            className="cos-stagger-2 order-2 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] px-5 py-5 md:px-10 md:py-8 lg:px-12"
+            className="cos-stagger-2 order-2 border-b border-[var(--lit-border)]/70 bg-[var(--lit-bg)] px-5 py-2.5 md:px-10 md:py-8 lg:px-12"
           >
             <div className="mx-auto max-w-3xl">
               <div className="max-w-xl">
