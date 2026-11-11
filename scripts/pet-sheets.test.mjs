@@ -185,8 +185,7 @@ for (const cell of ["E5", "D5"]) {
   assert.equal(typeof scene().props.onBattle, "function"); assert.equal(scene().props.hasOpponent, false);
   scene().props.onBattle(); battleView.render(); assert.equal(battlePause, false);
   button(battleView.tree, "여긴 겨룰 상대가 없어요 · 지도에서 🐾를 찾아보세요").props.onClick(); battleView.render();
-  const map = nodes(battleView.tree, n => "showAnimals" in n.props)[0];
-  assert.equal(map.props.showAnimals, true); map.props.onClose(); battleView.render();
+  assert.equal(nodes(battleView.tree, n => n.props?.className === "pet-encounter-notice").length, 0, "tapping the notice closes it");
 }
 const slot = encounterSlot(), found = PET_WORLD.find(cell => encounterFor(cell.id, 40, slot));
 battleGame.machine.committedMap = found.id; battleGame.machine.command = "pending"; battleView.render();

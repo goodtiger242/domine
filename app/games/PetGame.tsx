@@ -122,7 +122,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
   }, [cell.id]);
   useEffect(() => {
     if (!noOpponent) return;
-    const timer = setTimeout(() => setNoOpponent(false), 5000);
+    const timer = setTimeout(() => setNoOpponent(false), 2500);
     return () => clearTimeout(timer);
   }, [noOpponent]);
   useEffect(() => {
@@ -171,7 +171,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
       {game.canRetry && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>
     {status && <PetNotice key={`${game.petId}-${status}`} parts={[status]} onOpen={() => open(game.registered ? "notice" : "record")} />}
-    <div className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
+    <div onPointerDownCapture={() => setNoOpponent(false)} className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
       {game.worldReady ? <PetScene key={game.petId} busyText={busyText} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => openMap()} onLocal={game.localScene} locked={locked}
         onBattle={startBattle} hasOpponent={!!currentEncounter} battleDisabled={careLocked || machine.command !== "idle"}
         tapDisabled={careLocked || machine.command !== "idle"} onPet={strokePet}
@@ -181,7 +181,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
         cue={game.cue} onSay={say} onDone={game.done} speaker={speech?.speaker} needs={pet ?? undefined}
         bubble={speech?.arrival ? speech.text : petText(speech?.text || "반가워요!", game.petId)} wearable={equipment("wearable")} toy={equipment("toy")} />
         : <p className="p-8 text-center text-sm" role="status">동네를 불러오고 있어요…</p>}
-      {noOpponent && !currentEncounter && <div className="pet-encounter-notice" role="status"><button type="button" onClick={() => openMap(true)}>여긴 겨룰 상대가 없어요 · 지도에서 🐾를 찾아보세요</button></div>}
+      {noOpponent && !currentEncounter && <div className="pet-encounter-notice" role="status"><button type="button" onClick={() => setNoOpponent(false)}>여긴 겨룰 상대가 없어요 · 지도에서 🐾를 찾아보세요</button></div>}
       {pet && <div className="pointer-events-none absolute inset-x-0 bottom-0 flex gap-4 bg-gradient-to-t from-black/55 to-transparent px-3 pb-1 pt-3">
         <Mini label="배부름" icon="🍖" value={pet.fullness} color="#f5c878" /><Mini label="기분" icon="♥" value={pet.mood} color="#ffabbc" /><Mini label="청결" icon="💧" value={pet.clean ?? 80} color="#9ae4f0" />
       </div>}
