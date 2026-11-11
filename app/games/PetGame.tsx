@@ -165,7 +165,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     <div className="pet-title-row">
       <h2 className="t-heading">우리 강아지</h2>
       <div role="group" aria-label="강아지 선택">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeeches([]); }}>{PETS[id].name}</button>)}</div>
-      <button type="button" className="pet-record-button" onClick={() => open("record")}>{game.nickname || "내 이름"}</button>
+      <button type="button" className="pet-record-button" onClick={() => open("record")}>{game.registered && game.nickname || "내 이름"}</button>
     </div>
     <div className="pet-progress-row">{personal && !personal.player ? <span role="status">불러오는 중… · <span aria-label={`우리 코인(공용) ${personal.coins ?? 0}`}>🪙 {personal.coins ?? 0}</span></span> : <PetProgress key={game.petId} name={PETS[game.petId].name} xp={personal?.player?.xp ?? 0} coins={personal?.coins ?? personal?.player?.coins ?? 0} />}
       {game.canRetry && <button type="button" onClick={game.retry}>결과 확인</button>}
@@ -211,7 +211,7 @@ export function PetGame({ api }: { api?: PetApi } = {}) {
     {(sheet === "record" || sheet === "notice") && <PetSheet title={sheet === "notice" ? "안내" : "내 이름"} onClose={close}>
       {sheet === "notice" ? <p className="pet-sheet-note">{status || "새 안내가 없어요."}</p> : <>
       <form className="pet-record-form" onSubmit={(event) => { event.preventDefault(); void connect(query); }}>
-        <input id={`${tabsId}-name-search`} aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder={game.nickname || "이름"} enterKeyHint="go" />
+        <input id={`${tabsId}-name-search`} aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder="이름" enterKeyHint="go" />
         {invalidName && <p role="status">도미네 청년회 이름을 정자로 사용해주세요</p>}
         <button type="submit" className="pet-primary" disabled={connecting || !query || machine.command !== "idle"}>시작</button>
       </form>

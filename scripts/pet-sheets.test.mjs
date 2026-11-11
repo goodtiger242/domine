@@ -51,7 +51,7 @@ const input = () => nodes(gameView.tree, n => n.type === "input")[0];
 const nameSheet = () => nodes(gameView.tree, n => n.type === "section" && n.props.title === "내 이름")[0];
 const submit = () => nodes(gameView.tree, n => n.type === "form")[0].props.onSubmit({preventDefault(){}});
 assert.equal(nodes(gameView.tree, n => n.type === "input").length, 1);
-assert.equal(input().props.placeholder, "김경석"); assert.equal(input().props.enterKeyHint, "go");
+assert.equal(input().props.placeholder, "이름", "the name field never shows an earlier name"); assert.equal(input().props.enterKeyHint, "go");
 function noRoster() {
   const html = renderToStaticMarkup(createElement("section", null, nameSheet().props.children));
   for (const name of PET_LEGAL_NAMES) if (name !== game.nickname) assert.ok(!html.includes(name), `sheet must not render ${name}`);

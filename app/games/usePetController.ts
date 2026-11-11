@@ -373,9 +373,7 @@ export function usePetController(injectedApi?: PetApi) {
   }, [api, refresh, connect]);
   useEffect(() => {
     alive.current = true;
-    const stored = safeGet("domine-pet-nick"), nick = normalizeNickname(stored) ?? "";
-    nickRef.current = nick; setNickname(nick);
-    if (stored && !nick) setMessage("내 이름을 입력하면 함께 키울 수 있어요");
+    // Each visit starts without a name; a previous visitor's name and record are never shown.
     const selected: PetId = safeGet("domine-pet-selected") === "2" ? 2 : 1; petRef.current = selected; setPetId(selected);
     let saved: string | null = null;
     try { saved = localStorage.getItem("domine-pet-cell"); } catch { /* Default location. */ }

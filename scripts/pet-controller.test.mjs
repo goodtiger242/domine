@@ -78,6 +78,7 @@ function mount(api, saved = [], reduced = false) {
   };
 }
 const savedToken = [["domine-pet-nick",identity.nickname]];
+async function login(h){await h.flush();await h.game.connect(identity.nickname);await h.flush();}
 let mock=createPetMock(), h=mount(mock.api);
 await h.flush();assert.equal(h.game.registered,false);
 h.game.care("feed");await h.flush();
@@ -85,34 +86,39 @@ assert.equal(h.game.machine.visual,"acting");
 assert.equal(h.game.message,"내 이름을 입력하면 함께 키울 수 있어요");
 assert.ok(!mock.calls.includes("action"));h.close();
 
-mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
-assert.equal(mock.calls.filter(c=>c==="register").length,1,"unconfirmed saved name retries registration");
+// A saved name from an earlier visit is never restored or shown; each visit enters a name.
+mock=createPetMock();h=mount(mock.api,[...savedToken,[`domine-pet-reg:${identity.nickname}`,"1"]]);await h.flush();
+assert.equal(h.game.nickname,"");assert.equal(h.game.identity,null);assert.equal(h.game.registered,false);assert.equal(h.game.personal,null);
+assert.ok(!mock.calls.includes("register"));assert.ok(!mock.calls.includes("state"));h.close();
+
+mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
+assert.equal(mock.calls.filter(c=>c==="register").length,1,"unconfirmed name registers");
 assert.equal(h.game.identity.secret,identity.secret);
 assert.equal(h.game.registered,true);assert.equal(h.storage.get(`domine-pet-reg:${identity.nickname}`),"1");h.close();
 
-mock=createPetMock();await mock.api.register(identity);h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock();await mock.api.register(identity);h=mount(mock.api);await login(h);
 assert.equal(h.game.registered,true,"already registered with the same token is success");
 assert.equal(mock.calls.filter(c=>c==="register").length,2);h.close();
 
-mock=createPetMock();await mock.api.register({...identity,secret:"b".repeat(64)});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock();await mock.api.register({...identity,secret:"b".repeat(64)});h=mount(mock.api);await login(h);
 assert.equal(h.game.registered,false);assert.ok(!h.storage.has(`domine-pet-reg:${identity.nickname}`));
 assert.equal(h.game.message,"이름을 다시 입력해 주세요");h.close();
 
 // Old random tokens are ignored, including when the name has a confirmation flag.
 mock=createPetMock();await mock.api.register(identity);
-h=mount(mock.api,[...savedToken,[`domine-pet-identity:${identity.nickname}`,"b".repeat(64)],[`domine-pet-reg:${identity.nickname}`,"1"]]);await h.flush();
+h=mount(mock.api,[...savedToken,[`domine-pet-identity:${identity.nickname}`,"b".repeat(64)],[`domine-pet-reg:${identity.nickname}`,"1"]]);await login(h);
 assert.equal(h.game.identity.secret,identity.secret);assert.equal(h.game.registered,true);
 assert.equal(mock.calls.filter(c=>c==="register").length,1,"confirmed name reads state without registering again");h.close();
 
 // A stale confirmation is cleared after authentication fails, allowing registration on retry.
-mock=createPetMock();h=mount(mock.api,[...savedToken,[`domine-pet-reg:${identity.nickname}`,"1"]]);await h.flush();
+mock=createPetMock();h=mount(mock.api,[...savedToken,[`domine-pet-reg:${identity.nickname}`,"1"]]);await login(h);
 assert.equal(h.game.message,"이름을 다시 입력해 주세요");assert.equal(h.game.registered,false);
 await h.game.checkCapabilities();await h.flush();assert.equal(h.game.registered,true);h.close();
 
 for (const missing of [false,true]) {
   mock=createPetMock({missing});h=mount(mock.api,[["domine-pet-nick","옛별명"],["domine-pet-identity:옛별명","a".repeat(64)],["domine-pet-reg:옛별명","1"]]);await h.flush();
   assert.equal(h.game.nickname,"");assert.equal(h.game.identity,null);assert.equal(h.game.registered,false);
-  assert.equal(h.game.message,"내 이름을 입력하면 함께 키울 수 있어요");assert.ok(!mock.calls.includes("register"));assert.ok(!mock.calls.includes("state"));
+  assert.ok(!mock.calls.includes("register"));assert.ok(!mock.calls.includes("state"));
   for (const invalid of ["옛별명","a!","123456789",`${identity.nickname}:${identity.secret}`]) {
     const before=mock.calls.length;await h.game.connect(invalid);await h.flush();assert.equal(mock.calls.length,before);
   }
@@ -138,7 +144,7 @@ assert.ok(!h.storage.has(`domine-pet-identity:${identity.nickname}`));assert.ok(
 mock.api.register=register;await h.game.connect(identity.nickname);await h.flush();
 assert.equal(h.game.identity.secret,identity.secret);assert.equal(h.game.registered,true);h.close();
 
-mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 const command={kind:"action",pet:1,action:"feed",requestId:"error"};
 const execute=mock.api.execute;
 mock.api.execute=async()=>{throw new PetRpcError("23514",true);};
@@ -160,18 +166,18 @@ await h.advance(8000);assert.equal(h.game.machine.command,"uncertain");
 mock.api.operation=async()=>{throw new PetRpcError("42P01",true);};
 h.game.retry();await h.flush();assert.equal(h.game.machine.command,"uncertain","lookup failures cannot discard an unresolved mutation");h.close();
 
-mock=createPetMock({v9:false});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock({v9:false});h=mount(mock.api,savedToken);await login(h);
 await h.game.execute({kind:"explore_begin",map:"farm",source:"map",requestId:"old-server"});await h.flush();
 assert.ok(!mock.calls.includes("explore_begin"));assert.equal(h.game.machine.command,"idle");
 assert.equal(h.game.message,"서버 업데이트 대기 중(새 지역 탐험은 아직)");h.close();
 
 mock=createPetMock({v9:false});await mock.api.register(identity);
 h=mount(mock.api,[...savedToken,[`domine-pet-reg:${identity.nickname}`,"1"],[`domine-pet-pending:${identity.nickname}`,JSON.stringify({kind:"explore_begin",map:"farm",source:"map",requestId:"old-pending"})]]);
-await h.flush();assert.equal(h.game.machine.command,"uncertain");
+await login(h);assert.equal(h.game.machine.command,"uncertain");
 h.game.retry();await h.flush();assert.ok(mock.calls.includes("operation"));
 assert.equal(h.game.machine.command,"idle","old pending themes can still look up and settle without sending to the old server");h.close();
 
-mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 mock.api.execute=async()=>({...mock.state(),version:1,reward:{xp:0,coins:0,levelCoins:0,newEntries:[],newBadges:[],skipped:"DAILY_CAP"}});
 await h.game.execute(command);await h.flush();
 assert.equal(h.game.rewardNotice,"오늘 보상 한도를 채웠어요(내일 다시)");
@@ -180,7 +186,7 @@ await h.advance(1);assert.equal(h.game.feedback,null);assert.ok(h.game.rewardNot
 await h.game.refresh();await h.flush();assert.ok(h.game.rewardNotice,"polling does not clear the daily cap");
 mock.api.execute=async()=>({...mock.state(),version:2,reward:{xp:8,coins:4,levelCoins:0,newEntries:[],newBadges:[]}});
 await h.game.execute({...command,requestId:"success"});await h.flush();assert.equal(h.game.rewardNotice,"");h.close();
-mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 await h.game.execute({kind:"purchase",pet:1,item:"061",requestId:"domi-item"});await h.flush();
 await h.game.execute({...command,pet:1,requestId:"domi-level"});await h.flush();
 assert.equal(h.game.personal.player.level,2);assert.deepEqual(h.game.personal.inventory,["061"]);
@@ -241,7 +247,7 @@ for (const restored of [false, true]) {
   const committed=await mock.api.execute(identity,savedCommand);
   const lookup=mock.api.operation; const times=[];
   mock.api.operation=async(i,id)=>{times.push(Date.now());assert.equal(id,savedCommand.requestId);if(times.length<3)throw new TypeError("offline");return lookup(i,id);};
-  h=mount(mock.api,[...savedToken,...(restored?[[`domine-pet-pending:${identity.nickname}`,JSON.stringify(savedCommand)]]:[])]);await h.flush();
+  h=mount(mock.api,[...savedToken,...(restored?[[`domine-pet-pending:${identity.nickname}`,JSON.stringify(savedCommand)]]:[])]);await login(h);
   if(!restored){mock.api.execute=async()=>{throw new TypeError("lost response");};await h.game.execute(savedCommand);await h.flush();}
   assert.equal(h.game.canRetry,false);
   await h.advance(1499);assert.deepEqual(times,[]);
@@ -251,7 +257,7 @@ for (const restored of [false, true]) {
   assert.equal(h.game.machine.command,"idle");assert.equal(h.game.personal.coins,committed.coins);
   assert.ok(!h.storage.has(`domine-pet-pending:${identity.nickname}`));h.close();
 }
-mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 mock.api.execute=async()=>{throw new TypeError("offline");};let attempts=0;
 mock.api.operation=async()=>{attempts++;throw new TypeError("offline");};
 await h.game.execute({...command,requestId:"exhausted"});await h.flush();
@@ -260,7 +266,7 @@ await h.advance(3000);assert.equal(h.game.canRetry,false);
 await h.advance(6000);assert.equal(h.game.canRetry,true);assert.equal(attempts,3);
 await h.advance(60000);assert.equal(attempts,3,"automatic retries stop at three");h.close();
 
-mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await login(h);
 const send=mock.api.execute;let deliver;
 mock.api.execute=async(...args)=>{await new Promise(resolve=>{deliver=resolve;});return send(...args);};
 h.game.care("feed");await h.flush();
@@ -273,11 +279,11 @@ assert.equal(h.game.machine.command,"idle");assert.equal(h.game.personal.pet,2);
 assert.equal(h.game.machine.visual,"idle","a response for another pet does not animate the current one");
 h.game.selectPet(1);await h.flush();assert.equal(h.game.personal.player.level,2);assert.ok(h.game.busy);h.close();
 
-mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await login(h);
 h.game.care("treat");await h.flush();assert.equal(h.game.machine.visual,"acting");assert.equal(h.game.cue.action,"treat");
 await h.advance(2200);assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy,undefined);h.close();
 
-mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await login(h);
 await mock.api.register({nickname:"김보영",secret:"b".repeat(64)});
 await mock.api.execute({nickname:"김보영",secret:"b".repeat(64)},{...command,pet:2,action:"treat",durationMs:2200,requestId:"someone-else"});
 h.game.selectPet(2);await h.flush();assert.equal(h.game.busy.nickname,"김보영");
@@ -287,14 +293,14 @@ await h.advance(1800);mock.advance(1800);h.game.selectPet(2);await h.flush();ass
 await h.advance(400);assert.equal(h.game.busy,undefined);h.close();
 
 // A racing click receives BUSY, then unlocks automatically without any scene.
-mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await login(h);
 await mock.api.execute(identity,{...command,requestId:"racer",durationMs:500});
 h.game.care("pet");await h.flush();assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy.action,"feed");assert.equal(h.game.message,"");
 await h.advance(500);assert.equal(h.game.busy,undefined);h.close();
 console.log("Pet recovery/busy: 1.5/3/6s retries, restored pending, exhaustion, in-flight pet switching, server-first scenes and expiry passed.");
 
 for (const busyLock of [false,true]) {
-  mock=createPetMock({busyLock});h=mount(mock.api,savedToken);await h.flush();
+  mock=createPetMock({busyLock});h=mount(mock.api,savedToken);await login(h);
   h.game.care("pet",true);await h.flush();
   assert.ok(mock.calls.includes("action"));assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.cue,null,"direct strokes already present their own animation");
   if(busyLock) {
@@ -303,21 +309,21 @@ for (const busyLock of [false,true]) {
   }
   h.close();
 }
-mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await login(h);
 await mock.api.execute(identity,{...command,requestId:"stroke-racer",durationMs:500});
 h.game.care("pet",true);await h.flush();assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy.action,"feed");assert.equal(h.game.cue,null);h.close();
 
-mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock({busyLock:true});h=mount(mock.api,savedToken);await login(h);
 h.game.care("walk");await h.flush();
 await h.advance(4000);assert.ok(mock.calls.includes("explore_begin"),"lock expiry still completes the walk exploration");h.close();
 
-mock=createPetMock({busyLock:true,delayMs:300});h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock({busyLock:true,delayMs:300});h=mount(mock.api,savedToken);await login(h);
 h.game.care("feed");await h.flush();assert.equal(h.game.machine.visual,"idle");
 await h.advance(300);assert.equal(h.game.machine.visual,"acting");assert.equal(h.game.cue.endsAt,2400,"network delay cannot extend the scene beyond the reservation");
 await h.advance(2100);assert.equal(h.game.machine.visual,"idle");assert.equal(h.game.busy,undefined);h.close();
 
 // A local battle holds the existing pause lock and never starts a server request.
-mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 const callsBeforeBattle=mock.calls.length, petBeforeBattle=h.game.petId;
 h.game.pause(true);await h.flush();
 h.game.care("feed");h.game.localScene({action:"map",to:"F5",id:1});h.game.selectPet(2);
@@ -328,7 +334,7 @@ h.game.resume();await h.flush();assert.equal(h.game.machine.visual,"idle");asser
 await h.game.refresh();assert.equal(mock.calls.length,callsBeforeBattle+1);h.close();
 
 // A timeout is also recovered automatically even if the transport ignores abort.
-mock=createPetMock();h=mount(mock.api,savedToken);await h.flush();
+mock=createPetMock();h=mount(mock.api,savedToken);await login(h);
 const commitBeforeTimeout=mock.api.execute;
 mock.api.execute=async(...args)=>{await commitBeforeTimeout(...args);return new Promise(()=>{});};
 void h.game.execute({...command,requestId:"recover-timeout"});await h.flush();
