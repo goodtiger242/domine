@@ -80,6 +80,21 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose 
   const typing = !!cue?.text && playback!.revealed < characters.length;
   const intro = cue?.motion === "intro";
   const shown = playback?.shown ?? battle;
+  const [displayHp, setDisplayHp] = useState({ player: shown.player.hp, opponent: shown.opponent.hp });
+  const hpRef = useRef(displayHp);
+  useEffect(() => {
+    const from = hpRef.current, to = { player: shown.player.hp, opponent: shown.opponent.hp };
+    let frame = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const progress = reduced ? 1 : 1 - (1 - ++frame / 20) ** 3;
+      hpRef.current = { player: Math.round(from.player + (to.player - from.player) * progress), opponent: Math.round(from.opponent + (to.opponent - from.opponent) * progress) };
+      setDisplayHp(hpRef.current);
+      if (progress < 1) timer = setTimeout(tick, 30);
+    };
+    if (from.player !== to.player || from.opponent !== to.opponent) tick();
+    return () => clearTimeout(timer);
+  }, [shown.player.hp, shown.opponent.hp, reduced]);
   const outcome = cue?.outcome ?? (!playback ? battle.outcome : undefined);
   const finished = !playback && !!battle.outcome;
   const phase = intro ? "intro" : finished ? "result" : playback ? "playback" : "command";
@@ -127,7 +142,7 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose 
     const next = start(++attempt.current);
     playing.current = true; cancelHold(); setPreview(""); setMenu("main"); setBattle(next); setPlayback(introduction(next));
   }
-  const actions: (Action | null)[] = [...battle.player.moves.map(moveId => ({ kind: "move" as const, moveId })), ...Array<null>(Math.max(0, 4 - battle.player.moves.length)).fill(null), { kind: "push" }];
+  const actions: Action[] = [...battle.player.moves.map(moveId => ({ kind: "move" as const, moveId })), { kind: "push" }];
   const allowed = availableActions(battle, "player");
   const result = outcome === "player" ? "승리!" : outcome === "opponent" ? "아쉬운 패배" : outcome === "quit" ? "다음에 또 만나요" : "무승부";
 
@@ -135,7 +150,7 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose 
     const actor = shown[side];
     return <section className="pet-battle-hud" data-side={side} aria-label={`${names[side]} 상태`}>
       <h3>{names[side]} <small>Lv. {actor.level}</small></h3>
-      <div className="pet-battle-hp-label"><span>버틸 힘</span>{side === "player" && <span>{actor.hp}/{actor.stats.hp}</span>}</div>
+      <div className="pet-battle-hp-label"><span>버틸 힘</span><span data-hp-number={side}>{displayHp[side]}/{actor.stats.hp}</span></div>
       <div className="pet-battle-hp" data-color={hpColor(actor.hp, actor.stats.hp)} role="progressbar" aria-label={`${names[side]} 버틸 힘`} aria-valuemin={0} aria-valuemax={actor.stats.hp} aria-valuenow={actor.hp}>
         <span className="pet-battle-hp-trail" style={{ transform: `scaleX(${actor.hp / actor.stats.hp})` }} />
         <span className="pet-battle-hp-fill" style={{ transform: `scaleX(${actor.hp / actor.stats.hp})` }} />
@@ -157,28 +172,34 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose 
         <span className="pet-battle-flash" aria-hidden="true" />
         {motion === "win" && <span className="pet-battle-sparkles" aria-hidden="true">✦ · ✧<br />✧　✦</span>}
       </div></div>
+      {cue?.side === side && cue.fx && <span key={`${shown.round}-${playback?.index}-fx`} className="pet-battle-fx" aria-hidden="true">
+        <span className="pet-battle-flash" />
+        <Image src={`/pet/battle/fx-${cue.fx}.webp`} alt="" width={160} height={160} unoptimized loading="eager" onError={e => { e.currentTarget.style.visibility = "hidden"; }} />
+      </span>}
       {cue?.side === side && cue.amount !== undefined && <strong key={`${shown.round}-${playback?.index}`} className="pet-battle-number" data-heal={cue.motion === "heal"} aria-hidden="true">{cue.motion === "heal" ? "+" : "−"}{cue.amount}</strong>}
     </div>;
   }
 
-  return <dialog ref={dialog} className="pet-battle-screen" aria-labelledby={heading} tabIndex={-1} onCancel={e => { e.preventDefault(); if (menu === "moves" && !playback) { setMenu("main"); setPreview(""); } else onClose(); }}>
+  return <dialog ref={dialog} className="pet-battle-screen" style={{ "--arena-bg": `url(${cellBackground(encounter.cellId, hour)})` } as CSSProperties} aria-labelledby={heading} tabIndex={-1} onCancel={e => { e.preventDefault(); if (menu === "moves" && !playback) { setMenu("main"); setPreview(""); } else onClose(); }}>
     <div className="pet-battle-scene" data-phase={phase} data-impact={cue?.motion === "effective"} key={attempt.current} onClick={intro ? advance : undefined}>
-      <div className="pet-battle-arena" style={{ "--arena-bg": `url(${cellBackground(encounter.cellId, hour)})` } as CSSProperties}>
+      <div className="pet-battle-arena">
         <header className="pet-battle-topline"><h2 id={heading}>동네 겨루기</h2><span>{shown.round.toString().padStart(2, "0")} / {MAX_ROUNDS} 라운드</span></header>
         {hud("opponent")}{fighter("opponent")}{fighter("player")}{hud("player")}
         {!intro && !finished && <p className="pet-battle-forecast">{names.opponent}, {actionLabel(battle.opponentAction)}{battle.opponentAction.kind === "rest" ? "를 준비하고 있어요…" : "를 노리고 있어요…"}</p>}
         {intro && <div className="pet-battle-npc"><small>{encounter.npc.title}</small><strong>{encounter.npc.name}</strong><p>“우리 친구들, 신나게 놀아 볼까요?”</p></div>}
-        {finished && <div className="pet-battle-banner" data-victory={outcome === "player"} role="status"><small>겨루기 종료</small><h3>{result}</h3><span>✦　수고했어요, {names.player}　✦</span></div>}
+        {finished && <div className="pet-battle-banner" data-victory={outcome === "player"} role="status"><span className="pet-battle-sparkles" aria-hidden="true">✦　　✧　　✦</span><small>겨루기 종료</small><h3>{result}</h3><span>수고했어요, {names.player}</span></div>}
       </div>
       <div className="pet-battle-console">
         {finished ? <div className="pet-battle-result"><small>{encounter.npc.title} · {encounter.npc.name}</small><p>“{outcome === "player" ? "정말 멋진 움직임이었어요!" : outcome === "opponent" ? "끝까지 함께해 줘서 고마워요." : "다음에도 즐겁게 겨뤄요!"}”</p><p>{names.player}, {encounter.npc.name}에게 꾸벅!<br />함께 놀아 줘서 고마워!</p><small>곧 보상이 생겨요</small><div className="pet-battle-result-actions"><button ref={command} type="button" onClick={restart}>다시 겨루기</button><button type="button" onClick={onClose}>돌아가기</button></div></div>
           : <>
+            <div className="pet-battle-dialogue">
             <button ref={message} type="button" className="pet-battle-message" aria-label={intro ? "등장 연출 건너뛰기" : typing ? "대사 모두 보기" : playback ? "다음 대사" : "대결 안내"} onClick={e => { e.stopPropagation(); if (intro) advance(); else if (typing) setPlayback({ ...playback!, revealed: characters.length }); else if (cue?.text) advance(); }}>
-              <small>{intro ? "새로운 친구를 만났어요" : playback ? "겨루는 중" : "우리의 차례"}</small>
               <span aria-hidden="true">{intro ? "동네 친구와의 겨루기가 시작돼요." : typing ? characters.slice(0, playback!.revealed).join("") : text}</span>
               <span className="pet-battle-sr" role="status" aria-live="polite">{intro ? "등장 연출, 눌러서 건너뛰기" : text}</span>
-              <small className="pet-battle-prompt">{intro ? "탭하여 건너뛰기" : playback ? typing ? "탭하여 모두 보기" : cue?.text ? "탭하여 계속 ▾" : "움직임을 지켜봐요" : "명령을 골라 주세요"}</small>
+              {playback && <span className="pet-battle-prompt" aria-hidden="true">▾</span>}
             </button>
+            {!playback && menu === "moves" && <button ref={command} type="button" className="pet-battle-back" onClick={() => { cancelHold(); held.current = false; setMenu("main"); setPreview(""); }}>← 뒤로</button>}
+            </div>
             {!playback ? <div className="pet-battle-command">
               <div className="pet-battle-actions" data-menu={menu} aria-label={menu === "main" ? "대결 명령" : "기술 선택"}>
                 {menu === "main" ? <>
@@ -187,24 +208,23 @@ export default function PetBattleSheet({ encounter, petId, stage, hour, onClose 
                   <button type="button" disabled={!allowed.some(a => a.kind === "rest")} onClick={() => choose({ kind: "rest" })}><span aria-hidden="true">◌</span> 숨 고르기<small>기력 +4</small></button>
                   <button type="button" onClick={() => choose({ kind: "quit" })}><span aria-hidden="true">↗</span> 그만하기<small>인사하고 돌아가요</small></button>
                 </> : <>
-                  {actions.map((action, index) => {
-                    if (!action) return <button key={`unlearned-${index}`} type="button" disabled>아직 배우는 중<small>레벨이 오르면 배워요</small></button>;
+                  {actions.map(action => {
                     const move = moveFor(action)!, label = actionLabel(action), hint = effectHint(move, battle.player, battle.opponent);
                     const damage = previewDamage(move, battle.player, battle.opponent, battle.round);
                     const detail = move.kind === "attack" ? `${label} · 상성 ×${damage.multiplier} · 예상 피해 ${damage.min}~${damage.max} (명중 시) · 명중 ${damage.hitChance}%` : `${label} · ${GROUP_LABEL[move.group]} · 기력 ${move.energy} · ${move.kind === "defense" ? "방어 자세" : "능력 강화·회복"}`;
-                    return <button type="button" key={label} data-group={move.group} data-hint={hint} disabled={!allowed.some(a => sameAction(a, action))} aria-describedby={previewId}
+                    return <button type="button" key={label} data-group={move.group} data-hint={hint} disabled={!allowed.some(a => sameAction(a, action))} aria-label={`${label}, ${GROUP_LABEL[move.group]}, 기력 ${move.energy}, ${HINT_LABEL[hint]}`} aria-describedby={preview ? previewId : undefined}
                       onPointerDown={e => { if (!e.isPrimary || e.button !== 0) return; cancelHold(); held.current = false; holdTimer.current = setTimeout(() => { held.current = true; setPreview(detail); }, 500); }}
-                      onPointerUp={cancelHold} onPointerCancel={() => { cancelHold(); held.current = false; }} onPointerLeave={cancelHold}
-                      onContextMenu={e => e.preventDefault()} onFocus={() => setPreview(detail)} onBlur={() => { cancelHold(); setPreview(""); }}
+                      onPointerUp={() => { cancelHold(); setPreview(""); }} onPointerCancel={() => { cancelHold(); held.current = false; setPreview(""); }} onPointerLeave={() => { cancelHold(); setPreview(""); }}
+                      onContextMenu={e => e.preventDefault()} onKeyDown={e => { if (e.key === " " && !e.repeat) { held.current = false; holdTimer.current = setTimeout(() => { held.current = true; setPreview(detail); }, 500); } }} onKeyUp={() => { cancelHold(); setPreview(""); }} onBlur={() => { cancelHold(); setPreview(""); }}
                       onClick={() => { if (held.current) { held.current = false; return; } choose(action); }}>
-                      <strong>{label}</strong><small>{GROUP_LABEL[move.group]} · 기력 {move.energy} <span>{HINT_ICON[hint]}{HINT_LABEL[hint]}</span></small>
+                      <Image className="pet-battle-type" src={`/pet/battle/type-${move.group}.webp`} alt="" width={34} height={34} unoptimized onError={e => { e.currentTarget.style.display = "none"; }} />
+                      <span className="pet-battle-move-copy"><strong>{label}</strong><small><span className="pet-battle-cost">기력 <span className="pet-battle-cost-dots" aria-hidden="true">{move.energy ? "●".repeat(move.energy) : "0"}</span></span><span className="pet-battle-matchup"><span className="pet-battle-sr">{HINT_ICON[hint]}</span>{HINT_LABEL[hint]}</span></small></span>
                     </button>;
                   })}
-                  <button ref={command} type="button" className="pet-battle-back" onClick={() => { cancelHold(); held.current = false; setMenu("main"); setPreview(""); }}>← 뒤로</button>
                 </>}
               </div>
               <p className="pet-battle-preview" id={previewId} role="status">{preview}</p>
-            </div> : <div className="pet-battle-wait" aria-hidden="true"><span>✦</span><p>{intro ? "만남의 순간" : "친구의 움직임을 지켜봐요"}</p><small>명령은 차례가 끝나면 열려요</small></div>}
+            </div> : null}
           </>}
       </div>
       {intro && <div className="pet-battle-stripes" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} />)}</div>}

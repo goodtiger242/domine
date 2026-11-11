@@ -51,6 +51,7 @@ export function showBattleEvent(state: BattleState, event: BattleEvent): BattleS
 export type BattleCue = {
   text?: string; duration?: number; event?: BattleEvent;
   motion?: "intro" | "attack" | "hit" | "heal" | "effective" | "finish";
+  fx?: "hit" | "hit-good" | "heal" | "buff" | "debuff" | "dizzy" | "sleepy" | "shield";
   side?: Side; amount?: number; outcome?: Outcome;
 };
 
@@ -70,7 +71,7 @@ export function battleCues(events: readonly BattleEvent[], names: Record<Side, s
         break;
       case "effectiveness": effectiveness = event; break;
       case "damage":
-        cues.push({ motion: "hit", side: event.target, amount: event.amount, duration: 450 });
+        cues.push({ motion: "hit", fx: effectiveness?.hint === "good" ? "hit-good" : "hit", side: event.target, amount: event.amount, duration: 500 });
         cues.push({ event, duration: 900 });
         if (effectiveness) {
           if (effectiveness.hint !== "normal") cues.push({ text: effectiveness.hint === "good" ? "효과가 좋아요!" : "잘 안 통해요…", motion: effectiveness.hint === "good" ? "effective" : undefined });
@@ -83,10 +84,10 @@ export function battleCues(events: readonly BattleEvent[], names: Record<Side, s
           for (let energy = event.energy - event.amount + 1; energy <= event.energy; energy++) cues.push({ event: { ...event, energy, amount: 1 }, duration: 140 });
         } else cues.push({ event, duration: 0 });
         break;
-      case "heal": cues.push({ event, motion: "heal", side: event.side, amount: event.amount, text: `${who}, 버틸 힘을 ${event.amount} 되찾았어요!` }); break;
-      case "status": cues.push({ event, text: `${who} · ${STATUS_LABEL[event.status]}${event.change === "applied" ? " 상태가 됐어요." : event.change === "blocked" ? " 상태를 막았어요!" : " 상태가 풀렸어요."}` }); break;
-      case "buff": cues.push({ event, text: `${who}의 ${STAT_LABEL[event.stat]}${event.change === "applied" ? " 능력이 올랐어요!" : " 능력이 원래대로 돌아왔어요."}` }); break;
-      case "shield": cues.push({ event, text: event.change === "applied" ? `${who}, 단단히 버틸 준비를 해요!` : `${who}, 방어 자세를 풀어요.` }); break;
+      case "heal": cues.push({ event, motion: "heal", fx: "heal", side: event.side, amount: event.amount, text: `${who}, 버틸 힘을 ${event.amount} 되찾았어요!` }); break;
+      case "status": cues.push({ event, side: event.side, fx: event.change === "blocked" ? "shield" : event.change === "removed" ? undefined : event.status === "stagger" || event.status === "blur" ? "dizzy" : event.status === "slow" || event.status === "winded" ? "sleepy" : "debuff", text: `${who} · ${STATUS_LABEL[event.status]}${event.change === "applied" ? " 상태가 됐어요." : event.change === "blocked" ? " 상태를 막았어요!" : " 상태가 풀렸어요."}` }); break;
+      case "buff": cues.push({ event, side: event.side, fx: event.change === "applied" ? "buff" : "debuff", text: `${who}의 ${STAT_LABEL[event.stat]}${event.change === "applied" ? " 능력이 올랐어요!" : " 능력이 원래대로 돌아왔어요."}` }); break;
+      case "shield": cues.push({ event, side: event.side, fx: event.change === "applied" ? "shield" : undefined, text: event.change === "applied" ? `${who}, 단단히 버틸 준비를 해요!` : `${who}, 방어 자세를 풀어요.` }); break;
       case "end": cues.push({ motion: "finish", outcome: event.outcome, text: event.outcome === "quit" ? "다음에 또 함께 놀아요!" : event.outcome === "draw" ? "둘 다 끝까지 버텼어요. 멋진 무승부!" : `${names[event.outcome === "player" ? "opponent" : "player"]}, 지쳐서 앉아 버렸어요…` }); break;
     }
   }
