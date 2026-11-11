@@ -31,11 +31,12 @@ update domine_pet_v17.pet_progress set
 -- busy locks and shared history
 delete from domine_pet_v16.busy;
 delete from domine_pet_v10.history;
+-- v7.equipment points at v10.inventory (equipment_inventory_v10_fkey), so it must go first.
+delete from domine_pet_v7.equipment;
 delete from domine_pet_v10.inventory;
 update domine_pet_v10.pet_xp set xp=0;
 
 -- shared wallet, items and equipment
-delete from domine_pet_v7.equipment;
 delete from domine_pet_v7.inventory;
 delete from domine_pet_v7.daily;
 update domine_pet_v7.pool set xp=0, coins=0, version=version+1 where id=1;
