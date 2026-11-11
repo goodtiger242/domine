@@ -705,3 +705,24 @@
 }
 /* The foe stands high now: its speech goes beside it (left), clear of its HP box. */
 .pet-battle-fighter[data-side=opponent] .pet-battle-rival { bottom: auto; top: 12%; right: calc(100% + 4px); }
+/* Phone: smaller skill cards and filter tabs (user: "스킬들 너무 커"). */
+@media (max-width: 480px) {
+  .pet-battle-actions [data-group] { height: 40px; min-height: 40px; padding: 2px 4px; }
+  .pet-battle-move-copy strong { font-size: 14px; line-height: 17px; }
+  .pet-battle-move-copy small, .pet-battle-move-copy .pet-battle-effect { font-size: 11px; line-height: 14px; }
+  .pet-battle-move-title .pet-battle-matchup { padding: 1px 4px; font-size: 10px; line-height: 12px; }
+  .pet-battle-cost { font-size: 11px; line-height: 14px; }
+  .pet-battle-cost[data-finisher=true] { padding: 1px 5px; }
+  .pet-battle-filters button, .pet-battle-pagination button { min-height: 32px; height: 32px; font-size: 13px; }
+  .pet-battle-actions[data-menu=moves] { grid-template-rows: 32px auto 28px; gap: 3px; }
+  .pet-battle-console { min-height: 196px; }
+}
+@media (max-width: 480px) {
+  .pet-battle-card, .pet-battle-card .pet-battle-move { height: 42px; min-height: 42px; }
+  .pet-battle-card .pet-battle-move { gap: 6px; padding: 2px 6px; }
+  .pet-battle-card .pet-battle-kind { flex: 0 0 18px; font-size: 18px; }
+  .pet-battle-card .pet-battle-move-copy small { font-size: 12px; line-height: 15px; }
+  .pet-battle-card .pet-battle-cost { font-size: 13px; }
+}
+@media (max-width: 480px) { .pet-battle-page { grid-template-rows: repeat(3, 42px); gap: 5px; } }
+@media (max-width: 480px) { .pet-battle-pages { height: 136px; } }
