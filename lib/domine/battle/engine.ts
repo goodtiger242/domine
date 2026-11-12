@@ -9,7 +9,7 @@ export type { BattleProfile } from "./types";
 import type { Action, Actor, BattleEvent, BattleState, AiTier, Difficulty, Fighter, Outcome, RoundInput, Side } from "./types";
 
 export { availableActions, buildFighter, effectHint, previewDamage, cumulativeXp, levelFromXp, xpToNext, growthQ, growthScale, recommendedAllocation, conditionPenalty, critChance, MAX_LEVEL } from "./rules";
-export { learnset, autoMoves, moveSlots } from "./learnset";
+export { learnset, autoMoves, moveSlots, jobSkills, JOB_SLOTS } from "./learnset";
 export { JOBS, jobBonus, skillPoints } from "./jobs";
 export { chooseAction, AI_TIERS } from "./ai";
 export { opponentFor } from "./opponents";

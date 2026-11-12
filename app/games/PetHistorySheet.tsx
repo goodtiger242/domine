@@ -11,7 +11,7 @@ export function PetHistoryList({ entries }: { entries: PetHistoryEntry[] }) {
   </li>)}</ul>;
 }
 
-export default function PetHistorySheet({ history, onClose }: { history: PetApi["history"]; onClose: () => void }) {
+export default function PetHistorySheet({ history, onClose, title = "함께한 이력" }: { history: PetApi["history"]; onClose: () => void; title?: string }) {
   const [entries, setEntries] = useState<PetHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true), [error, setError] = useState("");
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function PetHistorySheet({ history, onClose }: { history: PetApi[
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [history]);
-  return <PetSheet title="함께한 이력" onClose={onClose}>
+  return <PetSheet title={title} onClose={onClose}>
     <p role="status" className="pet-sheet-note">{loading ? "이력을 불러오는 중…" : error || (!entries.length ? "아직 이력이 없어요." : "")}</p>
     <PetHistoryList entries={entries} />
   </PetSheet>;

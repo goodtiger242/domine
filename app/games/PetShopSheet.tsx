@@ -9,7 +9,8 @@ import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import PetSheet from "./PetSheet";
 import PetItemIcon from "./PetItemIcon";
 import { usePetProgressNumbers } from "./PetProgress";
-export default function PetShopSheet({ state, petId, disabled, notice, execute, onClose, bag = false, onSelectPet, onFindOpponent, multiPet = true, kingState = null, buyItem, pendingPurchase }: {
+export default function PetShopSheet({ state, petId, disabled, notice, execute, onClose, bag = false, onSelectPet, onFindOpponent, multiPet = true, kingState = null, buyItem, pendingPurchase, coinLabel = "우리 코인(공용)" }: {
+  coinLabel?: string;
   pendingPurchase?: { pet: PetId; item: string } | null;
   kingState?: KingState | null; buyItem?: (pet: PetId, id: string) => Promise<string>;
   bag?: boolean; state: V6Result | null; petId: PetId; disabled: boolean; notice: string; execute: (c: PetCommand) => Promise<void>; onClose: () => void;
@@ -60,7 +61,7 @@ export default function PetShopSheet({ state, petId, disabled, notice, execute, 
   return <PetSheet title={bag ? `${dog}의 가방` : "상점"} onClose={onClose} onBack={back}
     toolbar={<>
       {onSelectPet && <div className="pet-chips" role="group" aria-label="가방 강아지 선택">{([1, 2] as const).filter(id => multiPet || id === 1).map(id => <button type="button" key={id} aria-pressed={petId === id} disabled={blocked} onClick={() => { if (id === petId) return; setAsked(null); setDone(""); onSelectPet(id); }}>{PETS[id].name}</button>)}</div>}
-      <p className="pet-shop-coins" aria-label={`우리 코인(공용) ${coins}`}>🪙 {display.coins}</p>
+      <p className="pet-shop-coins" aria-label={`${coinLabel} ${coins}`}>🪙 {display.coins}</p>
       {!bag && <div className="pet-chips" role="group" aria-label="상품 분류">{["전체", "옷", "장난감", "전투 물품"].map(value => <button type="button" key={value} aria-pressed={category === value} onClick={() => { setCategory(value); setSelected(null); setConfirm(false); setDone(""); }}>{value}</button>)}</div>}
     </>}
     panel={!bag && selected && <div className="pet-product-detail">

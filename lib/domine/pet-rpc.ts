@@ -46,7 +46,7 @@ export type V6Result = {
   ticket?: { id: string; map_id: PetMap; eligible_at: string; expires_at: string } | null;
   season?: string; retryAfterSeconds?: number;
 };
-export type PetCapabilities = { version: 6; sharedEconomy: boolean; explorationThemes: number; v9: boolean; v10: boolean; perPetShop: boolean; history: boolean; busyLock?: boolean };
+export type PetCapabilities = { version: 6; sharedEconomy: boolean; explorationThemes: number; v9: boolean; v10: boolean; perPetShop: boolean; history: boolean; busyLock?: boolean; perPlayer?: boolean };
 export type PetHistoryEntry = { nickname: string; pet: PetId; kind: "action" | "purchase" | "equip" | "levelup" | "discover" | "battle" | "pickup"; detail: string | null; at: string };
 export class PetRpcError extends Error {
   definitive: boolean;
@@ -86,7 +86,7 @@ export function createPetApi(rpc: V6Rpc): PetApi {
       v9 = flags.v9 === true;
       v10 = flags.v10 === true;
       busyLock = flags.busyLock === true;
-      return { version: 6, sharedEconomy: flags.sharedEconomy === true, explorationThemes: flags.explorationThemes ?? 5, v9, v10, perPetShop: flags.perPetShop === true, history: flags.history === true, busyLock };
+      return { version: 6, sharedEconomy: flags.sharedEconomy === true, explorationThemes: flags.explorationThemes ?? 5, v9, v10, perPetShop: flags.perPetShop === true, history: flags.history === true, busyLock, perPlayer: flags.perPlayer === true };
     },
     register: (i, signal) => call("register", auth(i), signal),
     state: (i, pet, signal) => call("state", { ...auth(i), p_pet: pet }, signal),

@@ -1,18 +1,22 @@
 "use client";
-import { spawnsFor } from "@/lib/domine/pet-battle-view";
+import { spawnsFor, type Encounter } from "@/lib/domine/pet-battle-view";
+import type { LevelProfile } from "@/lib/domine/king/spawn";
 import { useState } from "react";
 import { PET_WORLD, worldCell } from "@/lib/domine/pet-world";
 import PetSheet from "./PetSheet";
 
-export default function PetWorldSheet({ current, onMove, onClose, slot, wins, careLevel = 1, showAnimals = false, onAnimals }: {
+export default function PetWorldSheet({ current, onMove, onClose, slot, wins, careLevel = 1, showAnimals = false, onAnimals, profile, now }: {
   current: string; visited: string[]; onMove: (to: string) => void; onClose: () => void;
   slot: number; wins: readonly string[]; careLevel?: number; showAnimals?: boolean; onAnimals?: (visible: boolean) => void;
+  profile?: LevelProfile | null; now?: number;
 }) {
   const [selected, setSelected] = useState(current);
   const cell = worldCell(selected);
   const [zoom, setZoom] = useState(false);
   const [animals, setAnimals] = useState(showAnimals);
-  const nearby = animals && careLevel <= 2 ? PET_WORLD.flatMap(place => spawnsFor(place.id, careLevel, slot, wins)
+  // One pass over the 100 cells feeds both the starter list and the grid.
+  const foesAt = new Map<string, Encounter[]>(animals ? PET_WORLD.map(place => [place.id, spawnsFor(place.id, careLevel, slot, wins, { profile, now })]) : []);
+  const nearby = animals && careLevel <= 2 ? PET_WORLD.flatMap(place => (foesAt.get(place.id) ?? [])
     .filter(foe => foe.level <= careLevel && ["순둥이", "보통"].includes(foe.individual.intelligence))
     .map(foe => ({ place, foe }))).sort((a, b) => {
       const distance = (id: string) => Math.abs(id.charCodeAt(0) - current.charCodeAt(0)) + Math.abs(Number(id.slice(1)) - Number(current.slice(1)));
@@ -30,7 +34,7 @@ export default function PetWorldSheet({ current, onMove, onClose, slot, wins, ca
       <div className="pet-world-grid" role="group" aria-label="서쪽 A열부터 동쪽 J열, 북쪽 1행부터 남쪽 10행">
         {PET_WORLD.map((place) => {
           const isHere = place.id === current;
-          const foes = animals ? spawnsFor(place.id, careLevel, slot, wins) : [];
+          const foes = foesAt.get(place.id) ?? [];
           return <button type="button" key={place.id}
             aria-label={`${place.id} ${place.name}${isHere ? ", 현재 위치" : ", 이동"}${foes.length ? `, 동물 ${foes.length}마리, ${foes.map(e => `${e.name} Lv.${e.level}`).join(", ")}` : ""}`}
             aria-current={isHere ? "location" : undefined} aria-pressed={place.id === selected}

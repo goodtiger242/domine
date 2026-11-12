@@ -373,7 +373,7 @@ test("v23: rollback restores exact pre-v23 bodies/ACLs and shared values without
   const db = await legacyFixture(t); await applyFile(db, v22);
   const definitions = async () => (await db.query(`select p.oid::regprocedure::text as name,pg_get_functiondef(p.oid) as body,array(select a::text from unnest(p.proacl) a order by a::text) as acl
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname in ('public','domine_pet_v6','domine_pet_v17','domine_pet_v22') and p.prokind='f' order by name`)).rows;
+    where n.nspname in ('public','domine_pet_v6','domine_pet_v17','domine_pet_v22') and p.prokind='f' order by name`)).rows.map(row => ({ ...row, body: row.body.replace(/\r\n/g, "\n") }));
   const originals = await definitions(), originalState = await state(db, "alice"), originalCare = await snapshot(db, "alice");
   await applyFile(db, v23);
   ok(await king(db, "alice", "buyItem", { pet: 1, item: "P02", quantity: 1 }));

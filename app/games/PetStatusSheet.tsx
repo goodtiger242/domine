@@ -25,8 +25,8 @@ function jobName(fighter: Fighter) {
 }
 
 /** 메인 화면에서 보는 내 강아지 정보(읽기 전용): 레벨·경험치·능력치·기술·특성·컨디션. */
-export default function PetStatusSheet({ petId, growth, condition, stage, onClose, supportMove }: {
-  petId: PetId; growth?: KingProgress; condition?: Condition; stage: PetStage; onClose: () => void; supportMove?: string;
+export default function PetStatusSheet({ petId, growth, condition, stage, onClose, supportMove, onJob }: {
+  petId: PetId; growth?: KingProgress; condition?: Condition; stage: PetStage; onClose: () => void; supportMove?: string; onJob?: () => void;
 }) {
   const level = growth?.level ?? 1, xp = growth?.xp ?? 0;
   const breedId = petId === 1 ? "B001" : "B002", breed = BREED_BY_ID[breedId];
@@ -57,13 +57,14 @@ export default function PetStatusSheet({ petId, growth, condition, stage, onClos
       <p className="pet-status-chips">
         <span>기운 {GROUP_LABEL[breed.group]}</span>
         <span>크리티컬 {Math.round(critChance(fighter))}%</span>
-        <span>직업 {jobName(fighter)}</span>
+        {!onJob && <span>직업 {jobName(fighter)}</span>}
         {penalty > 0 && <span data-warn="true">컨디션 −{penalty}%</span>}
       </p>
+      {onJob && <button type="button" className="pet-status-job" onClick={onJob}>직업 · {jobName(fighter)}<span>{selectedJob(fighter.job) ? "전직·바꾸기" : "직업 보기"} ›</span></button>}
       <p className="pet-status-trait">특성 · {TRAIT[breed.trait] ?? "없음"}</p>
       {held.length > 0 && <p className="pet-status-items">소모품 {held.length}종 · {held.reduce((sum, item) => sum + growth!.inventory[item.id], 0)}개</p>}
       <ul className="pet-status-moves" aria-label="장착 기술">
-        {moves.map(id => { const move = moveFor({ kind: "move", moveId: id }); return <li key={id} data-kind={move?.kind ?? "support"}>
+        {moves.map(id => { const move = moveFor({ kind: "move", moveId: id }); return <li key={id} data-kind={move?.kind ?? "support"} data-job={!!move?.learn?.job}>
           <span aria-hidden="true">{MOVE_KIND[move?.kind ?? "support"].icon}</span>{actionLabel({ kind: "move", moveId: id })}
         </li>; })}
       </ul>

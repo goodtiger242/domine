@@ -1014,3 +1014,46 @@
 .pet-battle-card .pet-battle-move-copy { overflow: hidden; }
 .pet-battle-card .pet-battle-move-copy strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pet-battle-card .pet-battle-move-copy small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* [job] job sheet, job skill mark */
+.pet-job { display: grid; gap: 10px; padding: 2px 2px 10px; }
+.pet-job-now { margin: 0; font-size: 13px; }
+.pet-job-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pet-job-tabs button { position: relative; display: grid; justify-items: center; gap: 2px; min-height: 56px; padding: 6px 2px; border: 1px solid var(--lit-border); border-radius: 12px; background: transparent; color: inherit; font-size: 12px; font-weight: 700; line-height: 1.2; word-break: keep-all; }
+.pet-job-tabs button > span { font-size: 18px; line-height: 1; }
+.pet-job-tabs button[aria-checked=true] { border-color: #365942; background: #36594222; box-shadow: inset 0 0 0 1px #365942; }
+.pet-job-tabs small { position: absolute; top: -7px; right: -3px; padding: 1px 5px; border-radius: 8px; background: #e6ba4d; color: #3a2c05; font-size: 10px; font-weight: 800; }
+.pet-job-tabs button[data-current=true] small { background: #365942; color: #fff; }
+.pet-job-card { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--lit-border); border-radius: 14px; }
+.pet-job-title { display: grid; gap: 2px; }
+.pet-job-title strong { font-size: 17px; line-height: 22px; }
+.pet-job-title span, .pet-job-hint { font-size: 12px; color: var(--lit-ink-muted, #8a8a8a); word-break: keep-all; }
+.pet-job-card h3 { margin: 4px 0 0; font-size: 12px; font-weight: 800; }
+.pet-job-hint { margin: 0; }
+.pet-job-stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.pet-job-stats span { padding: 3px 9px; border-radius: 12px; background: #70c79533; font-size: 12px; font-weight: 700; }
+.pet-job-stats span[data-down=true] { background: #d9534f26; }
+.pet-job-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pet-job-moves li { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 4px; align-items: center; padding: 6px 8px; border-radius: 10px; border-left: 4px solid #de7783; background: #8882; opacity: .6; }
+.pet-job-moves li[data-kind=defense] { border-color: #6eb5ec; }
+.pet-job-moves li[data-kind=support] { border-color: #70c795; }
+.pet-job-moves li[data-open=true] { opacity: 1; }
+.pet-job-moves b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.pet-job-moves small { grid-column: 2; font-size: 11px; color: var(--lit-ink-muted, #8a8a8a); }
+.pet-job-blocks { display: grid; gap: 4px; margin: 0; padding: 8px 10px; border-radius: 10px; background: #e6ba4d26; list-style: none; font-size: 13px; word-break: keep-all; }
+.pet-job-blocks li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.pet-job-blocks button { flex-shrink: 0; min-height: 36px; padding: 0 12px; border: 1px solid var(--lit-border); border-radius: 10px; background: transparent; color: inherit; font-size: 12px; font-weight: 700; }
+.pet-job-confirm { min-height: 48px; border: 0; border-radius: 12px; background: #365942; color: #fff; font-size: 15px; font-weight: 800; }
+.pet-job-confirm small { font-weight: 700; }
+.pet-job-confirm[data-armed=true] { background: #b9770e; }
+.pet-job-confirm:disabled { background: #8884; color: inherit; opacity: .7; }
+.pet-job-message { margin: 0; font-size: 13px; font-weight: 700; text-align: center; }
+.pet-status-job { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--lit-border); border-radius: 12px; background: transparent; color: inherit; font-size: 14px; font-weight: 700; }
+.pet-status-job span { font-size: 12px; font-weight: 400; color: var(--lit-ink-muted, #8a8a8a); }
+.pet-status-moves li[data-job=true]::before { content: "★ "; color: #d9a521; }
+/* The star sits on the kind icon so a job skill's name keeps its full width. */
+.pet-battle-card[data-job=true] .pet-battle-kind { position: relative; }
+.pet-battle-card[data-job=true] .pet-battle-kind::after { content: "★"; position: absolute; top: -5px; right: -6px; font-size: 10px; line-height: 1; color: #f0c84a; text-shadow: 0 0 2px #000; }
+.pet-job-ready { display: block; width: 100%; min-height: 44px; margin: 6px 0; border: 1px solid #e6ba4d; border-radius: 12px; background: #e6ba4d26; color: inherit; font-size: 14px; font-weight: 700; }
+.pet-job-ready:disabled { opacity: .55; }
+@media (max-width: 380px) { .pet-job-tabs button { font-size: 11px; } }

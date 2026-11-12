@@ -86,7 +86,9 @@ test("공유 성장 snapshot: 수동 분배·직업·배운 편성만 적용, �
   const growth = { level: 10, allocationMode: "manual", allocation: { hp: 8, attack: 8, defense: 8, speed: 3, focus: 0, calm: 0 }, job: "striker", jobTier: 1, moves: ["unknown", "T01"], mastery: { T01: 9000 } };
   const player = battlePlayer(1, 10, condition, [], undefined, growth);
   const expected = buildFighter("B001", 10, [], { condition, allocation: growth.allocation, job: { id: "rush", tier: 1 }, moves: ["T01"] });
-  assert.deepEqual(player.stats, expected.stats); assert.deepEqual(player.moves, ["T01"]);
+  assert.deepEqual(player.stats, expected.stats); assert.equal(player.moves[0], "T01");
+  const { MOVE_BY_ID } = loadTS("lib/domine/battle/data.ts");
+  assert.deepEqual(player.moves.slice(1).map(id => MOVE_BY_ID[id].learn?.job), ["rush"], "a job adds its own skill beside the equipped ones");
   assert.equal(player.mastery, undefined, "usage counts must never become unbounded damage ranks");
   assert.deepEqual(battlePlayer(1, 10, condition).stats, buildFighter("B001", 10, [], { condition }).stats);
   assert.doesNotThrow(() => battlePlayer(1, 1, condition, [], undefined, { ...growth, allocation: { hp: 9000 }, jobTier: 3 }));

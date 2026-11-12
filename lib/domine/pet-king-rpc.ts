@@ -43,6 +43,8 @@ export type KingState = {
   encyclopedia: KingEncounter[]; certifications: KingCertification[]; raids: KingRaid[];
   tickets: (KingTicket & { status: string; result: KingSettlement | null })[];
   prices: Record<string, number>;
+  /** Every player's dog levels (lowest, 25%, 50%, 75%, highest); absent on servers before v22. */
+  levelProfile?: { day: string; levels: number[] } | null;
 };
 export type KingRanking = { nickname: string; wins: number; raidContribution: number };
 export type KingReply<T> = { supported: true; ok: boolean; code: string; requestId: string; serverNow: string; data?: T | null }

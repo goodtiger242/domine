@@ -4,9 +4,10 @@ import { BREED_BY_ID as ENGINE_BREEDS, ITEM_BY_ID, MOVE_BY_ID } from "./battle/d
 import { random, seedFor } from "./battle/rng";
 import { LINES } from "./pet-lines";
 import { previewDamage, moveFor, REST_ENERGY, matchup, moveEnergy, sameAction } from "./battle/rules";
-import { moveSlots } from "./battle/learnset";
+import { jobSkills, moveSlots } from "./battle/learnset";
+import { KING_JOB_IDS } from "./pet-job-rules";
 import type { KingProgress } from "./pet-king-rpc";
-import { pickSpawns } from "./king/spawn";
+import { pickSpawns, type LevelProfile } from "./king/spawn";
 import { shortBreedName } from "./breed-short";
 import { BREED_BY_ID } from "./king/species";
 import { RIVAL_LINES, rivalLine, shouldSpeak, type RivalMoment, type RivalSpecies } from "./pet-rival-lines";
@@ -15,7 +16,7 @@ import type { Action, AiTier, BattleEvent, BattleState, Condition, Job, Move, Ou
 
 export function battlePlayer(petId: number, level: number, condition?: Condition, items: readonly string[] = [], supportMove?: string, growth?: KingProgress) {
   const breed = petId === 1 ? "B001" : "B002", element = petId === 1 ? "bond" : "trick";
-  const ids = { striker: "rush", defender: "guard", trickster: "trick", tracker: "track", empath: "bond" } as const;
+  const ids = KING_JOB_IDS;
   const tier = growth?.jobTier;
   const job: Job | undefined = growth?.job && ids[growth.job] && (tier === 1 || tier === 2 || tier === 3) && level >= [10, 30, 60][tier - 1] ? { id: ids[growth.job], tier } : undefined;
   const allocation = growth?.allocationMode === "manual" ? growth.allocation : undefined;
@@ -24,10 +25,14 @@ export function battlePlayer(petId: number, level: number, condition?: Condition
   catch { base = buildFighter(breed, level, [], { condition, items, job }); }
   const learned = learnset("dog", breed, element, level, job);
   const equipped = [...new Set(growth?.moves ?? [])].filter(id => learned.includes(id)).slice(0, moveSlots(level));
-  const supports = learned.filter(id => MOVE_BY_ID[id].kind === "support").sort((a, b) => (MOVE_BY_ID[a].learn?.level ?? 1) - (MOVE_BY_ID[b].learn?.level ?? 1));
+  const supports = learned.filter(id => MOVE_BY_ID[id].kind === "support" && !MOVE_BY_ID[id].learn?.job).sort((a, b) => (MOVE_BY_ID[a].learn?.level ?? 1) - (MOVE_BY_ID[b].learn?.level ?? 1));
   const support = supports.includes(supportMove ?? "") ? supportMove : supports.at(-1);
   // shortcut: server mastery is usage counts, enable rank bonuses when the server defines the conversion.
-  const moves = equipped.length ? equipped : [...new Set([...base.moves.slice(0, 3), ...(support ? [support] : [])])];
+  // Job skills ride in their own two slots, so choosing a job never costs a regular skill.
+  const special = job ? jobSkills(learned) : [];
+  const plain = job ? buildFighter(breed, level, [], { condition, items }).moves : base.moves;
+  const regular = (equipped.length ? equipped : [...new Set([...plain.slice(0, 3), ...(support ? [support] : [])])]).filter(id => !special.includes(id));
+  const moves = [...regular.slice(0, moveSlots(level)), ...special];
   return buildFighter(breed, level, [], { condition, items, job, allocation: base.allocation, moves });
 }
 
@@ -39,12 +44,13 @@ export function readEncounterWins(storage: Pick<Storage, "getItem">, slot: numbe
     return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string" && new RegExp(`^${slot}:[A-J](?:[1-9]|10)(?::[A-Za-z0-9_-]+){0,3}$`).test(key)) : [];
   } catch { return []; }
 }
-export function spawnsFor(cellId: string, careLevel: number, slot = encounterSlot(), wins: readonly string[] = []) {
+/** `shared.now` hides animals outside their stay; `shared.profile` is the server's level profile for every player. */
+export function spawnsFor(cellId: string, careLevel: number, slot = encounterSlot(), wins: readonly string[] = [], shared: { profile?: LevelProfile | null; now?: number } = {}) {
   if (wins.includes(`${slot}:${cellId}`)) return [];
   const playerLevel = Number.isFinite(careLevel) ? Math.max(1, Math.min(999, Math.floor(careLevel))) : 1;
   // Fixed named residents keep their place when the random quota would exceed three.
-  return pickSpawns(cellId, slot, playerLevel).sort((a, b) => Number(b.kind === "named") - Number(a.kind === "named")).slice(0, 3)
-    .filter(s => !wins.includes(`${slot}:${cellId}:${s.individual.id}`)).map(spawn => {
+  return pickSpawns(cellId, slot, playerLevel, shared.profile).sort((a, b) => Number(b.kind === "named") - Number(a.kind === "named")).slice(0, 3)
+    .filter(s => !wins.includes(`${slot}:${cellId}:${s.individual.id}`) && (shared.now === undefined || shared.now >= s.from && shared.now < s.until)).map(spawn => {
       const individual = spawn.individual, breed = BREED_BY_ID[individual.breedId];
       const art = breed.variants.some(v => v.art === individual.appearance.art) ? individual.appearance.art
         : breed.variants[individual.seed % breed.variants.length]?.art ?? individual.appearance.art;

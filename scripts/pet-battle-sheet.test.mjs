@@ -188,7 +188,9 @@ for (const offline of [false, true]) test(`quit keeps local play and has no rewa
   const e = PET_WORLD.flatMap(c => spawnsFor(c.id, 1, mock.slot()))[0], results = [];
   const api = createKingApi(offline ? async () => { throw Error("offline"); } : mock.rpc);
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {}, kingApi: api, identity, onSettled: r => results.push(r) });
-  await nextTurn(); h.render(); h.settle(); h.click("그만하기"); await nextTurn(); h.render(); h.settle();
+  // A failed request is retried once after 1.5 s, so the offline start settles only after that wait.
+  await nextTurn(); if (offline) { h.advance(1500); await nextTurn(); }
+  h.render(); h.settle(); h.click("그만하기"); await nextTurn(); h.render(); h.settle();
   assert.match(text(h.tree), /그만뒀어요/); assert.ok(!text(h.tree).includes("경험치 +"));
   if (offline) { assert.match(text(h.tree), /이 기기에서 계속/); assert.equal(results.length, 0); }
   else { assert.equal(results[0].outcome, "quit"); assert.equal(results[0].xp, 0); assert.equal(results[0].coins, 0); }

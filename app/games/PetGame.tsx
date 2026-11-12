@@ -30,10 +30,11 @@ const PetHistorySheet = dynamic(() => import("./PetHistorySheet"), { loading });
 const PetAchievementSheet = dynamic(() => import("./PetAchievementSheet"), { loading });
 const PetWorldSheet = dynamic(() => import("./PetWorldSheet"), { loading });
 const PetStatusSheet = dynamic(() => import("./PetStatusSheet"), { loading });
+const PetJobSheet = dynamic(() => import("./PetJobSheet"), { loading });
 const PetSheet = dynamic(() => import("./PetSheet"), { loading });
 const PetBattleSheet = dynamic(() => import("./PetBattleSheet"), { ssr: false, loading });
 const PetEncounterSheet = dynamic(() => import("./PetEncounterSheet"), { loading });
-type Sheet = "status" | "map" | "shop" | "bag" | "album" | "achievements" | "history" | "record" | "notice" | "encounter" | "battle" | null;
+type Sheet = "status" | "job" | "map" | "shop" | "bag" | "album" | "achievements" | "history" | "record" | "notice" | "encounter" | "battle" | null;
 const BUSY_ACTION: Record<string, string> = { feed: "밥 주는", treat: "간식 주는", pet: "쓰다듬는", play: "공놀이하는", walk: "산책하는", brush: "빗질하는", bath: "목욕시키는", train: "훈련하는" };
 
 
@@ -42,7 +43,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
   const { machine, shared: pet, personal, care } = game;
   const [sheet, setSheet] = useState<Sheet>(null), [category, setCategory] = useState<PetCategory>("먹이");
   const [encounter, setEncounter] = useState<Encounter | null>(null);
-  const [slot, setSlot] = useState(encounterSlot);
+  const [slot, setSlot] = useState(encounterSlot), [clock, setClock] = useState(() => Date.now());
   const [wins, setWins] = useState<string[]>([]);
   const [animalMap, setAnimalMap] = useState(false), [noOpponent, setNoOpponent] = useState(false);
   useEffect(() => { try { setAnimalMap(window.localStorage.getItem("domine-pet-map-animals") === "1"); } catch { /* Default: hidden. */ } }, []);
@@ -57,6 +58,8 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
   const speech = speeches[0];
   const [hour, setHour] = useState(12);
   const tabsId = useId();
+  // After the per-player migration every name owns its dogs and coins; before it they are shared.
+  const mine = !!game.features?.perPlayer, coinLabel = mine ? "내 코인" : "우리 코인(공용)";
   const stage = stageOf(pet?.care_total ?? 0), face = pet ? faceOf(pet, hour >= 21 || hour < 5) : "happy";
   const cell = worldCell(machine.committedMap);
   const groups = availableActionGroups(actionsForMap(PET_ACTIONS, cell.theme));
@@ -104,7 +107,10 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
   const items = selectedItems(carried,growth?.inventory ?? {});
   const rememberItems = (next: string[]) => { setCarried(next); try { window.localStorage.setItem(carryKey,JSON.stringify(next)); } catch { /* Session memory remains available. */ } };
   const sharedWins = departedWins(wins, king.departed, slot);
-  const currentEncounters = spawnsFor(cell.id, playerLevel, slot, sharedWins);
+  // Animals are the same for every player: the server's level profile and the clock decide who is here now.
+  const profile = king.state?.levelProfile;
+  const currentEncounters = spawnsFor(cell.id, playerLevel, slot, sharedWins, { profile, now: clock });
+  const jobReady = !!growth && !growth.job && growth.level >= 10 && !!king.state?.certifications?.some(c => c.pet === game.petId && c.kind === "region" && c.target === "R01");
   const careLocked = locked || !!game.busy || (!!game.features?.busyLock && machine.command !== "idle");
   const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeeches((queue) => queueSpeech(queue, { text, speaker })), []);
   const strokePet = useCallback(() => care("pet", true), [care]);
@@ -139,7 +145,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     if (sheet === "battle") return;
     const refresh = () => {
       const next = encounterSlot();
-      setSlot(next);
+      setSlot(next); setClock(Date.now());
       try { setWins(previous => [...new Set([...previous.filter(key => key.startsWith(`${next}:`)), ...readEncounterWins(window.localStorage, next)])]); }
       catch { /* Storage may be unavailable; keep this session's wins. */ }
     };
@@ -169,8 +175,9 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     const now = encounterSlot();
     let saved = wins;
     try { saved = [...new Set([...wins, ...readEncounterWins(window.localStorage, now)])]; } catch { /* Use the session record. */ }
-    setSlot(now); setWins(saved);
-    const next = spawnsFor(cell.id, playerLevel, now, departedWins(saved, king.departed, now));
+    const time = Date.now();
+    setSlot(now); setWins(saved); setClock(time);
+    const next = spawnsFor(cell.id, playerLevel, now, departedWins(saved, king.departed, now), { profile, now: time });
     const choice = encounterChoice(next);
     const chosen = selected ? next.find(e => e.id === selected.id) : choice === "confirm" ? next[0] : null;
     if (selected && !chosen || choice === "empty") { setNoOpponent(true); return; }
@@ -181,7 +188,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     const now = encounterSlot();
     let saved = wins;
     try { saved = [...new Set([...wins, ...readEncounterWins(window.localStorage, now)])]; } catch { /* Keep session wins. */ }
-    const next = spawnsFor(cell.id, playerLevel, now, departedWins(saved, king.departed, now)).find(e => e.id === encounter.id);
+    const next = spawnsFor(cell.id, playerLevel, now, departedWins(saved, king.departed, now), { profile, now: Date.now() }).find(e => e.id === encounter.id);
     setSlot(now); setWins(saved);
     if (!next) { close(); setNoOpponent(true); return; }
     setEncounter(next); open("battle");
@@ -224,7 +231,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     </div>
     {!game.registered && <form className="pet-name-gate" onSubmit={(event) => { event.preventDefault(); void connect(query); }}>
       <strong>이름을 입력해 주세요</strong>
-      <p>청년회 이름을 입력하면 도미·미네와 함께 시작해요.</p>
+      <p>{mine ? "이름마다 내 도미·미네를 키워요." : "청년회 이름을 입력하면 도미·미네와 함께 시작해요."}</p>
       <div>
         <input aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder="이름" enterKeyHint="go" />
         <button type="submit" aria-busy={connecting} disabled={connecting || !query || game.capability === "loading"}>{connecting ? "확인 중…" : "시작"}</button>
@@ -233,11 +240,12 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
       {connectionError && <p role="status" className="pet-name-gate-error">연결을 확인하지 못했어요 · <button type="button" disabled={connecting} aria-busy={connecting} onClick={() => void retryConnection()}>{connecting ? "확인 중…" : "다시 시도"}</button></p>}
       {game.capability === "loading" && <p role="status">연결 확인 중…</p>}
     </form>}
-    {game.registered && <div className="pet-progress-row">{personal && !personal.player ? <span role="status">불러오는 중… · <span aria-label={`우리 코인(공용) ${personal.coins ?? 0}`}>🪙 {personal.coins ?? 0}</span></span> : <PetProgress key={game.petId} onInfo={() => open("status")} needs={pet ? { fullness: pet.fullness, mood: pet.mood, clean: pet.clean ?? 80 } : undefined} name={PETS[game.petId].name} level={playerLevel} xp={growth?.xp ?? 0} coins={coins} reward={reward} />}
+    {game.registered && <div className="pet-progress-row">{personal && !personal.player ? <span role="status">불러오는 중… · <span aria-label={`${coinLabel} ${personal.coins ?? 0}`}>🪙 {personal.coins ?? 0}</span></span> : <PetProgress key={game.petId} coinLabel={coinLabel} onInfo={() => open("status")} needs={pet ? { fullness: pet.fullness, mood: pet.mood, clean: pet.clean ?? 80 } : undefined} name={PETS[game.petId].name} level={playerLevel} xp={growth?.xp ?? 0} coins={coins} reward={reward} />}
       {game.canRetry && <button type="button" onClick={game.retry}>결과 확인</button>}
     </div>}
     {status && game.registered && <PetNotice key={`${game.petId}-${status}`} parts={[status]} onOpen={() => open(game.registered ? "notice" : "record")} />}
     {firstOpponent && !sheet && <button type="button" className="pet-first-opponent" disabled={locked} onClick={() => openMap(true)}>지도에서 첫 상대 찾기</button>}
+    {jobReady && !firstOpponent && !sheet && <button type="button" className="pet-job-ready" disabled={locked} onClick={() => open("job")}>⭐ {PETS[game.petId].name}가 직업을 가질 수 있어요</button>}
     <div onPointerDownCapture={() => setNoOpponent(false)} className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
       {game.worldReady ? <PetScene key={game.petId} busyText={busyText} watchingText={sheet === "battle" ? "" : king.watching} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => openMap()} onLocal={game.localScene} locked={locked}
         onBattle={() => startBattle()} encounters={currentEncounters} selectedEncounter={sheet === "encounter" ? encounter?.id : undefined} onEncounter={startBattle} battleDisabled={locked}
@@ -269,12 +277,13 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     {sheet === "encounter" && <PetEncounterSheet encounters={currentEncounters} selected={encounter} petId={game.petId} supportMove={supportMove} onSupportMove={setSupportMove} inventory={growth?.inventory} items={items} onItems={rememberItems} onSelect={setEncounter} onStart={confirmBattle} onClose={close} />}
     {sheet === "battle" && encounter && <PetBattleSheet key={`${encounter.id}:${game.petId}`} encounter={encounter} petId={game.petId} condition={pet ?? undefined} stage={stage} hour={hour} onClose={close} onWin={winBattle}
       kingApi={game.kingApi} identity={game.identity} growth={growth} supportMove={supportMove} items={items} onInventoryRefresh={king.refresh} firstWin={!!king.state && !king.state.encyclopedia.some(e => e.individualId === encounter.individual.id && e.wins > 0)} onSettled={result => { king.settled(result); setSettlement(previous => ({ pet: game.petId, result, hasWon: !!previous?.hasWon || result.outcome === "win" })); }} />}
-    {sheet === "status" && <PetStatusSheet petId={game.petId} growth={growth} condition={pet ?? undefined} supportMove={supportMove} stage={stage} onClose={close} />}
-    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={sharedWins} careLevel={playerLevel} showAnimals={animalMap} onAnimals={rememberAnimals}
+    {sheet === "status" && <PetStatusSheet petId={game.petId} growth={growth} condition={pet ?? undefined} supportMove={supportMove} stage={stage} onClose={close} onJob={game.kingApi ? () => open("job") : undefined} />}
+    {sheet === "job" && <PetJobSheet petId={game.petId} growth={growth} coins={coins} certifications={king.state?.certifications ?? []} chooseJob={king.chooseJob} onClose={close} onMap={() => openMap(true)} />}
+    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={sharedWins} careLevel={playerLevel} showAnimals={animalMap} onAnimals={rememberAnimals} profile={profile} now={clock}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
-    {(sheet === "shop" || sheet === "bag") && <PetShopSheet pendingPurchase={king.pendingPurchase} kingState={king.state} buyItem={king.buyItem} bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={async (...args) => { await game.execute(...args); await king.refresh(); }} onClose={close} onSelectPet={game.selectPet} multiPet={game.multiPet} onFindOpponent={() => openMap(true)} />}
+    {(sheet === "shop" || sheet === "bag") && <PetShopSheet coinLabel={coinLabel} pendingPurchase={king.pendingPurchase} kingState={king.state} buyItem={king.buyItem} bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={async (...args) => { await game.execute(...args); await king.refresh(); }} onClose={close} onSelectPet={game.selectPet} multiPet={game.multiPet} onFindOpponent={() => openMap(true)} />}
     {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}
-    {sheet === "history" && <PetHistorySheet history={game.api.history} onClose={close} />}
+    {sheet === "history" && <PetHistorySheet title={mine ? "동네 소식" : undefined} history={game.api.history} onClose={close} />}
     {sheet === "achievements" && <PetAchievementSheet badges={personal?.badges ?? []} notice={notice} onClose={close} />}
     {(sheet === "record" || sheet === "notice") && <PetSheet title={sheet === "notice" ? "안내" : "내 이름"} onClose={close}>
       {sheet === "notice" ? <p className="pet-sheet-note">{status || "새 안내가 없어요."}</p> : <>

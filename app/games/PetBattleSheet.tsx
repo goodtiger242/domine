@@ -483,9 +483,9 @@ export default function PetBattleSheet({ encounter, petId, condition, stage, hou
                         const enabled = allowed.some(a => sameAction(a, action));
                         const detail = moveDetail(action, battle);
                         const showDetail = () => { setPreview(detail); setPreviewCost(cost); };
-                        return <div key={label} data-action-key={label} className="pet-battle-card" data-kind={move?.kind ?? "support"} data-finisher-ready={!!move?.finisher && enabled} data-insufficient={!enabled}>
+                        return <div key={label} data-action-key={label} className="pet-battle-card" data-kind={move?.kind ?? "support"} data-job={!!move?.learn?.job} data-finisher-ready={!!move?.finisher && enabled} data-insufficient={!enabled}>
                           <button type="button" className="pet-battle-move" data-group={move?.group ?? "neutral"} data-kind={move?.kind ?? "support"} data-hint={hint} aria-disabled={!enabled}
-                            aria-label={`${kind.label}, ${label}, ${move ? moveEffect(move, battle) : `기력 +${REST_ENERGY}`}, 기력 ${cost}${insufficient ? ", 기력 부족" : ""}${move?.kind === "attack" ? `, ${HINT_LABEL[hint]}` : ""}`}
+                            aria-label={`${move?.learn?.job ? "직업 기술, " : ""}${kind.label}, ${label}, ${move ? moveEffect(move, battle) : `기력 +${REST_ENERGY}`}, 기력 ${cost}${insufficient ? ", 기력 부족" : ""}${move?.kind === "attack" ? `, ${HINT_LABEL[hint]}` : ""}`}
                             onFocus={() => setPreviewCost(cost)} onBlur={() => { cancelHold(); if (!preview) setPreviewCost(0); }} onPointerEnter={() => setPreviewCost(cost)}
                             onPointerDown={e => { if (!e.isPrimary || e.button !== 0) return; cancelHold(); held.current = false; setPreviewCost(cost); holdTimer.current = setTimeout(() => { held.current = true; showDetail(); }, 500); }}
                             onPointerUp={cancelHold} onPointerCancel={() => { cancelHold(); held.current = false; setPreviewCost(0); }} onPointerLeave={() => { cancelHold(); if (!preview) setPreviewCost(0); }}

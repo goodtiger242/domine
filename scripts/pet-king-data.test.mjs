@@ -164,7 +164,7 @@ test("1000구간×98칸 출몰 분포와 입력 재현·서식 가중치·개체
     if (slot < 3) {
       assert.deepEqual(spawns, pickSpawns(cell.id, slot, 1));
       const high = pickSpawns(cell.id, slot, 50).filter(s => s.kind === "resident");
-      assert.deepEqual(high.map(s => s.individual.id), spawns.map(s => s.individual.id), "same animals for every level");
+      assert.ok(high.every(s => spawns.some(x => x.individual.id === s.individual.id)), "a veteran sees a subset of a starter's animals");
       for (const s of high) assert.ok(s.level >= 47 && s.level <= 55, "residents scale with our level");
     }
     const habitat = habitatOf(cell.id), tier = Math.floor((levelRange(cell.id)[0] - 1) / 18);

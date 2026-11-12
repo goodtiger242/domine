@@ -104,8 +104,8 @@ test("24개체 spawnsFor→createBattle→종료 3072판: 실제 품종·대사�
   const fixtures = new Map();
   for (let slot = 0; slot < 1000 && fixtures.size < 24; slot++) for (const cell of PET_WORLD) {
     if (NAMED.some(n => n.cellId === cell.id)) continue;
-    if (!pickSpawns(cell.id, slot, 1).some(s => species.includes(s.individual.species))) continue;
-    for (const encounter of spawnsFor(cell.id, 1, slot)) if (species.includes(encounter.individual.species) && !fixtures.has(encounter.individual.id)) fixtures.set(encounter.individual.id, encounter);
+    if (!pickSpawns(cell.id, slot, 10).some(s => species.includes(s.individual.species))) continue;
+    for (const encounter of spawnsFor(cell.id, 10, slot)) if (species.includes(encounter.individual.species) && !fixtures.has(encounter.individual.id)) fixtures.set(encounter.individual.id, encounter);
   }
   assert.equal(fixtures.size, 24);
   let completed = 0;

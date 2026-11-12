@@ -4,6 +4,14 @@ import { JOB_LEVELS, jobBonus, selectedJob, skillPoints } from "./jobs";
 import type { FighterOptions, Group, Job, Move, Species } from "./types";
 
 export const moveSlots = (level: number) => Math.min(8, 4 + Math.floor(level / 25));
+/** A job adds two extra slots that only its own skills can fill. */
+export const JOB_SLOTS = 2;
+/** The job skills used in battle: the newest attack and the newest non-attack (or the newest two of one kind). */
+export function jobSkills(learned: readonly string[]): string[] {
+  const own = learned.map(id => MOVES.find(m => m.id === id)!).filter(m => m?.learn?.job).sort((a, b) => b.learn!.level - a.learn!.level);
+  const attack = own.find(m => m.kind === "attack"), other = own.find(m => m.kind !== "attack");
+  return (attack && other ? [attack, other] : own.slice(0, JOB_SLOTS)).map(m => m.id);
+}
 export function validateJob(job: Job, level: number) {
   jobBonus(job.id,job.tier);
   if (level < JOB_LEVELS[job.tier - 1]) throw new Error("전직 레벨이 부족합니다.");

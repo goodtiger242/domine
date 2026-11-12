@@ -1,6 +1,6 @@
 import { ELEMENTS, MOVE_TAGS, SPECIES } from "./moves";
 import { jobBonus, selectedJob } from "./jobs";
-import { learnset, autoMoves, moveSlots, validateJob } from "./learnset";
+import { learnset, autoMoves, moveSlots, validateJob, JOB_SLOTS } from "./learnset";
 import { BREED_BY_ID, FINISHERS, ITEM_BY_ID, MOVE_BY_ID, MOVES, PUSH } from "./data";
 import { random } from "./rng";
 import { fighterProfile, profileFor, tiltStats } from "./profiles";
@@ -145,7 +145,8 @@ export function buildFighter(breedId: string, level: number, equipment: readonly
   }
   const learned = learnset(options.species ?? "dog", options.signatureBreedId ?? breedId, options.element ?? breed.group, level, options.job);
   const moves = options.moves ?? (options.element || options.species || selected ? autoMoves(learned,level) : breed.learn.filter(l => l.level <= level).slice(0,4).map(l => l.move));
-  if (!moves.length || moves.length > moveSlots(level) || new Set(moves).size !== moves.length || moves.some(id => !learned.includes(id))) throw new Error(`배운 기술 중 1~${moveSlots(level)}개를 선택합니다.`);
+  const jobExtra = selected ? Math.min(JOB_SLOTS, moves.filter(id => MOVE_BY_ID[id]?.learn?.job).length) : 0;
+  if (!moves.length || moves.length - jobExtra > moveSlots(level) || new Set(moves).size !== moves.length || moves.some(id => !learned.includes(id))) throw new Error(`배운 기술 중 1~${moveSlots(level)}개를 선택합니다.`);
   return { ...structuredClone(options), ...(battleProfile ? { battleProfile } : {}), finisher: options.finisher ?? FINISHERS.find(m => m.group === (options.element ?? breed.group))!.id, allocation: { ...allocation }, breedId, level, stats: result, baseStats, equipment: [...equipment], moves: [...moves] };
 }
 
