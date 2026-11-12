@@ -13,14 +13,17 @@ const source = ts.transpileModule(readFileSync("app/games/usePetController.ts", 
 }).outputText;
 
 // Exercise the real controller with deterministic hooks/timers and no browser or database.
-function mount(api, saved = [], reduced = false) {
+function mount(api, saved = [], reduced = false, client = {}) {
   let imageLoader = async () => true;
   const storage = new Map(saved), slots = [], effects = [], timers = new Map();
+  const events = new Map();
+  const listeners = { addEventListener: (name, fn) => events.set(name, fn), removeEventListener: name => events.delete(name) };
+  let intersection;
   let cursor = 0, dirty = true, game, now = 0, timerId = 0;
   globalThis.localStorage = { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) };
-  globalThis.document = { hidden: false, addEventListener() {}, removeEventListener() {} };
-  globalThis.window = { matchMedia: () => ({ matches: reduced }), addEventListener() {}, removeEventListener() {}, setTimeout: (...args) => setTimeout(...args), clearTimeout: id => clearTimeout(id) };
-  globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
+  globalThis.document = { hidden: false, ...listeners };
+  globalThis.window = { matchMedia: () => ({ matches: reduced }), ...listeners, setTimeout: (...args) => setTimeout(...args), clearTimeout: id => clearTimeout(id) };
+  globalThis.IntersectionObserver = class { constructor(fn) { intersection = fn; } observe() {} disconnect() {} };
   globalThis.setTimeout = (fn,ms) => { const id=++timerId; timers.set(id,{fn,at:now+ms}); return id; };
   globalThis.clearTimeout = id => timers.delete(id);
   globalThis.setInterval = () => 0;
@@ -51,7 +54,7 @@ function mount(api, saved = [], reduced = false) {
   const exports={};
   new Function("require","exports",source)(name=>{
     if(name==="react") return hooks;
-    if(name==="@/lib/supabase/client") return {createClient:()=>({})};
+    if(name==="@/lib/supabase/client") return {createClient:()=>client};
     if(name==="@/lib/domine/pet-assets") return {prepareImage:(...args)=>imageLoader(...args),vibrate:()=>{}};
     return loadTS(`${name.slice(2)}.ts`);
   },exports);
@@ -64,7 +67,7 @@ function mount(api, saved = [], reduced = false) {
     assert.equal(dirty,false,"controller settles without an effect loop");
   }
   return {
-    get game(){return game;},storage,flush, setImageLoader(fn){imageLoader=fn;},
+    get game(){return game;},storage,flush,events,timers, intersect(visible){intersection([{isIntersecting:visible}]);}, setImageLoader(fn){imageLoader=fn;},
     async advance(ms) {
       const end=now+ms;
       for(;;) {
@@ -344,3 +347,86 @@ mock.api.execute=async(...args)=>{await commitBeforeTimeout(...args);return new 
 void h.game.execute({...command,requestId:"recover-timeout"});await h.flush();
 await h.advance(8000);assert.equal(h.game.machine.command,"uncertain");assert.equal(h.game.canRetry,false);
 await h.advance(1500);assert.equal(h.game.machine.command,"idle");assert.ok(mock.calls.includes("operation"));h.close();
+
+// A stuck state transport is aborted at 8s; triggers coalesce and never overlap.
+mock=createPetMock();h=mount(mock.api);await login(h);
+let stateCalls=0, signal, resolveState;
+mock.api.state=(i,pet,s)=>{stateCalls++;signal=s;return new Promise(resolve=>{resolveState=()=>resolve(mock.state(pet));});};
+void h.game.refresh();await h.flush();
+for(let i=0;i<5;i++) h.events.get("online")();
+await h.flush();assert.equal(stateCalls,1);
+await h.advance(7999);assert.equal(signal.aborted,false);assert.equal(stateCalls,1);
+await h.advance(1);assert.equal(signal.aborted,true);
+await h.advance(300000);assert.equal(stateCalls,1,"an abort-ignoring transport still holds the guard");
+resolveState();await h.flush();assert.equal(stateCalls,1,"a queued automatic read respects the timeout backoff");
+h.close();
+
+mock=createPetMock();h=mount(mock.api);await login(h);
+stateCalls=0;
+mock.api.state=(_i,_pet,s)=>{stateCalls++;signal=s;return new Promise((_,reject)=>s.addEventListener("abort",()=>reject(Error("aborted")),{once:true}));};
+void h.game.refresh();await h.flush();await h.advance(8000);
+assert.equal(signal.aborted,true);assert.equal(stateCalls,1);
+// Hide between explicit events so the jittered interval cannot change the deadlines.
+document.hidden=true;
+for(const delay of [30000,60000,120000,240000,240000]) {
+  const before=stateCalls;
+  await h.advance(delay-1);
+  document.hidden=false;h.events.get("online")();h.events.get("pageshow")();h.intersect(false);h.intersect(true);await h.flush();
+  assert.equal(stateCalls,before,"all automatic triggers obey backoff");
+  document.hidden=true;await h.advance(1);document.hidden=false;h.events.get("online")();await h.flush();
+  assert.equal(stateCalls,before+1);
+  await h.advance(8000);document.hidden=true;
+}
+// An action refresh bypasses backoff; success resets the next failure to 30s.
+mock.api.state=async()=>{stateCalls++;return mock.state();};
+await h.game.refresh();await h.flush();
+const afterSuccess=stateCalls;
+document.hidden=false;h.events.get("online")();await h.flush();assert.equal(stateCalls,afterSuccess+1);
+mock.api.state=async()=>{stateCalls++;throw Error("offline");};
+h.events.get("online")();await h.flush();document.hidden=true;
+const afterFailure=stateCalls;
+await h.advance(29999);document.hidden=false;h.events.get("online")();await h.flush();assert.equal(stateCalls,afterFailure);
+document.hidden=true;await h.advance(1);document.hidden=false;h.events.get("online")();await h.flush();assert.equal(stateCalls,afterFailure+1);h.close();
+
+mock=createPetMock();h=mount(mock.api);await login(h);
+stateCalls=0;let releaseRead;
+mock.api.state=()=>{stateCalls++;return new Promise(resolve=>{releaseRead=()=>resolve(mock.state());});};
+void h.game.refresh();await h.flush();
+for(let i=0;i<4;i++) void h.game.refresh();
+releaseRead();await h.flush();assert.equal(stateCalls,2,"multiple triggers become one follow-up");
+releaseRead();await h.flush();assert.equal(stateCalls,2);
+void h.game.refresh();await h.flush();h.close();
+releaseRead();await h.flush();assert.equal(stateCalls,3,"unmount cannot start another read");
+
+// Every scheduled poll is within +/-15% and samples jitter again after firing.
+const random=Math.random;let sample=0;Math.random=()=>sample;
+mock=createPetMock();h=mount(mock.api);await login(h);
+assert.ok([...h.timers.values()].some(t=>t.at===25500));
+sample=1;await h.advance(25500);assert.ok([...h.timers.values()].some(t=>t.at===60000));
+h.close();Math.random=random;
+console.log("Pet polling: single flight, coalescing, abort, backoff, events, reset and jitter passed.");
+
+// Exercise the production Supabase adapters, including king's signal-bound API.
+const rpcRequests=[];
+const client={rpc(name,args){
+  let signal;
+  return {
+    abortSignal(value){signal=value;return this;},
+    then(resolve,reject){
+      rpcRequests.push({name,args,signal});
+      if(name==="domine_pet_capabilities_v6") return Promise.resolve({data:{version:6},error:null}).then(resolve,reject);
+      return new Promise((_,fail)=>signal.addEventListener("abort",()=>fail(Error("transport aborted")),{once:true})).then(resolve,reject);
+    },
+  };
+}};
+h=mount(undefined,[],false,client);await h.flush();
+const legacyRead=rpcRequests.find(r=>r.name==="domine_pet_state_for");assert.ok(legacyRead.signal);
+await h.advance(8000);assert.equal(legacyRead.signal.aborted,true);
+const {retryKing}=loadTS("lib/domine/pet-king-client.ts");
+const kingRead=retryKing(signal=>h.game.kingApi.abortSignal(signal).state(identity));
+const abortedKing=assert.rejects(kingRead,/transport aborted/);
+await h.flush();await h.advance(8000);
+assert.equal(rpcRequests.filter(r=>r.name==="domine_pet_king_v17").length,1);
+await h.advance(1500);await h.advance(8000);await abortedKing;
+assert.equal(rpcRequests.filter(r=>r.name==="domine_pet_king_v17").length,2);
+assert.ok(rpcRequests.filter(r=>r.name==="domine_pet_king_v17").every(r=>r.signal.aborted));h.close();

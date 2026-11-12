@@ -6,20 +6,25 @@ import type { Encounter } from "./pet-battle-view";
 import type { PetIdentity } from "./pet-identity";
 import type { createKingApi, KingFinish, KingPet, KingRank, KingReply, KingSettlement, KingSpawn, KingStart, KingState, KingTicket, KingWatching } from "./pet-king-rpc";
 
-export type KingApi = ReturnType<typeof createKingApi>;
+export type KingApi = ReturnType<typeof createKingApi> & { abortSignal?: (signal: AbortSignal) => KingApi };
 export const KING_LOCAL_NOTICE = "서버 보상을 확인하지 못했어요. 대결은 이 기기에서 계속해요.";
 
 /** A lost response must reuse both the request ID and the payload. */
-export async function retryKing<T>(request: () => Promise<T>): Promise<T> {
+export async function retryKing<T>(request: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const attempt = async () => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
     try {
-      return await Promise.race([request(), new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("TIMEOUT")), 8000);
-      })]);
+      // Wait for transport settlement even if an older injected API ignores cancellation.
+      const result = await request(controller.signal);
+      if (controller.signal.aborted) throw new Error("TIMEOUT");
+      return result;
     } finally { clearTimeout(timer); }
   };
-  try { return await attempt(); } catch { return attempt(); }
+  try { return await attempt(); } catch {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    return attempt();
+  }
 }
 
 export function kingRank(encounter: Encounter): KingRank {
@@ -83,7 +88,7 @@ export async function recoverKingBattles(api: KingApi, identity: PetIdentity, st
     if (!pending.startId || !pending.finishId || pending.start?.pet !== pet) { saveBattle(storage, key); continue; }
     try {
       if (!pending.ticket) {
-        const started = await retryKing(() => api.start(identity, pending!.startId, pending!.start));
+        const started = await retryKing(signal => (api.abortSignal?.(signal) ?? api).start(identity, pending!.startId, pending!.start));
         if (!started.supported) continue;
         if (!started.ok || !started.data) { saveBattle(storage, key); continue; }
         pending.ticket = started.data.id; saveBattle(storage, key, pending);
@@ -91,7 +96,7 @@ export async function recoverKingBattles(api: KingApi, identity: PetIdentity, st
       retained.add(pending.ticket);
       const saved = state.tickets.find(t => t.id === pending!.ticket);
       if (saved?.result) { results.push(saved.result); saveBattle(storage, key); continue; }
-      const reply = await retryKing(() => api.finish(identity, pending!.finishId, {
+      const reply = await retryKing(signal => (api.abortSignal?.(signal) ?? api).finish(identity, pending!.finishId, {
         ...(pending!.finish ?? { outcome: "quit", rounds: 0, usedItems: {} }), ticket: pending!.ticket!,
       }));
       if (reply.supported && reply.ok && reply.data) { results.push(reply.data); saveBattle(storage, key); }
@@ -107,7 +112,7 @@ export async function recoverKingBattles(api: KingApi, identity: PetIdentity, st
   for (const ticket of state.tickets) {
     if (ticket.status !== "active" || retained.has(ticket.id) || activeBattles.has(ticket.id) || Date.parse(ticket.expiresAt) > Date.now()) continue;
     try {
-      const reply = await retryKing(() => api.finish(identity, ticket.id, { ticket: ticket.id, outcome: "quit", rounds: 0, usedItems: {} }));
+      const reply = await retryKing(signal => (api.abortSignal?.(signal) ?? api).finish(identity, ticket.id, { ticket: ticket.id, outcome: "quit", rounds: 0, usedItems: {} }));
       if (reply.supported && reply.ok && reply.data) results.push(reply.data);
       expired ||= reply.supported && reply.code === "EXPIRED";
     } catch { /* The next refresh retries with the same ticket-based request ID. */ }
@@ -133,7 +138,7 @@ export function createKingBattle(api: KingApi | undefined, identity: PetIdentity
     try { if (storage?.getItem(key)) return null; } catch { /* Session-only recovery. */ }
     activeBattles.add(startId); saveBattle(storage, key, pending);
     try {
-      const reply = await retryKing(() => api.start(identity, startId, pending.start));
+      const reply = await retryKing(signal => (api.abortSignal?.(signal) ?? api).start(identity, startId, pending.start));
       if (reply.supported && reply.ok && reply.data) { pending.ticket = reply.data.id; activeBattles.add(reply.data.id); saveBattle(storage, key, pending); }
       else { activeBattles.delete(startId); saveBattle(storage, key); }
       return reply;
@@ -147,13 +152,13 @@ export function createKingBattle(api: KingApi | undefined, identity: PetIdentity
     if (!api || !identity || !ticket?.supported || !ticket.ok || !ticket.data) { activeBattles.delete(startId); return { notice: KING_LOCAL_NOTICE }; }
     const payload = { ...pending.finish!, ticket: ticket.data.id };
     try {
-      const reply = await retryKing(() => api.finish(identity, pending.finishId, payload));
+      const reply = await retryKing(signal => (api.abortSignal?.(signal) ?? api).finish(identity, pending.finishId, payload));
       if (reply.supported && reply.ok && reply.data) { saveBattle(storage, key); return { settlement: reply.data, notice: "" }; }
       if (reply.supported && reply.code === "TOO_EARLY") { pending.finishId = crypto.randomUUID(); saveBattle(storage, key, pending); }
     } catch { /* A lost response must not turn a completed win into a quit. */ }
     finally { activeBattles.delete(startId); activeBattles.delete(ticket.data.id); }
     try {
-      const state = await retryKing(() => api.state(identity));
+      const state = await retryKing(signal => (api.abortSignal?.(signal) ?? api).state(identity));
       const saved = state.supported && state.ok ? state.data?.tickets.find(t => t.id === ticket.data!.id)?.result : undefined;
       if (saved) { saveBattle(storage, key); return { settlement: saved, notice: "" }; }
     } catch { /* Unsettled reservations expire server-side without consuming items. */ }
@@ -176,7 +181,7 @@ export function createKingPickup() {
     pending.set(key, requestId); busy.add(key);
     try { storage?.setItem(key, `pending:${requestId}`); } catch { /* Session memory. */ }
     try {
-      const result = await retryKing(() => api.pickup(identity, requestId, { cell, slot }));
+      const result = await retryKing(signal => (api.abortSignal?.(signal) ?? api).pickup(identity, requestId, { cell, slot }));
       if (!result.supported || !result.ok || !result.data) return null;
       seen.add(key); pending.delete(key);
       try { storage?.setItem(key, "1"); } catch { /* Session memory. */ }

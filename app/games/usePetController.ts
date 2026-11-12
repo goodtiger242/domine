@@ -35,9 +35,11 @@ const errorText: Record<string, string> = {
 };
 export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi) {
   const [supabase] = useState(createClient);
-  const [kingApi] = useState(() => injectedKingApi ?? createKingApi((name, args) => injectedApi
-    ? Promise.resolve({ data: null, error: { code: "PGRST202", message: "King mock not supplied" } })
-    : supabase.rpc(name, args)));
+  const [kingApi] = useState<KingApi>(() => injectedKingApi ?? (injectedApi
+    ? createKingApi(() => Promise.resolve({ data: null, error: { code: "PGRST202", message: "King mock not supplied" } }))
+    : Object.assign(createKingApi((name, args) => supabase.rpc(name, args)), {
+      abortSignal: (signal: AbortSignal) => createKingApi((name, args) => supabase.rpc(name, args).abortSignal(signal)),
+    })));
   const [api] = useState(() => injectedApi ?? createPetApi((name, args, signal) => {
     const request = supabase.rpc(name, args);
     return signal ? request.abortSignal(signal) : request;
@@ -79,6 +81,8 @@ export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi
   const legacy = useRef(false), alive = useRef(false), generation = useRef(0), readSequence = useRef(0);
   const pending = useRef<PetCommand | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const readAbort = useRef<AbortController | null>(null), queuedRead = useRef<boolean | null>(null);
+  const readFailures = useRef(0), nextRead = useRef(0);
   const commandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapAbort = useRef<AbortController | null>(null);
   const registrationPending = useRef(false);
@@ -120,7 +124,7 @@ export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi
       }
     }
   }, []);
-  const refresh = useCallback(async (wallet?: KingSettlement["wallet"]) => {
+  const refresh = useCallback(async (wallet?: KingSettlement["wallet"], background = false): Promise<void> => {
     if (wallet) {
       ++readSequence.current;
       for (const pet of [1, 2] as const) {
@@ -135,18 +139,27 @@ export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi
       }
       return;
     }
-    if (offline.current) return;
+    if (!alive.current || offline.current) return;
+    if (background && (!activeRef.current || document.hidden || navigator.onLine === false || Date.now() < nextRead.current)) return;
+    if (readAbort.current) { queuedRead.current = (queuedRead.current ?? true) && background; return; }
+    const controller = new AbortController(); readAbort.current = controller;
+    const timer = setTimeout(() => controller.abort(), 8000);
     const g = generation.current, selected = petRef.current, i = identityRef.current, seq = ++readSequence.current;
     const started = Date.now();
+    let succeeded = false;
     try {
       if (capabilityRef.current === "ready" && i && registeredRef.current) {
-        const result = await api.state(i, selected);
+        const result = await api.state(i, selected, controller.signal);
+        if (controller.signal.aborted) throw new Error("TIMEOUT");
+        succeeded = result.ok;
         if (!current(g, i, selected) || seq !== readSequence.current) return;
         if (!result.ok) { setMessage(errorText[result.code] ?? "우리 강아지 상태를 확인하지 못했어요."); return; }
         apply(result, false, false, Date.now() - started);
         if (result.shared) setShared(result.shared.pet);
       } else {
-        const result = await api.legacy(selected, nickRef.current, undefined, legacy.current);
+        const result = await api.legacy(selected, nickRef.current, undefined, legacy.current, controller.signal);
+        if (controller.signal.aborted) throw new Error("TIMEOUT");
+        succeeded = !result.error;
         if (!current(g, i, selected) || seq !== readSequence.current) return;
         if (result.error) { setMessage("강아지를 불러오지 못했어요. 잠시 후 다시 열어 주세요."); return; }
         legacy.current = result.legacy; setMultiPet(!result.legacy);
@@ -154,6 +167,13 @@ export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi
         setShared(result.data as PetState);
       }
     } catch { if (current(g, i, selected)) setMessage("연결을 확인해 주세요. 놀이는 계속할 수 있어요."); }
+    finally {
+      clearTimeout(timer); readAbort.current = null;
+      if (succeeded) { readFailures.current = 0; nextRead.current = 0; }
+      else { nextRead.current = Date.now() + Math.min(240000, 30000 * 2 ** readFailures.current); readFailures.current = Math.min(3, readFailures.current + 1); }
+      const queued = queuedRead.current; queuedRead.current = null;
+      if (queued !== null) void refresh(undefined, queued);
+    }
   }, [api, apply, current]);
 
   const execute = useCallback(async (command: PetCommand, retry = false, presented = false) => {
@@ -408,6 +428,7 @@ export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi
     void checkCapabilities();
     return () => {
       alive.current = false;
+      queuedRead.current = null; readAbort.current?.abort();
       controller.abort();
       // Invalidate requests, not a DOM ref; cleanup must advance the current generation.
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -446,15 +467,22 @@ export function usePetController(injectedApi?: PetApi, injectedKingApi?: KingApi
       if (visible === activeRef.current) return;
       activeRef.current = visible; setActive(visible);
       if (!visible) { ++generation.current; mapAbort.current?.abort(); dispatch({ type: "pause" }); setCue(null); }
-      else if (!offline.current) { dispatch({ type: "resume" }); void refresh(); }
+      else if (!offline.current) { dispatch({ type: "resume" }); void refresh(undefined, true); }
     };
     const observer = new IntersectionObserver(([entry]) => { intersecting = entry.isIntersecting; update(); });
     if (host.current) observer.observe(host.current);
     const hide = () => { intersecting = false; update(); };
     const show = () => { intersecting = true; update(); };
     document.addEventListener("visibilitychange", update); window.addEventListener("pagehide", hide); window.addEventListener("pageshow", show);
-    const poll = setInterval(() => { if (activeRef.current && machineRef.current.command === "idle") void refresh(); }, 30000);
-    return () => { observer.disconnect(); clearInterval(poll); document.removeEventListener("visibilitychange", update); window.removeEventListener("pagehide", hide); window.removeEventListener("pageshow", show); };
+    const online = () => { void refresh(undefined, true); };
+    window.addEventListener("online", online);
+    let poll: ReturnType<typeof setTimeout>;
+    const schedule = () => { poll = setTimeout(() => {
+      if (machineRef.current.command === "idle") void refresh(undefined, true);
+      schedule();
+    }, 30000 * (0.85 + Math.random() * 0.3)); };
+    schedule();
+    return () => { observer.disconnect(); clearTimeout(poll); document.removeEventListener("visibilitychange", update); window.removeEventListener("pagehide", hide); window.removeEventListener("pageshow", show); window.removeEventListener("online", online); };
   }, [dispatch, refresh]);
   useEffect(() => {
     if (machine.visual !== "acting" || !machine.deadlineAt) return;

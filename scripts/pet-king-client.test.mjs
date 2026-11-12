@@ -7,7 +7,7 @@ import { loadTS } from "./pet-test-loader.mjs";
 
 const { createKingMock, kingXpForLevel } = loadTS("tests/pet/king-mock.ts");
 const { createKingApi } = loadTS("lib/domine/pet-king-rpc.ts");
-const { createKingBattle, recoverKingBattles, createKingPickup, departedWins, kingProgress, kingRank, kingRewardLine, watchingLine } = loadTS("lib/domine/pet-king-client.ts");
+const { retryKing, createKingBattle, recoverKingBattles, createKingPickup, departedWins, kingProgress, kingRank, kingRewardLine, watchingLine } = loadTS("lib/domine/pet-king-client.ts");
 const { spawnsFor } = loadTS("lib/domine/pet-battle-view.ts");
 const { NAMED } = loadTS("lib/domine/king/named.ts");
 const identity = { nickname: "김경석", secret: "a".repeat(64) };
@@ -264,7 +264,7 @@ test("30s polling hides remote wins on scene/map, refreshes level, and pickup wa
   assert.ok(value.state.pets[0].xp > 0);
   const before = calls.filter(k => k === "state").length;
   props.cell = "F5"; props.arrival = 1; props.ready = false; dirty = true; await flush();
-  assert.equal(calls.filter(k => k === "state").length, before + 1, "cell move polls immediately");
+  assert.equal(calls.filter(k => k === "state").length, before, "cell move does not refetch king state");
   const claims = calls.filter(k => k === "pickup").length;
   props.ready = true; dirty = true; await flush(); assert.ok(calls.filter(k => k === "pickup").length <= claims + 1);
   await advance(1800000); props.ready = false; dirty = true; await flush(); props.ready = true; dirty = true; await flush();
@@ -281,11 +281,102 @@ test("30s polling hides remote wins on scene/map, refreshes level, and pickup wa
   const savedBuy=wrapped.buyItem, requests=[];
   wrapped.buyItem=async(...args)=>{requests.push(args[1]);await savedBuy(...args);throw Error("lost response");};
   const coinsBefore=mock.inspect().coins;
-  await value.buyItem(1,"P01");await flush();
+  const lostPurchase=value.buyItem(1,"P01");await flush();await advance(1500);await lostPurchase;await flush();
   assert.deepEqual(value.pendingPurchase,{pet:1,item:"P01"});assert.equal(value.state.pets[0].inventory.P01,1);
   wrapped.buyItem=async(...args)=>{requests.push(args[1]);return savedBuy(...args);};
   await value.buyItem(1,"P01");await flush();
   assert.equal(value.pendingPurchase,null);assert.equal(mock.inspect().pets[1].inventory.P01,1);
   assert.equal(value.state.coins,coinsBefore-15);assert.equal(new Set(requests).size,1);
+  props.ready=false;dirty=true;await flush();
+  const savedState=wrapped.state;
+  let stateCalls=0, readSignal;
+  wrapped.abortSignal=signal=>({...wrapped,state:()=>{
+    stateCalls++;readSignal=signal;
+    return new Promise((_,reject)=>signal.addEventListener("abort",()=>reject(Error("timeout")),{once:true}));
+  }});
+  events.get("online")();await flush();
+  for(let i=0;i<5;i++)events.get("online")();
+  await flush();assert.equal(stateCalls,1);
+  await advance(7999);assert.equal(readSignal.aborted,false);assert.equal(stateCalls,1);
+  await advance(1);assert.equal(readSignal.aborted,true);assert.equal(stateCalls,1);
+  await advance(1499);assert.equal(stateCalls,1,"retry waits 1.5s");
+  await advance(1);assert.equal(stateCalls,2);assert.equal(readSignal.aborted,false);
+  await advance(8000);assert.equal(readSignal.aborted,true);assert.equal(stateCalls,2,"queued events cannot bypass failure backoff");
+  document.hidden=true;
+  for(const delay of [30000,60000,120000,240000,240000]) {
+    const before=stateCalls;
+    await advance(delay-1);document.hidden=false;events.get("online")();events.get("visibilitychange")();await flush();
+    assert.equal(stateCalls,before);
+    document.hidden=true;await advance(1);document.hidden=false;events.get("online")();await flush();assert.equal(stateCalls,before+1);
+    await advance(8000);await advance(1500);await advance(8000);document.hidden=true;
+  }
+  delete wrapped.abortSignal;
+  await value.refresh();await flush(); // Explicit action bypasses the previous 240s delay.
+  document.hidden=false;const resetReads=calls.filter(k=>k==="state").length;
+  events.get("online")();await flush();assert.equal(calls.filter(k=>k==="state").length,resetReads+1);
+  wrapped.state=async()=>{stateCalls++;throw Error("offline");};
+  events.get("online")();await flush();await advance(1500);document.hidden=true;
+  const failures=stateCalls;
+  await advance(29999);document.hidden=false;events.get("online")();await flush();assert.equal(stateCalls,failures);
+  document.hidden=true;await advance(1);document.hidden=false;events.get("online")();await flush();assert.equal(stateCalls,failures+1);
+  wrapped.state=savedState;await advance(1500);await value.refresh();await flush();
+
+  // A choice merges immediately, then makes one read to obtain the missing wallet.
+  const jobRequests=[];let committedProgress;
+  wrapped.chooseJob=async(_identity,id,input)=>{
+    jobRequests.push({id,input:structuredClone(input)});
+    committedProgress={...value.state.pets.find(p=>p.pet===input.pet),job:input.job,jobTier:input.tier,version:input.expectedVersion+1};
+    return {supported:true,ok:true,code:"OK",data:committedProgress};
+  };
+  let jobReads=0;
+  wrapped.state=async()=>{jobReads++;return {supported:true,ok:true,code:"OK",data:{...value.state,coins:77,version:1000,pets:[committedProgress,value.state.pets[1]]}};};
+  const version=value.state.pets[0].version;
+  assert.deepEqual(await value.chooseJob(1,"striker",1),{ok:true,code:"OK"});await flush();
+  assert.equal(jobReads,1);assert.equal(value.state.pets[0].job,"striker");assert.equal(value.state.coins,77);
+  assert.equal(jobRequests[0].input.expectedVersion,version);
+  for(const code of ["PROMOTION_LOCKED","INVALID_TIER","JOB_COOLDOWN","INSUFFICIENT_COINS"]) {
+    wrapped.chooseJob=async(_identity,id,input)=>{jobRequests.push({id,input});return {supported:true,ok:false,code};};
+    assert.deepEqual(await value.chooseJob(1,"striker",2),{ok:false,code});await flush();
+    assert.equal(jobReads,1,"a server rejection does not refresh or merge");
+  }
+  assert.equal(new Set(jobRequests.map(r=>r.id)).size,jobRequests.length,"definitive replies release the ID");
+  jobRequests.length=0;
+  wrapped.chooseJob=async(_identity,id,input)=>{jobRequests.push({id,input:structuredClone(input)});throw Error("lost");};
+  const lostJob=value.chooseJob(1,"striker",2);await flush();await advance(1500);
+  assert.deepEqual(await lostJob,{ok:false,code:"NETWORK"});await flush();assert.equal(jobRequests.length,2);
+  assert.deepEqual(await value.chooseJob(2,"tracker",1),{ok:false,code:"NETWORK"});assert.equal(jobRequests.length,2,"an uncertain choice cannot be overwritten");
+  // A state refresh may advance expectedVersion, but replay must keep the old payload.
+  committedProgress={...value.state.pets[0],version:value.state.pets[0].version+10};
+  await value.refresh();await flush();
+  wrapped.chooseJob=async(_identity,id,input)=>{
+    jobRequests.push({id,input:structuredClone(input)});
+    committedProgress={...value.state.pets[0],job:input.job,jobTier:input.tier,version:value.state.pets[0].version+1,wallet:{coins:66,version:1001}};
+    return {supported:true,ok:true,code:"OK",data:committedProgress};
+  };
+  const beforeJobReads=jobReads;
+  assert.deepEqual(await value.chooseJob(1,"striker",2),{ok:true,code:"OK"});await flush();
+  assert.equal(jobReads,beforeJobReads+1);assert.equal(value.state.coins,66,"reply wallet survives an older read");
+  assert.deepEqual(jobRequests[0],jobRequests[1]);assert.deepEqual(jobRequests[0],jobRequests[2]);
+  assert.equal(value.state.pets[0].jobTier,2);
   slots.forEach(s => s.cleanup?.()); assert.equal(timers.size, 0);
+});
+
+
+test("retryKing aborts transport before retry and never overlaps an abort-ignoring API", async t => {
+  t.mock.timers.enable({apis:["setTimeout"]});
+  let active=0, maximum=0;const signals=[];
+  const pending=retryKing(signal=>{
+    signals.push(signal);maximum=Math.max(maximum,++active);
+    return new Promise((_,reject)=>signal.addEventListener("abort",()=>{active--;reject(Error("aborted"));},{once:true}));
+  });
+  const rejected=assert.rejects(pending,/aborted/);
+  t.mock.timers.tick(7999);await nextTurn();assert.equal(signals.length,1);assert.equal(signals[0].aborted,false);
+  t.mock.timers.tick(1);await nextTurn();assert.equal(signals[0].aborted,true);assert.equal(active,0);
+  t.mock.timers.tick(1499);await nextTurn();assert.equal(signals.length,1);
+  t.mock.timers.tick(1);await nextTurn();assert.equal(signals.length,2);
+  t.mock.timers.tick(8000);await rejected;assert.equal(maximum,1);assert.equal(active,0);
+  let calls=0, release;
+  const ignored=retryKing(()=>{calls++;return calls===1?new Promise(resolve=>{release=resolve;}):Promise.resolve("ok");});
+  t.mock.timers.tick(240000);await nextTurn();assert.equal(calls,1,"retain ownership until transport settles");
+  release();await nextTurn();t.mock.timers.tick(1500);assert.equal(await ignored,"ok");assert.equal(calls,2);
 });

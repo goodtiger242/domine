@@ -6,20 +6,20 @@ import type { PetState } from "./pet";
 import type { Reward } from "./pet-progress";
 
 type Result = { data: unknown; error: { code?: string; message: string } | null; status?: number };
-type Rpc = (name: string, args: Record<string, string | number>) => PromiseLike<Result>;
+type Rpc = (name: string, args: Record<string, string | number>, signal?: AbortSignal) => PromiseLike<Result>;
 
 /** 없는 함수에 한해서만 구버전으로 돌아간다. 미네 돌봄을 도미에게 보내지 않는다. */
-export async function petRequest(rpc: Rpc, petId: PetId, nickname: string, action?: PetAction, legacy = false) {
+export async function petRequest(rpc: Rpc, petId: PetId, nickname: string, action?: PetAction, legacy = false, signal?: AbortSignal) {
   const name = action ? "domine_pet_care" : "domine_pet_state";
   const args = { p_nickname: nickname, ...(action ? { p_action: action } : {}) };
   if (!legacy) {
-    const result = await rpc(`${name}_for`, { ...args, p_pet: petId });
+    const result = await rpc(`${name}_for`, { ...args, p_pet: petId }, signal);
     if (result.error?.code !== "PGRST202") return { ...result, petId, legacy: false };
   }
   if (action && petId !== 1) {
     return { data: null, error: { message: "미네는 아직 준비 중이에요." }, petId: 1 as const, legacy: true };
   }
-  return { ...await rpc(name, args), petId: 1 as const, legacy: true };
+  return { ...await rpc(name, args, signal), petId: 1 as const, legacy: true };
 }
 
 export type PetCommand = { requestId: string } & (
@@ -54,7 +54,7 @@ export class PetRpcError extends Error {
 }
 export const supportsExploration = (v9: boolean, map: PetMap) => v9 || ["church", "field", "street", "park", "home"].includes(map);
 export interface PetApi {
-  legacy(pet: PetId, nickname: string, action?: PetAction, legacy?: boolean): ReturnType<typeof petRequest>;
+  legacy(pet: PetId, nickname: string, action?: PetAction, legacy?: boolean, signal?: AbortSignal): ReturnType<typeof petRequest>;
   capabilities(): Promise<PetCapabilities | false>;
   register(identity: PetIdentity, signal?: AbortSignal): Promise<V6Result>;
   state(identity: PetIdentity, pet: PetId, signal?: AbortSignal): Promise<V6Result>;
@@ -73,7 +73,7 @@ export function createPetApi(rpc: V6Rpc): PetApi {
   };
   const auth = (i: PetIdentity) => ({ p_nickname: i.nickname, p_secret: i.secret });
   return {
-    legacy: (pet, nickname, action, legacy) => petRequest((name, args) => rpc(name, args), pet, nickname, action, legacy),
+    legacy: (pet, nickname, action, legacy, signal) => petRequest(rpc, pet, nickname, action, legacy, signal),
     async capabilities() {
       v9 = false;
       v10 = false;

@@ -5,7 +5,7 @@ import { createKingPickup, recoverKingBattles, watchingLine, retryKing, type Kin
 import { purchaseReason } from "@/lib/domine/pet-king-items";
 import { encounterSlot } from "@/lib/domine/pet-battle-view";
 import type { PetIdentity } from "@/lib/domine/pet-identity";
-import type { KingPickupResult, KingSpawn, KingState, KingWatching, KingPet, KingProgress, KingSettlement } from "@/lib/domine/pet-king-rpc";
+import type { KingPickupResult, KingSpawn, KingState, KingWatching, KingPet, KingProgress, KingSettlement, KingChooseJob, KingJob } from "@/lib/domine/pet-king-rpc";
 
 export function usePetKing(api: KingApi, identity: PetIdentity | null, cell: string, arrivalId: number | undefined, pickupReady: boolean, refreshWallet: (wallet?: KingSettlement["wallet"]) => Promise<void>, enabled = true) {
   const [pendingPurchase, setPendingPurchase] = useState<{ pet: KingPet; item: string } | null>(null);
@@ -18,15 +18,20 @@ export function usePetKing(api: KingApi, identity: PetIdentity | null, cell: str
   current.current = identity;
   const [claim] = useState(createKingPickup);
   const reading = useRef(false), failures = useRef(0), nextRead = useRef(0);
-  const queuedRead = useRef<(() => void) | null>(null);
-  const refresh = useCallback(async (): Promise<void> => {
+  const queuedRead = useRef<{ run: () => void; background: boolean } | null>(null);
+  const refresh = useCallback(async (background = false): Promise<void> => {
     if (!identity) return;
-    if (reading.current) { queuedRead.current = () => { void refresh(); }; return; }
+    if (background && (!enabled || document.hidden || navigator.onLine === false || Date.now() < nextRead.current)) return;
+    if (reading.current) {
+      if (!queuedRead.current || !background) queuedRead.current = { run: () => { void refresh(background); }, background };
+      return;
+    }
     reading.current = true;
     const seq = ++sequence.current;
     try {
-      const reply = await retryKing(() => api.state(identity));
+      const reply = await retryKing(signal => (api.abortSignal?.(signal) ?? api).state(identity));
       if (current.current !== identity || sequence.current !== seq) return;
+      if (reply.supported && (!reply.ok || !reply.data)) throw new Error(reply.code);
       if (reply.supported && reply.ok && reply.data) {
         const data = reply.data;
         setState(previous => !previous || previous.resetEpoch !== data.resetEpoch || data.version >= previous.version ? data : previous);
@@ -40,24 +45,25 @@ export function usePetKing(api: KingApi, identity: PetIdentity | null, cell: str
               pets: previous.pets.map(p => p.pet === result.progress!.pet && result.progress!.version >= p.version ? result.progress! : p) } : previous);
             await refreshWallet(result.wallet);
           }
-          if (recovered.changed) queuedRead.current = () => { void refresh(); };
+          if (recovered.changed && !queuedRead.current) queuedRead.current = { run: () => { void refresh(true); }, background: true };
         }
       }
       failures.current = 0; nextRead.current = 0; setNow(Date.now());
-    } catch { nextRead.current = Date.now() + Math.min(240000, 30000 * 2 ** failures.current++); }
-    finally { reading.current = false; const queued = queuedRead.current; queuedRead.current = null; queued?.(); }
+    } catch { nextRead.current = Date.now() + Math.min(240000, 30000 * 2 ** failures.current); failures.current = Math.min(3, failures.current + 1); }
+    finally { reading.current = false; const queued = queuedRead.current; queuedRead.current = null; queued?.run(); }
   }, [api, identity, enabled, refreshWallet]);
   useEffect(() => {
-    setState(null); setDeparted([]); setWatching([]); setPickup(null); purchase.current = null; setPendingPurchase(null);
+    setState(null); setDeparted([]); setWatching([]); setPickup(null); purchase.current = null; setPendingPurchase(null); jobChoice.current = null;
+    failures.current = 0; nextRead.current = 0;
   }, [identity]);
   useEffect(() => {
     if (!enabled) return;
-    const update = () => { if (!document.hidden && navigator.onLine !== false) void refresh(); };
+    const update = () => { void refresh(true); };
     update();
     const timer = setInterval(() => { if (Date.now() >= nextRead.current) update(); }, 30000);
     document.addEventListener("visibilitychange", update); window.addEventListener("online", update);
     return () => { clearInterval(timer); sequence.current++; queuedRead.current = null; document.removeEventListener("visibilitychange", update); window.removeEventListener("online", update); };
-  }, [refresh, cell, enabled]);
+  }, [refresh, enabled]);
   useEffect(() => {
     const entry = watching.find(w => w.cell === cell && w.nickname !== identity?.nickname && Date.parse(w.startedAt) + 180000 > now);
     if (!entry) return;
@@ -103,7 +109,7 @@ export function usePetKing(api: KingApi, identity: PetIdentity | null, cell: str
     const requestId = (purchase.current ??= { pet, item, id: crypto.randomUUID() }).id;
     setPendingPurchase({pet,item});
     try {
-      const reply = await retryKing(() => api.buyItem(identity, requestId, { pet, item, quantity: 1 }));
+      const reply = await retryKing(signal => (api.abortSignal?.(signal) ?? api).buyItem(identity, requestId, { pet, item, quantity: 1 }));
       purchase.current = null; setPendingPurchase(null);
       if (current.current !== identity) return "";
       if (!reply.supported) return "전투 물품을 준비 중이에요";
@@ -114,11 +120,32 @@ export function usePetKing(api: KingApi, identity: PetIdentity | null, cell: str
     } catch { await refresh(); return "구매 결과를 확인하지 못했어요"; }
     finally { purchasing.current = false; }
   }, [api, identity, state, mergeProgress, refresh, refreshWallet]);
+  const choosingJob = useRef(false);
+  const jobChoice = useRef<{ id: string; input: KingChooseJob } | null>(null);
+  const chooseJob = useCallback(async (pet: KingPet, job: KingJob, tier: KingChooseJob["tier"]): Promise<{ ok: boolean; code: string }> => {
+    if (!identity || choosingJob.current) return { ok: false, code: "NETWORK" };
+    const previous = jobChoice.current;
+    if (previous && (previous.input.pet !== pet || previous.input.job !== job || previous.input.tier !== tier)) return { ok: false, code: "NETWORK" };
+    const progress = state?.pets.find(p => p.pet === pet);
+    if (!previous && !progress) return { ok: false, code: "NETWORK" };
+    const choice = jobChoice.current ??= { id: crypto.randomUUID(), input: { pet, expectedVersion: progress!.version, job, tier } };
+    choosingJob.current = true;
+    try {
+      const reply = await retryKing(signal => (api.abortSignal?.(signal) ?? api).chooseJob(identity, choice.id, choice.input));
+      if (current.current !== identity) return { ok: false, code: "NETWORK" };
+      jobChoice.current = null;
+      if (!reply.supported || !reply.ok || !reply.data) return { ok: false, code: reply.code };
+      mergeProgress(reply.data);
+      void refresh();
+      return { ok: true, code: reply.code };
+    } catch { return { ok: false, code: "NETWORK" }; }
+    finally { choosingJob.current = false; }
+  }, [api, identity, state, mergeProgress, refresh]);
   const settled = useCallback((result?: KingSettlement) => {
     if (current.current !== identity) return;
     if (result?.progress) mergeProgress(result.progress, result.wallet);
     void refresh(); void refreshWallet(result?.wallet);
   }, [identity, refresh, refreshWallet, mergeProgress]);
-  return { state, buyItem, pendingPurchase, refresh, departed, pickup: pickup?.cell === cell ? pickup : null, settled,
+  return { state, buyItem, chooseJob, pendingPurchase, refresh, departed, pickup: pickup?.cell === cell ? pickup : null, settled,
     watching: watchingLine(watching, cell, identity?.nickname ?? "", now) };
 }
