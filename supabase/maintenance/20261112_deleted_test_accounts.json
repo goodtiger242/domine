@@ -1,0 +1,11 @@
+{
+  "deleted_at": "2026-11-12",
+  "reason": "Test accounts whose names cannot sign in (not in PET_LEGAL_NAMES); removed from the level ranking at the owner's request.",
+  "players": [
+    { "id": "4e4e16d0-0fed-472b-85e3-7106262cb681", "nickname": "확인", "created_at": "2026-11-11T07:50:42.71944+00:00" },
+    { "id": "9e5e4ea6-73c4-4592-98a5-6687616da8c5", "nickname": "선호", "created_at": "2026-11-11T07:59:40.88464+00:00" },
+    { "id": "b1a76375-e10d-4670-b976-1495c088f3f4", "nickname": "호호", "created_at": "2026-11-11T08:55:57.708171+00:00" }
+  ],
+  "rows_removed": 246,
+  "restore": "Their game rows (wallet 57 coins v444, 도미 xp 78, 미네 xp 1845, items, cosmetics, certifications, encyclopedia, album) were the v23 copy of the shared state, which is still in the legacy tables (domine_pet_v7.pool, domine_pet_v17.*, domine_pet_v10.*, domine_pet_v7.equipment, public.domine_pet, shared album). Re-insert the player rows and rerun the v23 per-player copy for these ids to restore. No own activity existed: 0 tickets, operations, history lines or counters."
+}
