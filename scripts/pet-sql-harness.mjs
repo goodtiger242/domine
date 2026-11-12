@@ -39,3 +39,17 @@ export const identity = nickname => ({ p_nickname: nickname, p_secret: createHas
 export const king = (db, nickname, kind, input = {}, requestId = randomUUID()) =>
   rpc(db, "domine_pet_king_v17", { ...identity(nickname), p_request_id: requestId, p_kind: kind, p_input: input });
 export const count = async (db, table) => Number((await db.query(`select count(*) as n from ${table}`)).rows[0].n);
+
+/** All game rows, including wallet/progress versions, for read and migration invariants. */
+export async function tableSnapshot(db, tables) {
+  const names = tables ?? (await db.query(`select schemaname || '.' || tablename as name from pg_catalog.pg_tables
+    where schemaname like 'domine_pet_%' or (schemaname='public' and tablename in ('domine_pet','domine_pet_log'))
+    order by schemaname,tablename`)).rows.map(row => row.name);
+  const result = {};
+  for (const name of names) {
+    if (!/^[a-z_0-9]+\.[a-z_0-9]+$/.test(name)) throw new Error("Invalid test table");
+    result[name] = (await db.query(`select coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(t)
+      order by pg_catalog.to_jsonb(t)::text),'[]'::jsonb) as rows from ${name} t`)).rows[0].rows;
+  }
+  return result;
+}
