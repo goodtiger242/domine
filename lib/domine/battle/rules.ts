@@ -9,6 +9,7 @@ import type { Action, Actor, BattleState, Condition, Fighter, FighterOptions, Gr
 export const MAX_ENERGY = 10;
 export const START_ENERGY = 10;
 export const REST_ENERGY = 5;
+export const LEVEL_EDGE = .03;
 export const MAX_ROUNDS = 12;
 export const MAX_LEVEL = 999;
 export const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -196,7 +197,8 @@ export function damageAt(move: Move, attacker: Fighter | Actor, defender: Fighte
   const hits = move.mode === "multi" ? move.hits ?? 2 : 1;
   const rank = selectedJob(attacker.job)?.nodes?.[move.id] === 2 ? .04 : 0;
   const power = move.power * (1 + Math.min(.20, rank + .04 * ((attacker.mastery?.[move.id] ?? 1) - 1)));
-  const levelRate = clamp(1 + .002 * (growthQ(attacker.level) - growthQ(defender.level)),.92,1.08);
+  // Each level of difference moves damage 3% both ways, so a 12-level gap outweighs any element matchup (1.3/0.75).
+  const levelRate = clamp(1 + LEVEL_EDGE * (attacker.level - defender.level),.55,1.6);
   if (shield === 0) return 0;
   const base = (1.5 * move.power + .45 * (attacker.baseStats ?? attacker.stats)[move.group === "track" || move.group === "bond" ? "focus" : "attack"] / growthScale(attacker.level)) / hits
     * 40 / (40 + (defender.baseStats ?? defender.stats)[move.group === "bond" ? "calm" : "defense"] / growthScale(defender.level)) * Math.sqrt(growthScale(attacker.level) * growthScale(defender.level)) * .92;

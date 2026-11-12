@@ -71,7 +71,7 @@ input().props.onChange({target:{value:"김보영"}}); gameView.render(); submit(
 assert.equal(game.nickname,"김보영"); assert.equal(nodes(gameView.tree, n => n.type === "input").length, 0, "enter starts and closes sheet");
 button(gameView.tree, "김보영").props.onClick(); gameView.render(); noRoster();
 game.nickname=""; game.registered=false; gameView.render(); noRoster();
-assert.ok(button(gameView.tree,"내 이름"));
+assert.ok(!button(gameView.tree,"내 이름"), "before a name is entered only the name box asks for it");
 const gameCss = readFileSync("app/games/pet-game.css", "utf8");
 assert.match(gameCss, /\.pet-record-form input[^{}]*\{[^}]*font-size: 16px/);
 assert.match(gameCss, /button:focus:not\(:focus-visible\)/);
@@ -222,7 +222,8 @@ const battleView = mount("PetGame", {}, {
 const scene = () => nodes(battleView.tree, n => "onBattle" in n.props)[0];
 const { encounterFor, spawnsFor, encounterSlot, readEncounterWins, ENCOUNTER_STORAGE } = loadTS("lib/domine/pet-battle-view.ts");
 const { PET_WORLD } = loadTS("lib/domine/pet-world.ts");
-const saved = new Map();
+// The one-time guide is covered in pet-onboarding; here it is already seen so the timer checks stay focused.
+const saved = new Map([["domine-pet-guide", "1"]]);
 window.localStorage = { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) };
 for (const cell of ["E5", "D5"]) {
   battleGame.machine.committedMap = cell; battleView.render();
@@ -333,3 +334,27 @@ for(const name of ["작은 물약","시원한 물","힘나는 간식"]) {chip(na
 assert.deepEqual(carried,["P01","P04","P06"]);assert.ok(chip("정신 번쩍 껌").props.disabled);
 chip("작은 물약").props.onClick();packing.render({items:carried});assert.equal(chip("정신 번쩍 껌").props.disabled,false);
 console.log("Encounter items: owned quantities, three-type limit and chip toggle passed.");
+
+// The how-to guide opens once per device after a name is connected, and the menu reopens it.
+{
+  const store = new Map(), realInterval = globalThis.setInterval, realClear = globalThis.clearInterval;
+  // Fake timers: this harness can drop an effect cleanup when a state change lands mid-flush.
+  globalThis.setInterval = () => 0; globalThis.clearInterval = () => {};
+  window.localStorage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) };
+  const guideGame = { ...battleGame, registered: true };
+  const view = mount("PetGame", {}, {
+    "./usePetController": { usePetController: () => guideGame }, "next/dynamic": { default: () => "section" },
+    "./PetScene": { PetScene: () => null }, "./PetProgress": {}, "./PetFeedback": {}, "./pet-game.css": {},
+  });
+  const guide = () => nodes(view.tree, n => n.type === "section" && Object.keys(n.props).join() === "onClose")[0];
+  view.render(); view.flushEffects(); view.render();
+  assert.ok(guide(), "first connection opens the guide"); assert.equal(store.get("domine-pet-guide"), "1");
+  guide().props.onClose(); view.render(); view.flushEffects(); view.render();
+  assert.ok(!guide(), "closing it does not bring it back");
+  button(view.tree, "💡사용법").props.onClick(); view.render();
+  assert.ok(guide(), "the menu reopens the guide");
+  const html = renderToStaticMarkup(createElement(loadTS("app/games/PetGuideSheet.tsx").default, { onClose() {} }));
+  for (const word of ["돌보기", "겨루기", "성장", "기력", "숨 고르기", "결정기", "직업", "알겠어요"]) assert.ok(html.includes(word), word);
+  view.unmount(); globalThis.setInterval = realInterval; globalThis.clearInterval = realClear;
+  console.log("Guide: opens once after connecting, menu reopens it, short sections render.");
+}

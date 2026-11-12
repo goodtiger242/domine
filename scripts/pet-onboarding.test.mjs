@@ -80,7 +80,7 @@ button(firstMap().props.footer, "이동").props.onClick();
 assert.notEqual(game.machine.committedMap, "E5", "the recommendation goes through the real map-to-game move handler");
 king.state.encyclopedia = [{ wins: 1 }]; tree = render();
 assert.ok(!button(tree, "지도에서 첫 상대 찾기"), "confirmed win removes onboarding");
-assert.equal(loading.length, 10); assert.ok(loading.every(fn => fn().props["aria-busy"]));
+assert.equal(loading.length, 12); assert.ok(loading.every(fn => fn().props["aria-busy"]));
 
 const { spawnsFor, encounterSlot } = loadTS("lib/domine/pet-battle-view.ts");
 const { PET_WORLD } = loadTS("lib/domine/pet-world.ts");

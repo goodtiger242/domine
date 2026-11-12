@@ -103,7 +103,7 @@ chooseAction(state, aiTier?, announcedResponse?)와 기존 chooseOpponentAction(
 - 12라운드 도달은 해당 라운드 KO를 포함한다. 승률은 승리/전체 판수이며 무승부를 승리로 세지 않는다.
 - 행동 불가는 quit 이외 행동이 없는 경우다. 무료 밀기와 숨 고르기가 있으므로 유료 공격을 못 쓰는 턴과 다르다.
 
-합격 기준은 코드의 assertion으로 유지한다. 보통 등급 전체 및 레벨별 55~75%, 등급별 80/65/50/35%±8%p, 평균 6~10라운드, 12라운드 ≤15%, 3라운드 이하 ≤5%, 행동 불가 ≤10%, 방어 이득 +5~12%p, 소모품 이득 ≤15%p, 기운/태그 극단 30~85%, 레벨 차 ±3은 10~95%다.
+합격 기준은 코드의 assertion으로 유지한다. 보통 등급 전체 및 레벨별 55~75%, 등급별 80/65/50/35%±8%p, 평균 6~10라운드, 12라운드 ≤15%, 3라운드 이하 ≤5%, 행동 불가 ≤10%, 방어 이득 +5~12%p, 소모품 이득 ≤15%p, 기운/태그 극단 30~85%, 레벨 차는 내가 3 낮으면 3~50%, 3 높으면 70~99.5%다.
 <!-- simulation:start -->
 16시드, 12견종 순환 대진, 레벨 1·10·30·60·100·300, 기운 3조건. 24.71초.
 
@@ -315,3 +315,17 @@ UI 컴포넌트 검사에서 14종 렌더·구매 응답 반영·중복 클릭·
 
 
 이번 물품·보조기 변경 파일: `lib/domine/battle/{types,moves,support,rules,engine,ai}.ts`, `lib/domine/{pet-king-rpc,pet-king-client,pet-king-items,pet-battle-view}.ts`, `app/games/{PetGame,PetShopSheet,PetEncounterSheet,PetBattleSheet}.tsx`, `app/games/usePetKing.ts`, `app/games/pet-game.css`, `tests/pet/{king-mock.ts,ItemsFixture.tsx,image-stub.tsx,tsx-loader.cjs}`, `scripts/pet-{battle,battle-moves,battle-sheet,king-rpc,king-client,sheets,items,items-ui,support}.test.mjs`, 이 문서, v20 SQL. 기존 이미지 재사용으로 credits와 이미지 파일은 추가하지 않았다. 신원 로직·기존 SQL·감사 문서는 수정하지 않았다.
+
+## 레벨 차 보정 (2026-11-12)
+
+레벨 차 보정을 성장 차 0.002(±8% 상한)에서 레벨 1당 3%(0.55~1.6배)로 키웠다. 높은 레벨에서는 레벨이 3 낮아도 승률이 62~65%로 같은 레벨과 비슷했고, Lv.16이 상성 불리한 Lv.4를 이겨도 체력을 평균 44% 잃었다. 상성(1.3/0.75)은 그대로 두었다.
+
+| 내 레벨 | 상성 | 상대보다 높은 레벨 | 승률 전→후 | 잃은 체력 전→후 |
+|---:|---|---:|---:|---:|
+| 16 | 불리 | 0 | 54% → 54% | 86% → 86% |
+| 16 | 불리 | 3 | 65% → 81% | 80% → 71% |
+| 16 | 불리 | 6 | 78% → 99% | 75% → 52% |
+| 16 | 불리 | 12 | 100% → 100% | 44% → 22% |
+| 40 | 불리 | 12 | 75% → 100% | 75% → 38% |
+
+`node scripts/pet-balance-report.mjs`로 다시 잴 수 있다.

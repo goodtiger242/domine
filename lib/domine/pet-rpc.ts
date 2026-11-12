@@ -47,6 +47,9 @@ export type V6Result = {
   season?: string; retryAfterSeconds?: number;
 };
 export type PetCapabilities = { version: 6; sharedEconomy: boolean; explorationThemes: number; v9: boolean; v10: boolean; perPetShop: boolean; history: boolean; busyLock?: boolean; perPlayer?: boolean };
+/** Level ranking per dog (server v24). Level 1 dogs are left out: they have not started playing. */
+export type PetRankRow = { nickname: string; level: number };
+export type PetRanking = Record<PetId, PetRankRow[]>;
 export type PetHistoryEntry = { nickname: string; pet: PetId; kind: "action" | "purchase" | "equip" | "levelup" | "discover" | "battle" | "pickup"; detail: string | null; at: string };
 export class PetRpcError extends Error {
   definitive: boolean;
@@ -61,6 +64,8 @@ export interface PetApi {
   execute(identity: PetIdentity, command: PetCommand, signal?: AbortSignal): Promise<V6Result>;
   operation(identity: PetIdentity, requestId: string): Promise<V6Result>;
   history(): Promise<PetHistoryEntry[]>;
+  /** null when the server has no ranking yet (before v24). */
+  ranking(): Promise<PetRanking | null>;
 }
 type V6Rpc = (name: string, args: Record<string, string | number | null>, signal?: AbortSignal) => PromiseLike<Result>;
 export function createPetApi(rpc: V6Rpc): PetApi {
@@ -91,6 +96,16 @@ export function createPetApi(rpc: V6Rpc): PetApi {
     register: (i, signal) => call("register", auth(i), signal),
     state: (i, pet, signal) => call("state", { ...auth(i), p_pet: pet }, signal),
     operation: (i, id) => call("operation", { ...auth(i), p_request_id: id }),
+    async ranking() {
+      const { data, error, status } = await rpc("domine_pet_level_ranking_v24", {});
+      if (error?.code === "PGRST202") return null;
+      if (error) throw new PetRpcError(error.code || "NETWORK_ERROR", (status ?? 0) >= 400);
+      const rows = (value: unknown): PetRankRow[] => Array.isArray(value) ? value.filter((r): r is PetRankRow => !!r && typeof r === "object"
+        && typeof (r as PetRankRow).nickname === "string" && Number.isInteger((r as PetRankRow).level) && (r as PetRankRow).level >= 2)
+        .map(r => ({ nickname: r.nickname, level: r.level })) : [];
+      const record = data && typeof data === "object" ? data as Record<string, unknown> : {};
+      return { 1: rows(record["1"]), 2: rows(record["2"]) };
+    },
     async history() {
       const { data, error, status } = await rpc("domine_pet_history_v10", { p_limit: 30 });
       if (error) throw new PetRpcError(error.code || "NETWORK_ERROR", (status ?? 0) >= 400);

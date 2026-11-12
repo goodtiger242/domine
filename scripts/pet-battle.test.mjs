@@ -717,7 +717,8 @@ test("3차 등급·기운·레벨·정책 시뮬레이션", () => {
     check(r.rate>=55&&r.rate<=75,`Lv.${r.level} 승률 ${r.rate.toFixed(2)}`);
     check(r.rounds>=6&&r.rounds<=10&&r.limit<=15&&r.short<=5&&r.stuck<=10,`Lv.${r.level} 극단 검사`);
   }
-  for(const r of gaps) check(r.rate>=10&&r.rate<=95,`Lv.${r.level}/${r.gap} 승률 ${r.rate.toFixed(2)}`);
+  // Three levels must decide most fights: below the opponent rarely wins, above it usually does.
+  for(const r of gaps) check(r.gap>0 ? r.rate>=3&&r.rate<=50 : r.rate>=70&&r.rate<=99.5,`Lv.${r.level}/${r.gap} 승률 ${r.rate.toFixed(2)}`);
   for(const r of extremes) check(r.rate>=30&&r.rate<=85,`기운+태그 ${r.favorable} ${r.rate.toFixed(2)}`);
   const defenseGain=policies[1].rate-policies[0].rate, itemGain=policies[2].rate-policies[1].rate;
   check(defenseGain>=5&&defenseGain<=12,`방어 이득 ${defenseGain.toFixed(2)}`);

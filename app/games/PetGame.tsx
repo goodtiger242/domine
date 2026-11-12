@@ -31,10 +31,12 @@ const PetAchievementSheet = dynamic(() => import("./PetAchievementSheet"), { loa
 const PetWorldSheet = dynamic(() => import("./PetWorldSheet"), { loading });
 const PetStatusSheet = dynamic(() => import("./PetStatusSheet"), { loading });
 const PetJobSheet = dynamic(() => import("./PetJobSheet"), { loading });
+const PetGuideSheet = dynamic(() => import("./PetGuideSheet"), { loading });
+const PetRankSheet = dynamic(() => import("./PetRankSheet"), { loading });
 const PetSheet = dynamic(() => import("./PetSheet"), { loading });
 const PetBattleSheet = dynamic(() => import("./PetBattleSheet"), { ssr: false, loading });
 const PetEncounterSheet = dynamic(() => import("./PetEncounterSheet"), { loading });
-type Sheet = "status" | "job" | "map" | "shop" | "bag" | "album" | "achievements" | "history" | "record" | "notice" | "encounter" | "battle" | null;
+type Sheet = "status" | "job" | "guide" | "rank" | "map" | "shop" | "bag" | "album" | "achievements" | "history" | "record" | "notice" | "encounter" | "battle" | null;
 const BUSY_ACTION: Record<string, string> = { feed: "밥 주는", treat: "간식 주는", pet: "쓰다듬는", play: "공놀이하는", walk: "산책하는", brush: "빗질하는", bath: "목욕시키는", train: "훈련하는" };
 
 
@@ -167,6 +169,13 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     const timer = setInterval(() => { setHour(new Date().getHours()); }, 9000);
     return () => clearInterval(timer);
   }, [game.active, sheet]);
+  // The guide opens by itself once per device, the first time a name is connected.
+  useEffect(() => {
+    if (!game.registered || sheet) return;
+    try { if (window.localStorage.getItem("domine-pet-guide")) return; window.localStorage.setItem("domine-pet-guide", "1"); } catch { return; }
+    open("guide");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.registered, sheet]);
   function open(next: Sheet) { if (next === "record") { setNameSearch(""); setInvalidName(false); } setNoOpponent(false); game.pause(next === "battle"); setSheet(next); }
   function openMap(animals = false) { if (animals) rememberAnimals(true); open("map"); }
   function startBattle(selected?: Encounter) {
@@ -226,14 +235,16 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
   return <div ref={game.host} className="pet-game">
     <div className="pet-title-row">
       <h2 className="t-heading">우리 강아지</h2>
-      <div role="group" aria-label="강아지 선택">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeeches([]); }}>{PETS[id].name}</button>)}</div>
-      <button type="button" className="pet-record-button" onClick={() => open("record")}>{game.registered && game.nickname || "내 이름"}</button>
+      <div role="group" aria-label="강아지 선택" className="pet-dog-switch">{([1, 2] as const).filter((id) => game.multiPet || id === 1).map((id) => <button type="button" key={id} aria-pressed={game.petId === id} disabled={locked} onClick={() => { game.selectPet(id); setSpeeches([]); }}>
+        <i aria-hidden="true" data-pet={id} style={{ backgroundImage: `url(${PETS[id].standing[id === 1 ? stage : "adult"]})` }} />{PETS[id].name}
+      </button>)}</div>
+      <button type="button" className="pet-rank-button" aria-label="랭킹" onClick={() => open("rank")}><span aria-hidden="true">🏆</span><span className="pet-rank-button-text">랭킹</span></button>
+      {game.registered && <button type="button" className="pet-record-button" onClick={() => open("record")}>{game.nickname}</button>}
     </div>
     {!game.registered && <form className="pet-name-gate" onSubmit={(event) => { event.preventDefault(); void connect(query); }}>
-      <strong>이름을 입력해 주세요</strong>
-      <p>{mine ? "이름마다 내 도미·미네를 키워요." : "청년회 이름을 입력하면 도미·미네와 함께 시작해요."}</p>
+      <label htmlFor={`${tabsId}-gate-name`}>{mine ? "이름을 입력하면 내 도미·미네를 키워요" : "이름을 입력하면 도미·미네와 함께 시작해요"}</label>
       <div>
-        <input aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder="이름" enterKeyHint="go" />
+        <input id={`${tabsId}-gate-name`} aria-label="이름" type="text" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setInvalidName(false); }} autoComplete="off" placeholder="이름" enterKeyHint="go" />
         <button type="submit" aria-busy={connecting} disabled={connecting || !query || game.capability === "loading"}>{connecting ? "확인 중…" : "시작"}</button>
       </div>
       {nameError && <p role="status" className="pet-name-gate-error">도미네 청년회 이름을 정자로 사용해주세요</p>}
@@ -273,11 +284,13 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
         <span aria-hidden="true">{action === "sleep" ? LOCAL_ACTIONS.sleep.icon : ACTION_ICON[action]}</span><span>{action === "sleep" ? LOCAL_ACTIONS.sleep.label : ACTION_LABEL[action]}</span>
       </button>)}
     </div>)}
-    <nav className="pet-menu" aria-label="진행과 기록"><button type="button" onClick={() => open("shop")}><span aria-hidden="true">🛍️</span>상점</button><button type="button" onClick={() => open("bag")}><span aria-hidden="true">🎒</span>가방</button><button type="button" onClick={() => open("album")}><span aria-hidden="true">📖</span>도감</button><button type="button" onClick={() => open("achievements")}><span aria-hidden="true">🏅</span>업적</button><button type="button" onClick={() => open("history")}><span aria-hidden="true">🕘</span>이력</button></nav>
+    <nav className="pet-menu" aria-label="진행과 기록"><button type="button" onClick={() => open("shop")}><span aria-hidden="true">🛍️</span>상점</button><button type="button" onClick={() => open("bag")}><span aria-hidden="true">🎒</span>가방</button><button type="button" onClick={() => open("album")}><span aria-hidden="true">📖</span>도감</button><button type="button" onClick={() => open("achievements")}><span aria-hidden="true">🏅</span>업적</button><button type="button" onClick={() => open("history")}><span aria-hidden="true">🕘</span>이력</button><button type="button" onClick={() => open("guide")}><span aria-hidden="true">💡</span>사용법</button></nav>
     {sheet === "encounter" && <PetEncounterSheet encounters={currentEncounters} selected={encounter} petId={game.petId} supportMove={supportMove} onSupportMove={setSupportMove} inventory={growth?.inventory} items={items} onItems={rememberItems} onSelect={setEncounter} onStart={confirmBattle} onClose={close} />}
     {sheet === "battle" && encounter && <PetBattleSheet key={`${encounter.id}:${game.petId}`} encounter={encounter} petId={game.petId} condition={pet ?? undefined} stage={stage} hour={hour} onClose={close} onWin={winBattle}
       kingApi={game.kingApi} identity={game.identity} growth={growth} supportMove={supportMove} items={items} onInventoryRefresh={king.refresh} firstWin={!!king.state && !king.state.encyclopedia.some(e => e.individualId === encounter.individual.id && e.wins > 0)} onSettled={result => { king.settled(result); setSettlement(previous => ({ pet: game.petId, result, hasWon: !!previous?.hasWon || result.outcome === "win" })); }} />}
     {sheet === "status" && <PetStatusSheet petId={game.petId} growth={growth} condition={pet ?? undefined} supportMove={supportMove} stage={stage} onClose={close} onJob={game.kingApi ? () => open("job") : undefined} />}
+    {sheet === "guide" && <PetGuideSheet onClose={close} />}
+    {sheet === "rank" && <PetRankSheet load={game.api.ranking} petId={game.petId} nickname={game.registered ? game.nickname : ""} onClose={close} />}
     {sheet === "job" && <PetJobSheet petId={game.petId} growth={growth} coins={coins} certifications={king.state?.certifications ?? []} chooseJob={king.chooseJob} onClose={close} onMap={() => openMap(true)} />}
     {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={sharedWins} careLevel={playerLevel} showAnimals={animalMap} onAnimals={rememberAnimals} profile={profile} now={clock}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}

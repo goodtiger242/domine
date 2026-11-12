@@ -13,6 +13,7 @@ import { PETS, type PetId } from "@/lib/domine/pet-photos";
 import type { PetStage } from "@/lib/domine/pet";
 
 const STATS: readonly Stat[] = ["hp", "attack", "defense", "speed", "focus", "calm"];
+const STAT_ICON: Record<Stat, string> = { hp: "❤", attack: "⚔", defense: "🛡", speed: "💨", focus: "🎯", calm: "🍃" };
 const TRAIT: Record<string, string> = {
   restDamage: "쉰 뒤 첫 공격 강화", earlySpeed: "초반 민첩 증가", firstTrack: "첫 추적 공격 강화",
   firstShield: "첫 피해 감소", thirdEnergy: "3라운드에 기력 회복", longBuff: "첫 강화가 더 오래 지속",
@@ -32,7 +33,8 @@ export default function PetStatusSheet({ petId, growth, condition, stage, onClos
   const breedId = petId === 1 ? "B001" : "B002", breed = BREED_BY_ID[breedId];
   const fighter = battlePlayer(petId, level, condition, [], supportMove, growth);
   const progress = kingProgress(xp, level), penalty = condition ? Math.round(conditionPenalty(condition) * 100) : 0;
-  const peak = Math.max(...STATS.filter(key => key !== "hp").map(key => fighter.stats[key]), 1);
+  // The job's share of each stat, shown beside the total the way RPG stat windows list bonuses.
+  const plain = growth?.job ? battlePlayer(petId, level, condition, [], supportMove, { ...growth, job: null, jobTier: 0 }) : fighter;
   const moves = [...fighter.moves, ...(fighter.finisher ? [fighter.finisher] : [])];
   const held = CONSUMABLES.filter(item => (growth?.inventory[item.id] ?? 0) > 0);
   return <PetSheet title={`${PETS[petId].name} 정보`} onClose={onClose}>
@@ -47,13 +49,13 @@ export default function PetStatusSheet({ petId, growth, condition, stage, onClos
           <small>{progress.needed ? `다음 레벨까지 ${progress.needed - progress.current}` : "최고 레벨"}{growth && growth.streak > 1 ? ` · ${growth.streak}연승` : ""}</small>
         </div>
       </header>
-      <ul className="pet-status-stats" aria-label="능력치">
-        {STATS.map(key => <li key={key}>
-          <span>{STAT_LABEL[key]}</span>
-          <b className="pet-status-bar" aria-hidden="true"><u style={{ width: `${key === "hp" ? 100 : Math.round(fighter.stats[key] / peak * 100)}%` }} /></b>
-          <em>{fighter.stats[key]}</em>
-        </li>)}
-      </ul>
+      <dl className="pet-status-stats" aria-label="능력치">
+        {STATS.map(key => { const bonus = fighter.stats[key] - plain.stats[key];
+          return <div key={key} data-stat={key}>
+            <dt><span aria-hidden="true">{STAT_ICON[key]}</span>{STAT_LABEL[key]}</dt>
+            <dd><em>{fighter.stats[key]}</em>{bonus !== 0 && <small data-good={bonus > 0} title="직업 효과">{bonus > 0 ? "+" : "−"}{Math.abs(bonus)}</small>}</dd>
+          </div>; })}
+      </dl>
       <p className="pet-status-chips">
         <span>기운 {GROUP_LABEL[breed.group]}</span>
         <span>크리티컬 {Math.round(critChance(fighter))}%</span>

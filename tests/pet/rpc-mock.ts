@@ -28,6 +28,7 @@ export function createPetMock(options: { missing?: boolean; v9?: boolean; busyLo
   const authorized = (i: PetIdentity) => owners.get(i.nickname.toLowerCase())?.secret === i.secret;
   const api: PetApi = {
     capabilities: async()=>options.missing ? false : {version:6,sharedEconomy:true,explorationThemes:24,v9:options.v9!==false,v10:true,perPetShop:true,history:true,busyLock:options.busyLock===true},
+    ranking: async()=> ({ 1: [], 2: [] }),
     history: async()=> { calls.push("history"); return history.filter(row=>Date.parse(row.at)>=now-14*86400000).slice(-30).reverse().map(row=>({...row})); },
     legacy: async(pet,nickname,action)=> { calls.push(action ? "legacy-action" : "legacy-state"); return { data: action ? {ok:true} : {...shared,name:pet===1?"도미":"미네"},error:null,petId:pet,legacy:false }; },
     register: async(i)=> {

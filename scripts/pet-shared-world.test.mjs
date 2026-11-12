@@ -109,3 +109,24 @@ test("직업 화면: 조건·기술·버튼을 보여 준다", () => {
   const promote = html({ growth: { ...growth, level: 30, job: "striker", jobTier: 1 }, coins: 120, certifications: ["R01", "R02", "R03"].map(target => ({ pet: 1, kind: "region", target, at: "" })) });
   for (const text of ["돌격수", "현재", "선봉수로 전직", "🪙 120", "사용 중"]) assert.ok(promote.includes(text), text);
 });
+
+test("레벨 차가 상성보다 크다: 12레벨 위면 불리해도 체력을 적게 잃고, 3레벨 아래면 대개 진다", async () => {
+  const { duel } = await import("./pet-balance-report.mjs");
+  const big = duel({ level: 16, gap: 12, relation: "weak", samples: 6 });
+  assert.equal(big.win, 100); assert.ok(big.hpLost <= 30, `hp lost ${big.hpLost}%`);
+  const even = duel({ level: 16, gap: 0, relation: "weak", samples: 6 }), ahead = duel({ level: 16, gap: 3, relation: "weak", samples: 6 });
+  assert.ok(ahead.win > even.win + 10, `+3 levels ${ahead.win}% vs even ${even.win}%`);
+});
+
+test("랭킹: 서버 응답에서 Lv.2 이상만 받고, 서버가 아직 없으면 준비 중으로 보인다", async () => {
+  const { createPetApi } = loadTS("lib/domine/pet-rpc.ts");
+  let reply = { data: { 1: [{ nickname: "bob", level: 20, xp: 9 }, { nickname: "x", level: 1 }, { level: 9 }], 2: "bad" }, error: null };
+  const api = createPetApi(async name => (assert.equal(name, "domine_pet_level_ranking_v24"), reply));
+  assert.deepEqual(await api.ranking(), { 1: [{ nickname: "bob", level: 20 }], 2: [] });
+  reply = { data: null, error: { code: "PGRST202", message: "missing" } };
+  assert.equal(await api.ranking(), null);
+  const Sheet = loadTS("app/games/PetRankSheet.tsx").default;
+  const html = renderToStaticMarkup(createElement(Sheet, { petId: 2, nickname: "bob", load: async () => null, onClose() {} }));
+  for (const text of ["랭킹", "도미 랭킹", "미네 랭킹", "불러오는 중", "Lv.2부터 순위에 올라요"]) assert.ok(html.includes(text), text);
+  assert.match(html, /aria-selected="true"[^>]*>미네 랭킹/);
+});

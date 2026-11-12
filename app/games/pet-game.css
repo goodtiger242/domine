@@ -735,7 +735,6 @@
 @media (max-width: 480px) { .pet-battle-pages { height: 136px; } }
 /* Name gate: shown until a name is entered, so nobody plays unregistered by accident. */
 .pet-name-gate { display: grid; gap: 6px; margin: 8px 0; padding: 12px; border: 2px solid #e6ba4d; border-radius: 14px; background: #fff7df; color: #2a2013; }
-.pet-name-gate strong { font-size: 17px; line-height: 22px; }
 .pet-name-gate p { margin: 0; font-size: 13px; line-height: 18px; word-break: keep-all; }
 .pet-name-gate div { display: flex; gap: 8px; }
 .pet-name-gate input { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid #b9a273; border-radius: 10px; background: #fff; color: #2a2013; font-size: 16px; }
@@ -796,11 +795,14 @@
 .pet-status-head small { font-size: 12px; color: var(--lit-ink-muted, #8a8a8a); }
 .pet-status-xp { display: block; height: 6px; overflow: hidden; border-radius: 4px; background: #8884; }
 .pet-status-xp i { display: block; height: 100%; transform-origin: left; background: #759478; }
-.pet-status-stats { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
-.pet-status-stats li { display: grid; grid-template-columns: 52px 1fr 40px; align-items: center; gap: 8px; font-size: 13px; }
-.pet-status-stats em { font-style: normal; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
-.pet-status-bar { display: block; height: 6px; overflow: hidden; border-radius: 4px; background: #8884; }
-.pet-status-bar u { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #e6ba4d, #f0cf7c); }
+.pet-status-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.pet-status-stats > div { display: grid; gap: 2px; min-width: 0; padding: 7px 10px 8px; border: 1px solid var(--lit-border); border-radius: 10px; background: #8881; }
+.pet-status-stats dt { display: flex; align-items: center; gap: 4px; overflow: hidden; font-size: 12px; line-height: 16px; color: var(--lit-ink-muted, #8a8a8a); white-space: nowrap; }
+.pet-status-stats dt span { flex: 0 0 auto; font-size: 12px; }
+.pet-status-stats dd { display: flex; align-items: baseline; gap: 4px; margin: 0; }
+.pet-status-stats em { font-style: normal; font-size: 19px; font-weight: 800; line-height: 24px; font-variant-numeric: tabular-nums; }
+.pet-status-stats small { font-size: 12px; font-weight: 800; color: #2f8a4f; font-variant-numeric: tabular-nums; }
+.pet-status-stats small[data-good=false] { color: #c0392b; }
 .pet-status-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 .pet-status-chips span { padding: 3px 9px; border-radius: 12px; background: #8882; font-size: 12px; }
 .pet-status-chips span[data-warn=true] { background: #d9534f33; color: #c0392b; }
@@ -1057,3 +1059,56 @@
 .pet-job-ready { display: block; width: 100%; min-height: 44px; margin: 6px 0; border: 1px solid #e6ba4d; border-radius: 12px; background: #e6ba4d26; color: inherit; font-size: 14px; font-weight: 700; }
 .pet-job-ready:disabled { opacity: .55; }
 @media (max-width: 380px) { .pet-job-tabs button { font-size: 11px; } }
+
+/* [title] dog switch with face avatars; compact name gate */
+.pet-title-row { column-gap: 10px; }
+.pet-dog-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--lit-border); border-radius: 999px; background: #8881; }
+.pet-title-row .pet-dog-switch button { display: inline-flex; align-items: center; gap: 6px; min-width: 0; min-height: 40px; padding: 0 14px 0 4px; border: 0; border-radius: 999px; background: transparent; color: inherit; font-size: 15px; font-weight: 700; transition: background .15s, color .15s; }
+.pet-title-row .pet-dog-switch button[aria-pressed=true] { background: #2f5a3f; color: #fff; font-weight: 800; box-shadow: 0 1px 3px #0003; }
+.pet-title-row .pet-dog-switch button:disabled { opacity: .6; cursor: default; }
+.pet-dog-switch i { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; background-color: #dde7ef; background-repeat: no-repeat; box-shadow: inset 0 0 0 1px #0001; }
+.pet-dog-switch i[data-pet="1"] { background-size: 300% auto; background-position: 100% 6%; }
+.pet-dog-switch i[data-pet="2"] { background-size: 260% auto; background-position: 100% 4%; }
+.pet-name-gate { gap: 6px; margin: 6px 0; padding: 8px 10px; border-width: 1.5px; border-radius: 12px; }
+.pet-name-gate label { font-size: 13px; font-weight: 700; line-height: 18px; word-break: keep-all; }
+.pet-name-gate input { height: 40px; }
+.pet-name-gate div > button { flex-basis: 64px; height: 40px; font-size: 15px; }
+@media (prefers-reduced-motion: reduce) { .pet-title-row .pet-dog-switch button { transition: none; } }
+
+/* [guide] short how-to sheet */
+.pet-guide { display: grid; gap: 14px; padding: 2px 2px 6px; }
+.pet-guide h3 { margin: 0 0 6px; font-size: 13px; font-weight: 800; color: var(--lit-ink-muted, #8a8a8a); }
+.pet-guide ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pet-guide li { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: start; gap: 6px; font-size: 14px; line-height: 20px; word-break: keep-all; }
+.pet-guide li span { text-align: center; }
+.pet-guide-close { width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: #2f5a3f; color: #fff; font-size: 15px; font-weight: 800; }
+
+/* [rank] ranking button and sheet */
+.pet-title-row .pet-rank-button { display: inline-flex; align-items: center; gap: 4px; min-width: 44px; min-height: 40px; padding: 0 12px; border: 1px solid #e6ba4d; border-radius: 999px; background: #e6ba4d22; color: inherit; font-size: 14px; font-weight: 700; }
+.pet-title-row .pet-rank-button span[aria-hidden] { font-size: 16px; line-height: 1; }
+.pet-rank { display: grid; gap: 10px; padding: 2px 2px 6px; }
+.pet-rank-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pet-rank-tabs button { min-height: 44px; border: 1px solid var(--lit-border); border-radius: 12px; background: transparent; color: inherit; font-size: 14px; font-weight: 700; }
+.pet-rank-tabs button[aria-selected=true] { border-color: #2f5a3f; background: #2f5a3f; color: #fff; }
+.pet-rank-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.pet-rank-list li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 10px; background: #8881; font-size: 15px; }
+.pet-rank-list li[data-me=true] { background: #e6ba4d33; box-shadow: inset 0 0 0 1px #e6ba4d; }
+.pet-rank-place { font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.pet-rank-name { overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.pet-rank-name small { margin-left: 6px; padding: 1px 6px; border-radius: 8px; background: #2f5a3f; color: #fff; font-size: 11px; font-weight: 800; vertical-align: 1px; }
+.pet-rank-list b { font-variant-numeric: tabular-nums; }
+.pet-rank-foot { margin: 0; font-size: 12px; color: var(--lit-ink-muted, #8a8a8a); }
+/* Phones: the switch, ranking and name share one line, so the heading and labels get smaller. */
+@media (max-width: 430px) {
+  .pet-title-row { column-gap: 6px; }
+  .pet-title-row h2 { font-size: 16px; }
+  .pet-title-row .pet-record-button { max-width: 76px; overflow: hidden; padding: 4px; text-overflow: ellipsis; white-space: nowrap; }
+  .pet-title-row .pet-dog-switch button { gap: 4px; padding: 0 10px 0 3px; font-size: 14px; }
+  .pet-dog-switch i { flex-basis: 28px; width: 28px; height: 28px; }
+  .pet-title-row .pet-rank-button { padding: 0 10px; }
+  .pet-title-row .pet-rank-button-text { display: none; }
+}
+/* Very narrow phones (360px): the switch already names the dogs, so the heading is kept for screen readers only. */
+@media (max-width: 374px) {
+  .pet-title-row h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
