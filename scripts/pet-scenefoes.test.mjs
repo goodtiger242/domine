@@ -44,7 +44,8 @@ test("출몰 수·범위·안전 칸·네임드 우선·승리 개체만 숨기�
     assert.ok(view.spawnsFor("F4", 999, slot).length <= 3);
   }
   const occupied = 1000 - counts[0];
-  assert.ok(occupied >= 260 && occupied <= 340);
+  const { STARTER_RATE } = loadTS("lib/domine/king/spawn.ts");
+  assert.ok(Math.abs(occupied / 1000 - STARTER_RATE) < .04, `${occupied}`);
   for (const [count, rate] of [[1, .65], [2, .25], [3, .1]]) assert.ok(Math.abs(counts[count] / occupied - rate) < .07, counts.join(","));
   const three = find(3), won = three[1];
   assert.deepEqual(view.spawnsFor("F5", 1, won.slot, [won.id]).map(e => e.id), [three[0].id, three[2].id]);

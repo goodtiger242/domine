@@ -5,10 +5,10 @@ import { NAMED, type NamedIndividual } from "./named";
 import { HABITAT_WEIGHTS, habitatOf, levelRange, REGIONS, regionOf, SAFE_CELLS } from "./world";
 
 export const GUEST_RATE = .065;
-/** Animals are shared by every player: a cell has animals in 25% of slots and each stays 20 of the 30 minutes. */
-export const SPAWN_RATE = .25, SLOT_MS = 1800000, STAY_MS = 1200000;
+/** Animals are shared by every player: a cell has animals in 40% of slots and each stays 18 of the 30 minutes (about 34 on the map at once). */
+export const SPAWN_RATE = .4, SLOT_MS = 1800000, STAY_MS = 1080000;
 /** Below this level a dog is still practising: it keeps the plentiful animals at its own level so a new player always finds a first opponent. */
-export const STARTER_LEVEL = 5, STARTER_RATE = .3;
+export const STARTER_LEVEL = 5, STARTER_RATE = .4;
 /** Five points (lowest, 25%, 50%, 75%, highest) of every active player's dog levels; the server fixes them once a day. */
 export type LevelProfile = { day: string; levels: readonly number[] };
 export interface Spawn {

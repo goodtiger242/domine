@@ -180,7 +180,8 @@ test("1000구간×98칸 출몰 분포와 입력 재현·서식 가중치·개체
       habitatTotals[habitat] = (habitatTotals[habitat] ?? 0) + 1;
     }
   }
-  const total = counts.reduce((a, b) => a + b, 0), expected = [.7, .3 * .65, .3 * .25, .3 * .1];
+  const { STARTER_RATE: rate } = load("lib/domine/king/spawn.ts");
+  const total = counts.reduce((a, b) => a + b, 0), expected = [1 - rate, rate * .65, rate * .25, rate * .1];
   counts.forEach((count, i) => assert.ok(Math.abs(count / total - expected[i]) < .008, `${i}마리: ${count / total}`));
   for (const habitat of Object.keys(habitatTotals)) {
     const weights = HABITAT_WEIGHTS[habitat], sum = Object.values(weights).reduce((a, b) => a + b, 0);
