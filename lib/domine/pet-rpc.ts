@@ -48,7 +48,7 @@ export type V6Result = {
 };
 export type PetCapabilities = { version: 6; sharedEconomy: boolean; explorationThemes: number; v9: boolean; v10: boolean; perPetShop: boolean; history: boolean; busyLock?: boolean; perPlayer?: boolean };
 /** Level ranking per dog (server v24). Level 1 dogs are left out: they have not started playing. */
-export type PetRankRow = { nickname: string; level: number };
+export type PetRankRow = { nickname: string; level: number; xp: number };
 export type PetRanking = Record<PetId, PetRankRow[]>;
 export type PetHistoryEntry = { nickname: string; pet: PetId; kind: "action" | "purchase" | "equip" | "levelup" | "discover" | "battle" | "pickup"; detail: string | null; at: string };
 export class PetRpcError extends Error {
@@ -102,7 +102,7 @@ export function createPetApi(rpc: V6Rpc): PetApi {
       if (error) throw new PetRpcError(error.code || "NETWORK_ERROR", (status ?? 0) >= 400);
       const rows = (value: unknown): PetRankRow[] => Array.isArray(value) ? value.filter((r): r is PetRankRow => !!r && typeof r === "object"
         && typeof (r as PetRankRow).nickname === "string" && Number.isInteger((r as PetRankRow).level) && (r as PetRankRow).level >= 2)
-        .map(r => ({ nickname: r.nickname, level: r.level })) : [];
+        .map(r => ({ nickname: r.nickname, level: r.level, xp: Number.isSafeInteger(r.xp) && r.xp >= 0 ? r.xp : 0 })) : [];
       const record = data && typeof data === "object" ? data as Record<string, unknown> : {};
       return { 1: rows(record["1"]), 2: rows(record["2"]) };
     },

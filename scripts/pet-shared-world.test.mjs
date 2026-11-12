@@ -122,7 +122,11 @@ test("랭킹: 서버 응답에서 Lv.2 이상만 받고, 서버가 아직 없으
   const { createPetApi } = loadTS("lib/domine/pet-rpc.ts");
   let reply = { data: { 1: [{ nickname: "bob", level: 20, xp: 9 }, { nickname: "x", level: 1 }, { level: 9 }], 2: "bad" }, error: null };
   const api = createPetApi(async name => (assert.equal(name, "domine_pet_level_ranking_v24"), reply));
-  assert.deepEqual(await api.ranking(), { 1: [{ nickname: "bob", level: 20 }], 2: [] });
+  assert.deepEqual(await api.ranking(), { 1: [{ nickname: "bob", level: 20, xp: 9 }], 2: [] });
+  const { places } = loadTS("app/games/PetRankSheet.tsx");
+  assert.deepEqual(places([{ level: 16, xp: 1936 }, { level: 16, xp: 1845 }, { level: 16, xp: 1845 }, { level: 9, xp: 400 }]), [1, 2, 2, 4], "equal level and XP share a place");
+  const full = renderToStaticMarkup(createElement(loadTS("app/games/PetRankSheet.tsx").default, { petId: 2, nickname: "최선호", onClose() {}, load: async () => null }));
+  assert.match(full, /경험치가 많은 쪽이 위/);
   reply = { data: null, error: { code: "PGRST202", message: "missing" } };
   assert.equal(await api.ranking(), null);
   const Sheet = loadTS("app/games/PetRankSheet.tsx").default;
