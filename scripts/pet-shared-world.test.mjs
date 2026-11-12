@@ -134,3 +134,41 @@ test("랭킹: 서버 응답에서 Lv.2 이상만 받고, 서버가 아직 없으
   for (const text of ["랭킹", "도미 랭킹", "미네 랭킹", "불러오는 중", "Lv.2부터 순위에 올라요"]) assert.ok(html.includes(text), text);
   assert.match(html, /aria-selected="true"[^>]*>미네 랭킹/);
 });
+
+test("난이도 색: 레벨·상성·직업이 반영되고, 단계가 승률 순서와 맞는다", async () => {
+  const { sample } = await import("./pet-difficulty-report.mjs");
+  const { DIFFICULTY_LABEL, DIFFICULTIES, foeDifficulty, powerRatio } = loadTS("lib/domine/pet-difficulty.ts");
+  assert.deepEqual(DIFFICULTIES.map(d => DIFFICULTY_LABEL[d]), ["쉬움", "보통", "조금 어려움", "어려움"]);
+  const rows = sample({ levels: [8, 16, 30], perLevel: 90, seeds: 3 });
+  const mean = d => { const g = rows.filter(r => r.difficulty === d); return g.reduce((a, r) => a + r.win, 0) / Math.max(1, g.length); };
+  assert.ok(mean("easy") >= .95 && mean("normal") >= .7 && mean("normal") < mean("easy") && mean("hard") < mean("normal") && mean("deadly") <= .2,
+    DIFFICULTIES.map(d => `${d} ${mean(d).toFixed(2)}`).join(" "));
+  // The same animal gets easier as our dog levels up, and a stronger dog never rates it harder.
+  const { battlePlayer, spawnsFor } = loadTS("lib/domine/pet-battle-view.ts");
+  const growth = level => ({ pet: 1, xp: 0, streak: 0, level, allocation: { hp: 0, attack: 0, defense: 0, speed: 0, focus: 0, calm: 0 }, unspent: 0, allocationMode: "auto", job: null, jobTier: 0, jobChangedAt: null, moves: [], version: 1, mastery: {}, inventory: {} });
+  const foe = PET_WORLD.flatMap(c => spawnsFor(c.id, 20, 5000, [], { profile: { day: "x", levels: [10, 14, 18, 22, 26] } }))[0];
+  const ratios = [6, 12, 20, 35, 60].map(level => powerRatio(battlePlayer(1, level, undefined, [], undefined, growth(level)), foe.fighter));
+  assert.deepEqual([...ratios].sort((a, b) => a - b), ratios, `stronger dog, higher ratio: ${ratios.map(r => r.toFixed(2))}`);
+  assert.equal(foeDifficulty(battlePlayer(1, 60, undefined, [], undefined, growth(60)), foe.fighter), "easy");
+});
+
+test("난이도 색: 장면·지도·겨루기 창에 단계와 초록 테두리가 붙고, 계산이 없으면 아무것도 붙지 않는다", () => {
+  const profile = { day: "x", levels: [3, 8, 14, 22, 36] };
+  const slot = 2468, foes = new Map(PET_WORLD.map(c => [c.id, view.spawnsFor(c.id, 12, slot, [], { profile })]));
+  const cell = PET_WORLD.find(c => foes.get(c.id).length >= 2), here = foes.get(cell.id);
+  const levels = ["easy", "normal", "hard", "deadly"], rate = e => levels[Math.max(0, here.findIndex(x => x.id === e.id)) % 4];
+  const World = loadTS("app/games/PetWorldSheet.tsx").default, Scene = loadTS("app/games/PetScene.tsx").PetScene;
+  const map = props => renderToStaticMarkup(createElement(World, { current: "E5", visited: [], slot, wins: [], careLevel: 12, showAnimals: true, profile, onMove() {}, onClose() {}, ...props }));
+  const withRate = map({ rate });
+  assert.ok(withRate.includes('data-level="easy"') && withRate.includes('data-level="deadly"'));
+  assert.match(withRate, /이길 만한 상대/); assert.match(withRate, /data-fair="true"/); assert.match(withRate, /쉬움[\s\S]*보통[\s\S]*조금 어려움[\s\S]*어려움/);
+  const plain = map({});
+  assert.doesNotMatch(plain, /data-level=|이길 만한 상대|pet-world-legend/, "no rating, no colors");
+  const scene = renderToStaticMarkup(createElement(Scene, { encounters: here, rate, stage: "adult", face: "happy", light: 1, hour: 12, collar: "#fff", cue: null, onSay() {}, onEncounter() {}, onBattle() {}, cellId: cell.id }));
+  assert.ok(scene.includes('data-level="easy"') && scene.includes("쉬움,"), "name plate color and spoken label");
+  const Sheet = loadTS("app/games/PetEncounterSheet.tsx").default;
+  const list = renderToStaticMarkup(createElement(Sheet, { encounters: here, selected: null, petId: 1, onSelect() {}, onStart() {}, onClose() {}, rate }));
+  assert.match(list, /class="pet-diff" data-level="easy">쉬움</); assert.match(list, /조금 어려움/);
+  const card = renderToStaticMarkup(createElement(Sheet, { encounters: here, selected: here[0], petId: 1, onSelect() {}, onStart() {}, onClose() {}, rate }));
+  assert.match(card, /class="pet-diff" data-level="easy">쉬움</);
+});

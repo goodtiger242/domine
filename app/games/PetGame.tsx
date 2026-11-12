@@ -10,7 +10,8 @@ import { queueSpeech, type Speech } from "@/lib/domine/pet-bubble";
 import { actionsForMap } from "@/lib/domine/pet-maps";
 import { worldCell } from "@/lib/domine/pet-world";
 import { PETS, petText } from "@/lib/domine/pet-photos";
-import { encounterChoice, spawnsFor, encounterSlot, ENCOUNTER_STORAGE, readEncounterWins, type Encounter } from "@/lib/domine/pet-battle-view";
+import { battlePlayer, encounterChoice, spawnsFor, encounterSlot, ENCOUNTER_STORAGE, readEncounterWins, type Encounter } from "@/lib/domine/pet-battle-view";
+import { foeDifficulty } from "@/lib/domine/pet-difficulty";
 import { PET_LEGAL_NAMES } from "@/lib/domine/pet-identity";
 import type { PetApi } from "@/lib/domine/pet-rpc";
 import type { KingSettlement } from "@/lib/domine/pet-king-rpc";
@@ -113,6 +114,9 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
   const profile = king.state?.levelProfile;
   const currentEncounters = spawnsFor(cell.id, playerLevel, slot, sharedWins, { profile, now: clock });
   const jobReady = !!growth && !growth.job && growth.level >= 10 && !!king.state?.certifications?.some(c => c.pet === game.petId && c.kind === "region" && c.target === "R01");
+  // The color of each animal answers "can my dog beat it right now?" using our real level, stats, job, condition and the matchup.
+  const me = (() => { try { return battlePlayer(game.petId, playerLevel, pet ?? undefined, [], supportMove || undefined, growth); } catch { return null; } })();
+  const rate = me ? (encounter: Encounter) => foeDifficulty(me, encounter.fighter) : undefined;
   const careLocked = locked || !!game.busy || (!!game.features?.busyLock && machine.command !== "idle");
   const say = useCallback((text: string, speaker: "dog" | "priest" = "dog") => setSpeeches((queue) => queueSpeech(queue, { text, speaker })), []);
   const strokePet = useCallback(() => care("pet", true), [care]);
@@ -259,7 +263,7 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
     {jobReady && !firstOpponent && !sheet && <button type="button" className="pet-job-ready" disabled={locked} onClick={() => open("job")}>⭐ {PETS[game.petId].name}가 직업을 가질 수 있어요</button>}
     <div onPointerDownCapture={() => setNoOpponent(false)} className="pet-stage relative aspect-[16/9] overflow-hidden rounded-2xl border border-[var(--lit-border)] bg-[var(--lit-bg)]">
       {game.worldReady ? <PetScene key={game.petId} busyText={busyText} watchingText={sheet === "battle" ? "" : king.watching} petId={game.petId} cellId={cell.id} travel={game.travel} arrivalId={game.arrival?.id} onMap={() => openMap()} onLocal={game.localScene} locked={locked}
-        onBattle={() => startBattle()} encounters={currentEncounters} selectedEncounter={sheet === "encounter" ? encounter?.id : undefined} onEncounter={startBattle} battleDisabled={locked}
+        onBattle={() => startBattle()} encounters={currentEncounters} rate={rate} selectedEncounter={sheet === "encounter" ? encounter?.id : undefined} onEncounter={startBattle} battleDisabled={locked}
         tapDisabled={careLocked || machine.command !== "idle"} onPet={strokePet}
         bagToy={personal?.inventory?.find((id) => CATALOG.some((item) => item.id === id && item.slot === "toy"))}
         paused={!game.active || !!sheet || machine.visual === "paused"} stage={stage} face={face} hour={hour}
@@ -285,14 +289,14 @@ export function PetGame({ api, kingApi }: { api?: PetApi; kingApi?: KingApi } = 
       </button>)}
     </div>)}
     <nav className="pet-menu" aria-label="진행과 기록"><button type="button" onClick={() => open("shop")}><span aria-hidden="true">🛍️</span>상점</button><button type="button" onClick={() => open("bag")}><span aria-hidden="true">🎒</span>가방</button><button type="button" onClick={() => open("album")}><span aria-hidden="true">📖</span>도감</button><button type="button" onClick={() => open("achievements")}><span aria-hidden="true">🏅</span>업적</button><button type="button" onClick={() => open("history")}><span aria-hidden="true">🕘</span>이력</button><button type="button" onClick={() => open("guide")}><span aria-hidden="true">💡</span>사용법</button></nav>
-    {sheet === "encounter" && <PetEncounterSheet encounters={currentEncounters} selected={encounter} petId={game.petId} supportMove={supportMove} onSupportMove={setSupportMove} inventory={growth?.inventory} items={items} onItems={rememberItems} onSelect={setEncounter} onStart={confirmBattle} onClose={close} />}
+    {sheet === "encounter" && <PetEncounterSheet rate={rate} encounters={currentEncounters} selected={encounter} petId={game.petId} supportMove={supportMove} onSupportMove={setSupportMove} inventory={growth?.inventory} items={items} onItems={rememberItems} onSelect={setEncounter} onStart={confirmBattle} onClose={close} />}
     {sheet === "battle" && encounter && <PetBattleSheet key={`${encounter.id}:${game.petId}`} encounter={encounter} petId={game.petId} condition={pet ?? undefined} stage={stage} hour={hour} onClose={close} onWin={winBattle}
       kingApi={game.kingApi} identity={game.identity} growth={growth} supportMove={supportMove} items={items} onInventoryRefresh={king.refresh} firstWin={!!king.state && !king.state.encyclopedia.some(e => e.individualId === encounter.individual.id && e.wins > 0)} onSettled={result => { king.settled(result); setSettlement(previous => ({ pet: game.petId, result, hasWon: !!previous?.hasWon || result.outcome === "win" })); }} />}
     {sheet === "status" && <PetStatusSheet petId={game.petId} growth={growth} condition={pet ?? undefined} supportMove={supportMove} stage={stage} onClose={close} onJob={game.kingApi ? () => open("job") : undefined} />}
     {sheet === "guide" && <PetGuideSheet onClose={close} />}
     {sheet === "rank" && <PetRankSheet load={game.api.ranking} petId={game.petId} nickname={game.registered ? game.nickname : ""} onClose={close} />}
     {sheet === "job" && <PetJobSheet petId={game.petId} growth={growth} coins={coins} certifications={king.state?.certifications ?? []} chooseJob={king.chooseJob} onClose={close} onMap={() => openMap(true)} />}
-    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={sharedWins} careLevel={playerLevel} showAnimals={animalMap} onAnimals={rememberAnimals} profile={profile} now={clock}
+    {sheet === "map" && <PetWorldSheet current={cell.id} visited={game.visited} onClose={close} slot={slot} wins={sharedWins} careLevel={playerLevel} showAnimals={animalMap} onAnimals={rememberAnimals} profile={profile} now={clock} rate={rate}
       onMove={(to) => { close(); void game.localScene({ action: "map", to, id: 0 }); }} />}
     {(sheet === "shop" || sheet === "bag") && <PetShopSheet coinLabel={coinLabel} pendingPurchase={king.pendingPurchase} kingState={king.state} buyItem={king.buyItem} bag={sheet === "bag"} state={personal} petId={game.petId} disabled={disabled || !personal?.player} notice={notice} execute={async (...args) => { await game.execute(...args); await king.refresh(); }} onClose={close} onSelectPet={game.selectPet} multiPet={game.multiPet} onFindOpponent={() => openMap(true)} />}
     {sheet === "album" && <PetAlbumSheet state={personal} disabled={disabled} notice={notice} map={cell.theme} execute={game.execute} onClose={close} />}

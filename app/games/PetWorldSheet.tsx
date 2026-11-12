@@ -1,14 +1,17 @@
 "use client";
 import { spawnsFor, type Encounter } from "@/lib/domine/pet-battle-view";
 import type { LevelProfile } from "@/lib/domine/king/spawn";
+import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty } from "@/lib/domine/pet-difficulty";
 import { useState } from "react";
 import { PET_WORLD, worldCell } from "@/lib/domine/pet-world";
 import PetSheet from "./PetSheet";
 
-export default function PetWorldSheet({ current, onMove, onClose, slot, wins, careLevel = 1, showAnimals = false, onAnimals, profile, now }: {
+export default function PetWorldSheet({ current, onMove, onClose, slot, wins, careLevel = 1, showAnimals = false, onAnimals, profile, now, rate }: {
   current: string; visited: string[]; onMove: (to: string) => void; onClose: () => void;
   slot: number; wins: readonly string[]; careLevel?: number; showAnimals?: boolean; onAnimals?: (visible: boolean) => void;
   profile?: LevelProfile | null; now?: number;
+  /** How hard each animal is for our dog right now; colors the dots on the map. */
+  rate?: (encounter: Encounter) => Difficulty;
 }) {
   const [selected, setSelected] = useState(current);
   const cell = worldCell(selected);
@@ -28,6 +31,7 @@ export default function PetWorldSheet({ current, onMove, onClose, slot, wins, ca
       <button type="button" onClick={() => setSelected(current)}>취소</button></div>
   </div>}>
     <p className="pet-sheet-note"><button type="button" className="pet-world-zoom" aria-pressed={animals} onClick={() => { setAnimals(!animals); onAnimals?.(!animals); }}>{animals ? "🐾 동물 숨기기" : "🐾 동물 보기"}</button> <button type="button" className="pet-world-zoom" aria-pressed={zoom} onClick={() => { setZoom(!zoom); if (!zoom) requestAnimationFrame(() => document.querySelector(".pet-world-grid [aria-current=location]")?.scrollIntoView({ block: "center", inline: "center" })); }}>{zoom ? "전체 보기" : "확대"}</button></p>
+    {animals && rate && <ul className="pet-world-legend" aria-label="동물 난이도 색">{DIFFICULTIES.map(level => <li key={level}><b data-level={level} />{DIFFICULTY_LABEL[level]}</li>)}<li><b data-frame="true" />이길 만한 상대</li></ul>}
     {animals && (current === "D5" || current === "E5") && <p className="pet-sheet-note">여긴 안전 구역이에요 · 🐾가 있는 칸으로 이동해요</p>}
     {nearby.length > 0 && <div className="pet-world-starters" aria-label="순한 동급 이하 상대">{nearby.map(({ place, foe }) => <button type="button" key={foe.id} aria-pressed={selected === place.id} onClick={() => setSelected(place.id)}><strong>{place.id} · {foe.given}</strong><small>Lv.{foe.level} · {foe.individual.intelligence}</small></button>)}</div>}
     <div className="pet-world-scroll" data-zoom={zoom} tabIndex={0} aria-label="동네 지도, 확대하면 상하좌우로 스크롤">
@@ -35,14 +39,16 @@ export default function PetWorldSheet({ current, onMove, onClose, slot, wins, ca
         {PET_WORLD.map((place) => {
           const isHere = place.id === current;
           const foes = foesAt.get(place.id) ?? [];
+          // A green frame marks cells with an animal our dog can handle (easy or normal).
+          const fair = !!rate && foes.some(e => rate(e) === "easy" || rate(e) === "normal");
           return <button type="button" key={place.id}
-            aria-label={`${place.id} ${place.name}${isHere ? ", 현재 위치" : ", 이동"}${foes.length ? `, 동물 ${foes.length}마리, ${foes.map(e => `${e.name} Lv.${e.level}`).join(", ")}` : ""}`}
+            aria-label={`${place.id} ${place.name}${isHere ? ", 현재 위치" : ", 이동"}${foes.length ? `, 동물 ${foes.length}마리, ${foes.map(e => `${e.name} Lv.${e.level}${rate ? ` ${DIFFICULTY_LABEL[rate(e)]}` : ""}`).join(", ")}${fair ? ", 이길 만한 상대 있음" : ""}` : ""}`}
             aria-current={isHere ? "location" : undefined} aria-pressed={place.id === selected}
-            data-neighbor={!isHere} data-selected={place.id === selected}
+            data-neighbor={!isHere} data-selected={place.id === selected} data-fair={fair}
             onClick={() => setSelected(place.id)}>
             <span aria-hidden="true">{isHere ? "🐕" : ""}</span>
             <small>{place.id}</small>
-            {foes.length > 0 && <em className="pet-world-animals" aria-hidden="true"><span>{"🐾".repeat(foes.length)}</span><small>Lv.{Math.max(...foes.map(e => e.level))}</small></em>}
+            {foes.length > 0 && <em className="pet-world-animals" aria-hidden="true"><span>{foes.map(e => <b key={e.id} data-level={rate?.(e)} />)}</span><small>Lv.{Math.max(...foes.map(e => e.level))}</small></em>}
           </button>;
         })}
       </div>

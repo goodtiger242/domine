@@ -14,6 +14,7 @@ import { clampBall, SCENE_SCALE, travelEdge } from "@/lib/domine/pet-geometry";
 import { DOG_W, PetDog } from "./PetDog";
 import NextImage from "next/image";
 import { GROUP_LABEL, type Encounter } from "@/lib/domine/pet-battle-view";
+import { DIFFICULTY_LABEL, type Difficulty } from "@/lib/domine/pet-difficulty";
 
 import { buildIdlePlan, buildScenePlan, restingPose, sampleScenePlan, type ScenePose } from "@/lib/domine/pet-scene-plan";
 import { chooseIdleAction, chooseNeedGoal, type IdleGoal } from "@/lib/domine/pet-idle";
@@ -58,6 +59,8 @@ type Props = {
   onBattle?: () => void;
   battleDisabled?: boolean;
   encounters?: readonly Encounter[];
+  /** How hard each animal is for our dog right now (easy, normal, hard, deadly). */
+  rate?: (encounter: Encounter) => Difficulty;
   selectedEncounter?: string;
   onEncounter?: (encounter: Encounter) => void;
   onLocal?: (cue: SceneCue) => void;
@@ -117,7 +120,7 @@ function SpeechBubble({ text, x, y, duration, label }: { text: string; x: number
   );
 }
 
-export const PetScene = memo(function PetScene({ busyText, watchingText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, encounters = [], selectedEncounter, onEncounter, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
+export const PetScene = memo(function PetScene({ busyText, watchingText, travel, arrivalId, stage, face, light, hour, collar, cue, onSay, onDone, bubble, petId = 1, cellId = DEFAULT_CELL, onMap, onBattle, battleDisabled, encounters = [], rate, selectedEncounter, onEncounter, onLocal, locked = false, tapDisabled = false, onPet, speaker = "dog", paused = false, wearable, toy, bagToy, needs = { fullness: 70, mood: 70, clean: 80 } }: Props) {
   const cell = worldCell(cellId);
   const [moving, setMoving] = useState(false);
   const lastTravel = useRef<MapTravel | null>(null);
@@ -495,9 +498,9 @@ export const PetScene = memo(function PetScene({ busyText, watchingText, travel,
       {!travel && encounters.map((foe, index) => <button type="button" key={foe.id} className="pet-scene-foe" data-selected={foe.id === selectedEncounter}
         style={{ left: `${[58, 74, 88][index]}%`, width: `${Math.min(13.4, w / 160 * 100 * [.8, .83, .86][index])}%`, "--foe-delay": `${index * -2.3}s` } as React.CSSProperties}
         disabled={locked || battleDisabled || paused || moving || !!ask} onPointerEnter={preloadBattle} onFocus={preloadBattle} onPointerDown={preloadBattle}
-        aria-label={`${foe.name} Lv.${foe.level}, ${GROUP_LABEL[foe.individual.group]}, 확인하기`} onClick={() => onEncounter?.(foe)}>
+        aria-label={`${foe.name} Lv.${foe.level}, ${GROUP_LABEL[foe.individual.group]}${rate ? `, ${DIFFICULTY_LABEL[rate(foe)]}` : ""}, 확인하기`} onClick={() => onEncounter?.(foe)}>
         <span className="pet-scene-foe-art">{failed[foe.art] ? <span role="img" aria-label={foe.name}>🐾</span> : <NextImage src={foe.art} alt="" width={160} height={160} sizes="16vw" unoptimized onError={() => setFailed(previous => ({ ...previous, [foe.art]: true }))} />}</span>
-        <span className="pet-scene-foe-label"><strong title={foe.name}>{foe.given}</strong><small data-danger={foe.levelDifference >= 5}><i data-group={foe.individual.group} aria-label={GROUP_LABEL[foe.individual.group]} />Lv.{foe.level}</small></span>
+        <span className="pet-scene-foe-label"><strong title={foe.name}>{foe.given}</strong><small data-level={rate?.(foe)}><i data-group={foe.individual.group} aria-label={GROUP_LABEL[foe.individual.group]} />Lv.{foe.level}</small></span>
       </button>)}
       {watchingText && !travel && <div className="pet-watching" role="status" title={watchingText}>{watchingText}</div>}
       {busyText && !watchingText && <div className="pet-busy" role="status">{busyText}</div>}

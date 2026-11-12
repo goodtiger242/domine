@@ -605,7 +605,6 @@
 .pet-scene-foe-label { position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%); width: 100%; padding: 1px 3px; border-radius: 7px; background: #13251ee0; color: white; font-size: 13px; line-height: 15px; }
 .pet-scene-foe-label strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 600; }
 .pet-scene-foe-label small { font-size: 13px; }
-.pet-scene-foe-label [data-danger=true] { color: #ff9a91; }
 .pet-scene-foe-label i { display: inline-block; width: 6px; height: 6px; margin-right: 3px; border-radius: 50%; background: #ecd36b; }
 .pet-scene-foe-label i[data-group=rush] { background: #f49478; }
 .pet-scene-foe-label i[data-group=trick] { background: #c7a6fc; }
@@ -1113,3 +1112,27 @@
 @media (max-width: 374px) {
   .pet-title-row h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
+
+/* [difficulty] four simple levels: easy green, normal white, hard orange, deadly red */
+:root { --diff-easy: #3fb56f; --diff-normal: #ffffff; --diff-hard: #f59a2b; --diff-deadly: #e5483f; }
+.pet-scene-foe-label [data-level=easy] { color: #7be8a6; font-weight: 800; }
+.pet-scene-foe-label [data-level=normal] { color: #fff; }
+.pet-scene-foe-label [data-level=hard] { color: #ffb45a; font-weight: 800; }
+.pet-scene-foe-label [data-level=deadly] { color: #ff6f66; font-weight: 800; }
+.pet-diff { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 9px; border: 1px solid #0003; font-size: 11px; font-weight: 800; line-height: 17px; color: #fff; vertical-align: 1px; }
+.pet-diff[data-level=easy] { background: var(--diff-easy); }
+.pet-diff[data-level=normal] { background: var(--diff-normal); color: #2a2a2a; border-color: #0004; }
+.pet-diff[data-level=hard] { background: var(--diff-hard); color: #2b1a00; }
+.pet-diff[data-level=deadly] { background: var(--diff-deadly); }
+.pet-world-animals > span { display: flex; gap: 2px; }
+.pet-world-grid .pet-world-animals small { position: static; white-space: nowrap; font-size: 10px; line-height: 11px; color: #4a1010; }
+.pet-world-animals b, .pet-world-legend b { display: inline-block; flex: 0 0 auto; width: 9px; height: 9px; margin: 0; border-radius: 50%; background: #8a8a8a; box-shadow: 0 0 0 1px #000b; }
+.pet-world-animals b[data-level=easy], .pet-world-legend b[data-level=easy] { background: var(--diff-easy); }
+.pet-world-animals b[data-level=normal], .pet-world-legend b[data-level=normal] { background: var(--diff-normal); }
+.pet-world-animals b[data-level=hard], .pet-world-legend b[data-level=hard] { background: var(--diff-hard); }
+.pet-world-animals b[data-level=deadly], .pet-world-legend b[data-level=deadly] { background: var(--diff-deadly); }
+.pet-world-grid button[data-fair=true] { box-shadow: inset 0 0 0 2px #2fbf6c, inset 0 0 6px 1px #2fbf6c99; }
+.pet-world-grid button[data-selected=true][data-fair=true] { box-shadow: inset 0 0 0 2px #986c15, inset 0 0 0 4px #2fbf6c; }
+.pet-world-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 8px; padding: 0; list-style: none; font-size: 12px; }
+.pet-world-legend li { display: inline-flex; align-items: center; gap: 4px; }
+.pet-world-legend b[data-frame=true] { width: 12px; height: 12px; border-radius: 3px; background: transparent; box-shadow: inset 0 0 0 2px #2fbf6c, 0 0 0 1px #0003; }
