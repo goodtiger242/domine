@@ -1,4 +1,6 @@
 begin;
+set local lock_timeout = '10s';
+set local statement_timeout = '90s';
 
 -- v21: bounded opponents, read-only polling, recovery epoch and battle achievements.
 -- No rows are deleted; existing FK parents precede writes (player, pool, pet, ticket).

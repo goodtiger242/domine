@@ -1,4 +1,6 @@
 begin;
+set local lock_timeout = '10s';
+set local statement_timeout = '90s';
 
 -- Items: include active reservations in the purchase cap; return authoritative wallet snapshots.
 create or replace function public.domine_pet_king_v17(
