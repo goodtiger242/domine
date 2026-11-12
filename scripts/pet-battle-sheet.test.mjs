@@ -401,7 +401,8 @@ test("장착 기술·결정기·기본 행동, 정보 버튼과 길게 누름은
   const h = mount(t, { encounter: e, petId: 1, stage: "adult", onClose() {} }, state);
   h.settle(); h.click("기술"); assert.equal(h.actions().length, 5);
   assert.equal(h.actions().some(b => text(b).includes("코끝 집중")), false);
-  h.button("앞발 밀기").props.onPointerEnter({ pointerType: "mouse" }); h.advance(500); assert.match(text(h.tree), /명중.*예상 피해/);
+  h.button("앞발 밀기").props.onPointerEnter({ pointerType: "mouse" }); h.advance(1500); assert.doesNotMatch(text(h.tree), /예상 피해/, "마우스를 올려 두기만 해서는 상세가 열리지 않는다");
+  h.button("앞발 밀기").props.onPointerDown({ isPrimary: true, button: 0 }); h.advance(500); assert.match(text(h.tree), /명중.*예상 피해/);
   h.click("상세 닫기");
   let push = h.button("가볍게 밀기");
   push.props.onKeyDown({ key: " ", repeat: false }); h.advance(500);
@@ -580,7 +581,7 @@ test("충전 해방은 기력 비용 0, 부족 표시 없음", t => {
   const card = nodes(h.tree, n => n.props.className === "pet-battle-card" && text(n).includes("웅크려 큰걸음"))[0];
   assert.match(text(card), /⚡0/); assert.equal(card.props["data-insufficient"], false);
   assert.equal(h.button("웅크려 큰걸음").props["aria-disabled"], false);
-  h.button("웅크려 큰걸음").props.onPointerEnter({ pointerType: "mouse" }); h.advance(500); assert.match(text(h.tree), /충전 완료/); h.click("상세 닫기"); h.unmount();
+  h.button("웅크려 큰걸음").props.onPointerDown({ isPrimary: true, button: 0 }); h.advance(500); assert.match(text(h.tree), /충전 완료/); h.click("상세 닫기"); h.unmount();
 });
 
 test("기세 100에서 결정기 활성, 사용하면 컷인과 금색 게이지 소비", t => {
