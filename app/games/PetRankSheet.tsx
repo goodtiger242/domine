@@ -35,7 +35,7 @@ export default function PetRankSheet({ load, petId, nickname, onClose }: {
         {rows.map((row, index) => <li key={row.nickname} data-me={row.nickname === nickname}>
           <span className="pet-rank-place" aria-label={`${place[index]}위`}>{MEDAL[place[index] - 1] ?? place[index]}</span>
           <span className="pet-rank-name">{row.nickname}{row.nickname === nickname && <small>나</small>}</span>
-          <span className="pet-rank-level"><b>Lv.{row.level}</b><small>{row.xp.toLocaleString("ko-KR")} XP</small></span>
+          <b>Lv.{row.level}</b>
         </li>)}
       </ol>}
       <p className="pet-rank-foot">레벨이 같으면 경험치가 많은 쪽이 위예요. Lv.2부터 순위에 올라요.</p>
